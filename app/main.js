@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=9922290";
+import { AXES, Shindan, loadData } from "./shindan.js?v=e25784a";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=9922290"), getJSON("../data/rarity.json?v=9922290")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=e25784a"), getJSON("../data/rarity.json?v=e25784a")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -40,6 +40,56 @@ if (!store.get("price")) store.set("price", [300, 480, 680][Math.floor(Math.rand
 // ?notrack=1 で開くと、この端末からの計測を止める（自分たちのアクセスを数えない）
 if (new URLSearchParams(location.search).get("notrack") === "1") { try { localStorage.setItem("umami.disabled", "1"); } catch {} }
 const RETURNING = !!store.get("visited");
+// この端末の招待トークン（ログイン前でも仮に持てる。ログイン後は cloud.ensureInvite で uid と結びつける）
+function inviteToken() {
+  let t = store.get("inviteToken");
+  if (!t) { t = Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); store.set("inviteToken", t); }
+  return t;
+}
+// ログインボタンの見出し文（場所ごとに少し変える）
+function accountBanner(place) {
+  if (store.get("cloudUid")) return "";
+  const msg = { zukan: "ログインすると、図鑑をずっと保存できます", result: "この偉人をずっと図鑑に残すなら",
+    me: "ログインすると、図鑑を保存でき、友達を招待できます" }[place] || "ログインすると、もっと楽しくなります";
+  return `<div class="login-banner"><p>🔑 ${esc(msg)}</p><button class="btn sub" data-login>Googleでログイン</button></div>`;
+}
+async function doLogin() {
+  try {
+    const cloud = await import("./cloud.js");
+    if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); return; }
+    const user = await cloud.signIn();
+    store.set("cloudUid", user.uid); store.set("cloudName", user.name || "");
+    // クラウドの図鑑と、この端末の図鑑を足し合わせる（上書きしない）
+    const cloudProfile = await cloud.pullProfile(user.uid).catch(() => null);
+    const isNewUser = !cloudProfile;
+    const merged = { ...(cloudProfile?.zukan || {}), ...store.get("zukan", {}) };
+    store.set("zukan", merged);
+    const token = inviteToken();
+    // uid・email・displayName・photoURL は毎回のログインで最新化。createdAt は初回だけ書く（merge:true なので既存値は消えない）
+    const patch = { uid: user.uid, displayName: user.name || "", email: user.email || "", photoURL: user.photo || "",
+      zukan: merged, inviteToken: token, diagCount: store.get("diagCount", 0), lastLoginAt: Date.now() };
+    if (isNewUser) patch.createdAt = Date.now();
+    await cloud.pushProfile(user.uid, patch);
+    await cloud.ensureInvite(user.uid, token);
+    toast("ログインしました");
+    route();
+  } catch (e) {
+    const msg = String(e);
+    let t = "ログインできませんでした";
+    if (msg.includes("not_configured")) t = "ログイン機能は準備中です";
+    else if (msg.includes("unauthorized-domain")) t = "このサイトのドメインがFirebaseに未登録です（運営者向け：承認済みドメインを確認）";
+    else if (msg.includes("popup-closed-by-user") || msg.includes("cancelled-popup-request")) t = "ログインがキャンセルされました";
+    else if (msg.includes("popup-blocked")) t = "ポップアップがブロックされました。設定を確認してください";
+    toast(t);
+    console.error("[login]", e);
+  }
+}
+async function doLogout() {
+  try { const cloud = await import("./cloud.js"); await cloud.signOutUser(); } catch {}
+  store.del("cloudUid"); store.del("cloudName");
+  toast("ログアウトしました（この端末の記録は残ります）");
+  route();
+}
 let currentMode = "none", nextSrc = null;
 const ctaSeen = new Set();
 const pending = [];
@@ -174,7 +224,7 @@ function renderTop() {
     <div class="teaser" aria-live="polite"></div>
     <div class="type-strip" aria-hidden="true">${SD.types.map((t) => `<i style="background:${THEMES[t.id].bg2}"></i>`).join("")}</div>
     <p class="note">${LOCKED.length ? `無料で出会えるのは${FREE.length}人。ほか${LOCKED.length}人はシルエットで待機中。` : `${FREE.length}人すべてに、無料で出会えます。`}<br>逸話には伝承や諸説あるものを含みます。</p>
-    <p class="note"><a href="#/me">マイページ</a>　・　<a href="#/about">このサイトについて</a></p>`;
+    <p class="note"><a href="#/how">使い方</a>　・　<a href="#/me">マイページ</a>　・　<a href="#/about">このサイトについて</a></p>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => (a.onclick = () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   disposeGuide = mountGuide($("#guide"));
   window.scrollTo(0, 0);
@@ -416,6 +466,14 @@ function renderResult(mode, code) {
   }
   // 図鑑：自分でこの端末で診断した結果だけ DISCOVERED。リンクから保存した結果（via:"link"）は KNOWN のまま
   meet(f.id, !fresh && mine?.via === "link" ? "friend" : "me");
+  if (fresh) {
+    store.set("diagCount", store.get("diagCount", 0) + 1);
+    const uid = store.get("cloudUid");
+    if (uid) import("./cloud.js").then((cloud) => cloud.pushProfile(uid, { zukan: store.get("zukan", {}), diagCount: store.get("diagCount", 0) })).catch(() => {});
+    // 招待リンクから来た診断なら、招待もとへ結果を1件記録する（友達自身の匿名の結果として。中身の回答は送らない）
+    const from = store.get("inviteFrom");
+    if (from) { store.del("inviteFrom"); import("./cloud.js").then((cloud) => cloud.recordInviteResponse(from, { mode, fig: f.id })).catch(() => {}); }
+  }
   const fate = fateOf(f.id);
   const ms = r.matchups;
   const strongId = ms.strong.find((id) => id !== fate?.other), weakId = ms.weak.find((id) => id !== fate?.other);
@@ -499,7 +557,8 @@ function renderResult(mode, code) {
     ${otherHtml}
     <section class="card"><h2>図鑑</h2>
       <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人を発見</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
-      <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a></section>
+      <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a>
+      ${accountBanner("result")}</section>
     <section class="card premium" data-view="premium_cta_view"><h2>本格診断でわかること（準備中）</h2>
       ${lockedTwo.length ? `<div class="locks">${lockedTwo.map((id) => `<img class="tile" src="${avatar(id, true)}" alt="鍵つきの偉人" style="${themeVars(r.type.id)}">`).join("")}</div>` : ""}
       <ul><li>30問で、もっとくわしく</li><li>あなたの偉人スペクトラム（上位3人の割合）</li><li>100人全員との相性</li><li>あなたの第2の系統</li></ul>
@@ -739,6 +798,7 @@ function renderZukan() {
   app.innerHTML = `
     <div class="zhead"><h1>偉人図鑑</h1><span class="cnt">発見 <b>${zukanCount()}</b> / ${FREE.length}${LOCKED.length ? `（＋鍵つき ${LOCKED.length}）` : ""}</span></div>
     <p class="note" style="text-align:left">自分の診断（通常・恋愛）の結果に出た偉人が「発見」として登録されます。相性や友達の結果で名前を見かけた偉人は🔒のまま（${knownCount()}人）。</p>
+    ${accountBanner("zukan")}
     ${SD.types.map((t) => `<div class="zrow"><h2><i style="background:${THEMES[t.id].accent}"></i>${esc(t.name)}</h2>
       <div class="zcells">${t.figures.map((f, k) => {
         const st = k > MAX_TIER ? "locked" : z[f.id] ? (z[f.id].src === "me" ? "me" : "known") : "unseen";
@@ -769,6 +829,21 @@ function renderZukan() {
 const sd_type = (id) => SD.type(fig(id).type);
 
 // ---------------- マイページ（#/me）：この端末の保存データを読むだけ。新しい保存はしない ----------------
+function accountCard() {
+  const uid = store.get("cloudUid"), name = store.get("cloudName");
+  if (!uid) return `<section class="card login-card">
+      <h2 style="margin-top:0">ログインして図鑑を育てよう</h2>
+      <p class="note" style="text-align:left;margin:0 0 12px">Googleでログインすると、出会った偉人の図鑑を保存できます。友達を診断に招待して、届いた分だけ偉人を集めることもできます。ログインしなくても、診断・結果閲覧・シェアはこれまでどおり自由に使えます。</p>
+      <button class="btn start" data-login>🔑 Googleでログイン</button></section>`;
+  const token = inviteToken(), inviteUrl = `${location.origin}${location.pathname}#/invite/${token}`;
+  return `<section class="card login-card on">
+      <h2 style="margin-top:0">👤 ${esc(name || "ログイン中")}</h2>
+      <p class="note" style="text-align:left;margin:0 0 14px">図鑑はこの端末とクラウドの両方に保存されます。</p>
+      <p class="note" style="text-align:left;margin:0 0 6px;font-weight:800;color:var(--ink)">友達を招待するリンク</p>
+      <div class="invite-url"><input readonly value="${esc(inviteUrl)}" onclick="this.select()"><button class="btn sub" data-copy-invite="${esc(inviteUrl)}">コピー</button></div>
+      <p class="note" style="text-align:left;margin:8px 0 0" id="invite-count">友達がこのリンクから診断すると、ここに数が出ます</p>
+      <button class="btn sub" data-logout style="margin-top:16px">ログアウト</button></section>`;
+}
 function renderMe() {
   document.title = "マイページ｜世界の偉人性格診断";
   app.style.cssText = "";
@@ -794,7 +869,8 @@ function renderMe() {
   const friends = store.get("friends", []).filter((x) => ok(x.mode, x));
   app.innerHTML = `
     <div class="zhead"><h1>マイページ</h1></div>
-    <section class="card"><h2>自分の結果</h2><div class="me-list">${mineHtml}</div></section>
+    ${accountCard()}
+    <section class="card"><h2>自分の結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
     <section class="card"><h2>図鑑</h2>
       <p style="margin:0 0 10px">発見 <b>${zukanCount()}</b> / ${FREE.length}人　・　名前だけ知っている 🔒 <b>${knownCount()}</b>人</p>
       <a class="btn sub" href="#/zukan">図鑑を見る</a></section>
@@ -805,12 +881,53 @@ function renderMe() {
     <section class="card"><h2>保存について</h2>
       <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています（アカウントはありません）。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
       <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a></section>
+    <a class="btn sub" href="#/how">このサイトの使い方</a>
     <a class="btn sub" href="#/">トップへ</a>`;
+  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  window.scrollTo(0, 0);
+  const uid = store.get("cloudUid");
+  if (uid) import("./cloud.js").then((cloud) => cloud.countInviteResponses(inviteToken())).then((n) => {
+    const el = $("#invite-count"); if (el && n) el.textContent = `友達が ${n} 件、このリンクから診断しました`;
+  }).catch(() => {});
+}
+
+// このサイトについて（文案：docs/about-draft.md、根拠：docs/legal-check.md）
+// ---------------- 使い方（#/how） ----------------
+function renderHow() {
+  document.title = "使い方｜世界の偉人性格診断";
+  app.style.cssText = "";
+  const steps = [
+    ["①", "性格診断をする", "12問・約1分半。登録なしですぐ始められます。"],
+    ["②", "似た偉人と出会う", "6つの軸から、あなたに近い偉人が1人わかります。"],
+    ["③", "偉人を図鑑に集める", "相性・もしもの分岐などで名前を知り、診断で出会うと図鑑に「発見」として残ります。"],
+    ["④", "友達にも診断してもらう", "結果はリンクでシェアでき、招待リンクからも友達を誘えます。"],
+    ["⑤", "いろんな角度から自分を知る", "性格版・恋愛版、友達との相性もあわせて楽しめます。"],
+  ];
+  app.innerHTML = `
+    <div class="zhead"><h1>このサイトの使い方</h1></div>
+    <div class="how-steps">${steps.map(([n, t, d]) => `<section class="card how-step"><div class="how-n">${n}</div>
+        <div><h2 style="margin:0 0 4px">${esc(t)}</h2><p class="note" style="text-align:left;margin:0">${esc(d)}</p></div></section>`).join("")}</div>
+    <a class="btn start" data-fresh="normal" data-src="how" href="#/q/normal">診断スタート</a>
+    <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   window.scrollTo(0, 0);
 }
 
-// このサイトについて（文案：docs/about-draft.md、根拠：docs/legal-check.md）
+// ---------------- 招待リンクのランディング（#/invite/<token>） ----------------
+function renderInvite(token) {
+  document.title = "診断に招待されました｜世界の偉人性格診断";
+  app.style.cssText = "";
+  store.set("inviteFrom", token);
+  app.innerHTML = `
+    <section class="card invite-land">
+      <h1 style="margin-top:0">診断に招待されました</h1>
+      <p>12問に答えると、あなたに似た偉人と出会えます。結果は、このリンクを送ってくれた人にも「診断してくれた人がいます」という形で届きます（あなたの回答の中身が伝わることはありません）。</p>
+      <a class="btn start" data-fresh="normal" data-src="invite" href="#/q/normal">診断してみる（12問・約1分半）</a>
+      <a class="btn sub" style="margin-top:10px" href="#/how">使い方を見る</a></section>`;
+  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress.normal"); quiz = null; }));
+  window.scrollTo(0, 0);
+}
+
 function renderAbout() {
   document.title = "このサイトについて｜世界の偉人性格診断";
   app.style.cssText = "";
@@ -888,6 +1005,11 @@ function renderFigure(mode, id) {
 // ---------------- ルーティング ----------------
 let visitSent = false;
 app.addEventListener("click", (e) => { const el = e.target.closest("[data-src]"); if (el) nextSrc = el.dataset.src; }, true);
+app.addEventListener("click", (e) => {
+  if (e.target.closest("[data-login]")) doLogin();
+  else if (e.target.closest("[data-logout]")) doLogout();
+  else { const c = e.target.closest("[data-copy-invite]"); if (c) { navigator.clipboard?.writeText(c.dataset.copyInvite).then(() => toast("リンクをコピーしました")).catch(() => toast("コピーできませんでした")); } }
+});
 function route() {
   disposeGuide();
   disposeGuide = () => {};
@@ -909,6 +1031,8 @@ function route() {
   if (page === "r" && engines[mode] && code) return renderResult(mode, code);
   if (page === "zukan") return renderZukan();
   if (page === "me") return renderMe();
+  if (page === "how") return renderHow();
+  if (page === "invite" && mode) return renderInvite(mode);
   if (page === "about") return renderAbout();
   if (page === "f" && engines[mode] && SD.figures[code] && isFree(code)) return renderFigure(mode, code);
   quiz = null;

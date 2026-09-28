@@ -316,3 +316,18 @@ details p { font-size: 14px; margin: 8px 0; }
 .me-row .nm { display: block; font-family: var(--serif); font-weight: 900; font-size: 17px; line-height: 1.3; }
 .me-row .go { font-size: 22px; color: var(--ink-soft); }
 .me-empty { font-size: 14px; color: var(--ink-soft); padding: 6px 2px; }
+
+/* ログイン導線・マイページのアカウント欄・招待リンク */
+.login-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  background: var(--kin-soft, #fbeed6); border: 1px dashed var(--kin); border-radius: var(--r-md); padding: 10px 12px; margin-top: 10px; }
+.login-banner p { margin: 0; font-size: 13px; font-weight: 800; }
+.login-banner .btn { width: auto; min-height: 36px; padding: 8px 14px; font-size: 13px; }
+.login-card.on { background: var(--kin-soft, #fbeed6); }
+.invite-url { display: flex; gap: 8px; }
+.invite-url input { flex: 1; min-width: 0; padding: 10px 12px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: 13px; }
+.invite-url .btn { width: auto; min-height: 40px; padding: 8px 14px; }
+/* 使い方ページ */
+.how-steps { display: grid; gap: 10px; margin: 12px 0; }
+.how-step { display: flex; gap: 14px; align-items: flex-start; }
+.how-n { font-family: var(--serif); font-weight: 900; font-size: 26px; color: var(--kin); flex: none; line-height: 1; }
+.invite-land p { line-height: 1.7; }

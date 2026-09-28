@@ -1,0 +1,12 @@
+{
+  "_note": "Googleログイン機能（app/cloud.js）が使う設定。Firebase の Web 用config はクライアントに公開してよい値（秘密鍵ではない）なので、このままコミットしてよい。実際のアクセス制限は Firestore のセキュリティルール（docs/firebase-setup.md）が行う。プロジェクト：ijin-shindan（2026-09-29、ユーザーが作成済み）。",
+  "enabled": true,
+  "config": {
+    "apiKey": "AIzaSyAXldnL3d63yPK_FM3BKHqYlCHfDJkAS2I",
+    "authDomain": "ijin-shindan.firebaseapp.com",
+    "projectId": "ijin-shindan",
+    "storageBucket": "ijin-shindan.firebasestorage.app",
+    "messagingSenderId": "940114863487",
+    "appId": "1:940114863487:web:81f2a2d393df0f4539e64a"
+  }
+}
