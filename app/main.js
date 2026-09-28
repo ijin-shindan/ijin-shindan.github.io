@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=7542fb8";
+import { AXES, Shindan, loadData } from "./shindan.js?v=59ce973";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=7542fb8"), getJSON("../data/rarity.json?v=7542fb8")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=59ce973"), getJSON("../data/rarity.json?v=59ce973")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -492,10 +492,21 @@ function resultCard(r, mode, who, reveal) {
   </section>`;
 }
 
+// 外部（SNS・メッセージアプリ）へ渡す共有URLに付ける目印。
+// LINEはこのパラメータ付きリンクをタップすると外部ブラウザ（Safari等）へ出し、
+// X・Instagramはそのままアプリ内ブラウザで開く（実機で確認済み）。既存のquery/hashは壊さない。
+function withExternalBrowserParam(url) {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("openExternalBrowser", "1");
+    return u.href;
+  } catch { return url; }
+}
 function shareUrl(mode, id, code) {
   // SNS のカード画像を偉人ごとに出すため、静的ページ s/<mode>/<id>.html を経由させる
   // 形は固定：s/<mode>/<id>.html?c=<版>.<回答>。公開後は変えない（README 参照）
-  return new URL(`s/${mode}/${id}.html?c=${encodeURIComponent(code)}`, location.href.split("#")[0]).href;
+  const url = new URL(`s/${mode}/${id}.html?c=${encodeURIComponent(code)}`, location.href.split("#")[0]).href;
+  return withExternalBrowserParam(url);
 }
 function shareText(r, mode, fate) {
   const f = r.figure, pct = rare(f.id, mode);
@@ -928,7 +939,7 @@ function zukanSummaryCard() {
 function inviteCard() {
   const uid = store.get("cloudUid");
   if (!uid) return "";
-  const token = inviteToken(), inviteUrl = `${location.origin}${location.pathname}#/invite/${token}`;
+  const token = inviteToken(), inviteUrl = withExternalBrowserParam(`${location.origin}${location.pathname}#/invite/${token}`);
   return `<section class="card invite-card">
       <h2 style="margin:0 0 6px">友達にも診断してもらおう</h2>
       <p class="note" style="text-align:left;margin:0 0 14px">リンクを送ると、友達が12問に答えて偉人と出会えます。診断してくれた人数が、ここに届きます。</p>
