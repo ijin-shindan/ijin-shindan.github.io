@@ -1,0 +1,26 @@
+/* Full-body stage and quiet editorial styling. */
+.rcard {background:var(--card); border-radius:12px; box-shadow:0 8px 28px #28221a08; border:1px solid var(--line); padding-top:24px;}
+.rcard .stage {width:min(100%,320px);aspect-ratio:320/440;border-radius:3px;background:#f5f2eb;box-shadow:none;}
+.rcard .stage .avatar {object-fit:contain;}
+.rig-art {position:absolute;inset:0;width:100%;height:100%;display:block;}
+.rig-impact {position:absolute;inset:0;pointer-events:none;opacity:0;background:repeating-conic-gradient(from 8deg at 50% 29%,#514d4260 0deg 1deg,transparent 1deg 15deg);mask-image:radial-gradient(ellipse at 50% 29%,transparent 27%,#000 77%);}
+.rig-impact.active {opacity:.8;}
+.rig-controls {max-width:360px;margin:14px auto 6px;text-align:center;}
+.rig-buttons {display:flex;justify-content:center;flex-wrap:wrap;gap:5px;}
+.rig-buttons button {font:600 12px/1.4 var(--sans);min-height:40px;padding:7px 12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;box-shadow:none;cursor:pointer;}
+.rig-buttons button:hover:not(:disabled) {border-color:var(--kin);background:var(--paper);}
+.rig-buttons button:disabled {opacity:.35;cursor:default;}
+.rig-buttons button:focus-visible,.rig-reduce input:focus-visible {outline:2px solid var(--shu);outline-offset:3px;}
+.rig-reduce {display:block;margin-top:9px;font-size:11px;color:var(--ink-soft);}
+.rig-reduce input {accent-color:var(--ink);vertical-align:middle;}
+.rig-status {font-size:10px;line-height:1.5;color:var(--ink-soft);min-height:30px;margin:5px 0 0;}
+.rcard .fig-name {margin-top:10px;letter-spacing:.06em;}
+.rcard .anata {font-size:12px;letter-spacing:.12em;}
+.rcard .serif-quote {padding:15px 8px 0;border-top:1px solid var(--line);margin:18px 20px 12px;}
+.tile {border-radius:8px;box-shadow:none;}
+@media(max-width:400px) {.rcard .stage{width:min(100%,280px)}.rig-buttons button{padding:7px 10px}}
+
+/* Keep the new full-body proportions in existing square thumbnails. */
+img.tile,.tile img,.next-tile img,.teaser img,.again img,.zukan img {object-fit:contain;background:#f5f2eb;}
+
+img[src*="avatars/full/"] {object-fit:contain;}

@@ -1,0 +1,10 @@
+# 共有ページ（結果のリンク）は検索させない
+User-agent: *
+Disallow: /app/s/
+
+# SNS のリンクカード（OGP）の取得は許可する
+User-agent: Twitterbot
+User-agent: facebookexternalhit
+User-agent: Slackbot
+User-agent: Discordbot
+Allow: /

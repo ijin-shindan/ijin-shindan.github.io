@@ -1,0 +1,52 @@
+{
+  "_note": "無料版（かんたん診断）と有料版（本格診断）の違い。数値の根拠は docs/design.md の『8. 無料版と有料版』。",
+  "tier_lv": [
+    1,
+    20,
+    40,
+    60,
+    80,
+    99
+  ],
+  "plans": {
+    "free": {
+      "name": "かんたん診断",
+      "questions": "free",
+      "lv_cap": 99,
+      "max_tier": 4,
+      "matchups": 1,
+      "show_sub_type": false,
+      "show_levelup": true,
+      "locked_figure_display": "silhouette",
+      "_locked_note": "2026-09-28 公開前に鍵つき40人を無料化（ユーザー決定）。無料で100人すべてに出会える。locked_figure_display は将来の追加人物用に残す"
+    },
+    "full": {
+      "name": "本格診断",
+      "questions": "all",
+      "lv_cap": 99,
+      "max_tier": 4,
+      "matchups": 3,
+      "show_sub_type": true,
+      "show_levelup": true,
+      "price_jpy": 480
+    }
+  },
+  "modes": {
+    "normal": {
+      "name": "偉人性格診断",
+      "questions_file": "questions.json",
+      "matchup_labels": {
+        "strong": "強い相手",
+        "weak": "弱い相手"
+      }
+    },
+    "love": {
+      "name": "偉人恋愛診断",
+      "questions_file": "questions_love.json",
+      "matchup_labels": {
+        "strong": "主導権を握れる相手",
+        "weak": "振り回される相手"
+      }
+    }
+  }
+}

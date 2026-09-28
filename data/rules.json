@@ -1,0 +1,202 @@
+{
+  "_note": "判定・レベル・相性のパラメータ。数値は scripts/simulate.py の結果で調整する（本番データが集まったら再調整）。",
+  "battle": {
+    "_note": "相克行列 M（反対称）。M[i][j]=+1 は『i軸が高い人は j軸が高い人に強い』。バトル値 = aᵀ M b。反対称なので A→B と B→A は必ず逆符号、同じ向きの二人は引き分け。",
+    "axes": [
+      "O",
+      "C",
+      "E",
+      "A",
+      "G",
+      "M"
+    ],
+    "cycles": [
+      {
+        "name": "知勇の三すくみ",
+        "order": [
+          "O",
+          "C",
+          "G"
+        ],
+        "text": [
+          "発想は常識（規律）を覆す",
+          "緻密な計略は蛮勇（胆力）を封じる",
+          "動じない肝は思いつき（好奇）に振り回されない"
+        ]
+      },
+      {
+        "name": "人心の三すくみ",
+        "order": [
+          "M",
+          "A",
+          "E"
+        ],
+        "text": [
+          "野心は情け（協調）を踏み越える",
+          "誠実さは口先（社交）を見抜く",
+          "人望（社交）は独りよがりの野心を孤立させる"
+        ]
+      }
+    ],
+    "same_type_rule": "同じ系統どうしは Lv の高いほうが勝ち（ただし overrides が優先）",
+    "overrides": [
+      {
+        "winner": "akechi-mitsuhide",
+        "loser": "oda-nobunaga",
+        "label": "下剋上",
+        "text": "本能寺の変。性格の相性を超えた一撃"
+      },
+      {
+        "winner": "tokugawa-ieyasu",
+        "loser": "toyotomi-hideyoshi",
+        "label": "小牧・長久手",
+        "text": "戦では家康、政治では秀吉。ここは戦で"
+      },
+      {
+        "winner": "tesla",
+        "loser": "edison",
+        "label": "電流戦争",
+        "text": "交流 vs 直流。長い目で見れば交流が勝った"
+      },
+      {
+        "winner": "hojo-ujiyasu",
+        "loser": "uesugi-kenshin",
+        "label": "小田原籠城",
+        "text": "謙信の大軍に小田原城を囲まれても、城にこもってしのぎきった"
+      },
+      {
+        "winner": "murasaki-shikibu",
+        "loser": "sei-shonagon",
+        "label": "日記でばっさり",
+        "text": "会ったこともないのに、日記で「得意顔でとんでもない人」と書かれた"
+      }
+    ]
+  },
+  "calib": {
+    "_note": "scripts/calibrate.py が自動で書き換える。手で編集しない。",
+    "free": {
+      "norm_threshold": 0.829,
+      "type_bias": {
+        "haou": 0.144,
+        "hitotarashi": 0.023,
+        "gunshi": 0.053,
+        "moushou": 0.002,
+        "gi": -0.117,
+        "tetsu": -0.067,
+        "nintai": -0.13,
+        "jiai": -0.16,
+        "jinbou": -0.046,
+        "fuunji": 0.138,
+        "kabuki": 0.017,
+        "kokou": 0.044,
+        "tankyu": -0.019,
+        "kaitaku": 0.036,
+        "sensai": -0.094,
+        "jounetsu": 0.096,
+        "miyabi": -0.051,
+        "kansatsu": 0.006,
+        "suberu": 0.058
+      },
+      "breaks": [
+        0.693,
+        0.904,
+        1.091,
+        1.309,
+        1.581
+      ]
+    },
+    "full": {
+      "norm_threshold": 0.735,
+      "type_bias": {
+        "haou": 0.156,
+        "hitotarashi": 0.031,
+        "gunshi": 0.049,
+        "moushou": 0.023,
+        "gi": -0.132,
+        "tetsu": -0.06,
+        "nintai": -0.145,
+        "jiai": -0.164,
+        "jinbou": -0.049,
+        "fuunji": 0.154,
+        "kabuki": 0.029,
+        "kokou": 0.042,
+        "tankyu": -0.031,
+        "kaitaku": 0.034,
+        "sensai": -0.095,
+        "jounetsu": 0.101,
+        "miyabi": -0.037,
+        "kansatsu": -0.005,
+        "suberu": 0.061
+      },
+      "breaks": [
+        0.636,
+        0.823,
+        0.994,
+        1.198,
+        1.443
+      ]
+    },
+    "love-free": {
+      "norm_threshold": 0.829,
+      "type_bias": {
+        "haou": 0.151,
+        "hitotarashi": 0.021,
+        "gunshi": 0.036,
+        "moushou": 0.016,
+        "gi": -0.123,
+        "tetsu": -0.063,
+        "nintai": -0.137,
+        "jiai": -0.145,
+        "jinbou": -0.047,
+        "fuunji": 0.132,
+        "kabuki": 0.026,
+        "kokou": 0.041,
+        "tankyu": -0.029,
+        "kaitaku": 0.038,
+        "sensai": -0.108,
+        "jounetsu": 0.097,
+        "miyabi": -0.056,
+        "kansatsu": -0.013,
+        "suberu": 0.057
+      },
+      "breaks": [
+        0.695,
+        0.899,
+        1.093,
+        1.308,
+        1.581
+      ]
+    },
+    "love-full": {
+      "norm_threshold": 0.735,
+      "type_bias": {
+        "haou": 0.167,
+        "hitotarashi": 0.031,
+        "gunshi": 0.041,
+        "moushou": 0.017,
+        "gi": -0.128,
+        "tetsu": -0.055,
+        "nintai": -0.149,
+        "jiai": -0.152,
+        "jinbou": -0.033,
+        "fuunji": 0.142,
+        "kabuki": 0.033,
+        "kokou": 0.047,
+        "tankyu": -0.035,
+        "kaitaku": 0.03,
+        "sensai": -0.103,
+        "jounetsu": 0.102,
+        "miyabi": -0.049,
+        "kansatsu": -0.011,
+        "suberu": 0.059
+      },
+      "breaks": [
+        0.629,
+        0.821,
+        0.997,
+        1.193,
+        1.455
+      ]
+    }
+  }
+}

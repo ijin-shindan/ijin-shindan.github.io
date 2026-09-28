@@ -1,0 +1,252 @@
+{
+  "_note": [
+    "20系統。proto は6軸 [O好奇, C規律, E社交, A協調, G胆力, M野心] の『その系統らしさの方向』（-1〜+1）。",
+    "判定はユーザーの軸ベクトルとの向き（コサイン類似度）がいちばん近い系統。balance系だけは特別で、全軸が中央寄り（ベクトルが短い）の人がここに入る。",
+    "love_name / love_catch は恋愛版での系統の呼び名。figures は tier 1→5 の順。tier は『偉さ』ではなく『その系統の性質の濃さ』。tier 1〜3（60人）が無料版、tier 4〜5（40人）は本格診断で解放。",
+    "years は叩き台。生没年不詳・諸説ありが多いので公開前にファクトチェック必須。",
+    "flags: dictator_risk=独裁者と見られうる / estate=遺族・管理団体が名称や肖像の商用利用を管理 / uncertain=実在・事績に諸説"
+  ],
+  "types": [
+    {
+      "id": "haou", "name": "覇王系", "catch": "常識をぶち壊して天下を獲る",
+      "love_name": "ついてこい系", "love_catch": "迷っている暇があったら、手を引いて走り出す",
+      "proto": [0.6, -0.2, 0.2, -0.8, 0.8, 1.0],
+      "figures": [
+        { "id": "hojo-soun",   "name": "北条早雲",               "years": "1456?-1519", "region": "日本", "gender": "m" },
+        { "id": "saito-dosan", "name": "斎藤道三",               "years": "1494?-1556", "region": "日本", "gender": "m" },
+        { "id": "date-masamune","name": "伊達政宗",              "years": "1567-1636", "region": "日本", "gender": "m" },
+        { "id": "alexander",   "name": "アレクサンドロス大王",   "years": "前356-前323", "region": "マケドニア", "gender": "m" },
+        { "id": "oda-nobunaga","name": "織田信長",               "years": "1534-1582", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "hitotarashi", "name": "人たらし系", "catch": "気づけばみんな味方になっている",
+      "love_name": "口説き上手系", "love_catch": "気づけば、みんなあなたに夢中",
+      "proto": [0.2, -0.3, 1.0, 0.6, 0.3, 0.8],
+      "figures": [
+        { "id": "okuma-shigenobu","name": "大隈重信",            "years": "1838-1922", "region": "日本", "gender": "m" },
+        { "id": "maeda-toshiie", "name": "前田利家",             "years": "1538?-1599", "region": "日本", "gender": "m" },
+        { "id": "dumas",         "name": "アレクサンドル・デュマ","years": "1802-1870", "region": "フランス", "gender": "m" },
+        { "id": "lorenzo-medici","name": "ロレンツォ・デ・メディチ","years": "1449-1492", "region": "イタリア", "gender": "m" },
+        { "id": "toyotomi-hideyoshi","name": "豊臣秀吉",         "years": "1537-1598", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "gunshi", "name": "軍師系", "catch": "盤面の十手先まで読んでいる",
+      "love_name": "恋の策士系", "love_catch": "告白のタイミングまで計算ずみ",
+      "proto": [0.6, 0.8, -0.6, -0.4, 0.2, 0.2],
+      "figures": [
+        { "id": "takenaka-hanbei","name": "竹中半兵衛",          "years": "1544-1579", "region": "日本", "gender": "m" },
+        { "id": "kuroda-kanbei", "name": "黒田官兵衛",           "years": "1546-1604", "region": "日本", "gender": "m" },
+        { "id": "akechi-mitsuhide","name": "明智光秀",           "years": "1528?-1582", "region": "日本", "gender": "m" },
+        { "id": "machiavelli",   "name": "マキャヴェッリ",       "years": "1469-1527", "region": "イタリア", "gender": "m" },
+        { "id": "zhuge-liang",   "name": "諸葛亮",               "years": "181-234", "region": "中国", "gender": "m" }
+      ]
+    },
+    {
+      "id": "moushou", "name": "猛将系", "catch": "考えるより先に体が前に出る",
+      "love_name": "猪突猛進系", "love_catch": "好きになったら、まっすぐ一直線",
+      "proto": [-0.5, -0.4, 0.6, 0.0, 1.0, 0.4],
+      "figures": [
+        { "id": "fukushima-masanori","name": "福島正則",         "years": "1561-1624", "region": "日本", "gender": "m" },
+        { "id": "kato-kiyomasa", "name": "加藤清正",             "years": "1562-1611", "region": "日本", "gender": "m" },
+        { "id": "richard-1",     "name": "リチャード獅子心王",   "years": "1157-1199", "region": "イングランド", "gender": "m" },
+        { "id": "shimazu-yoshihiro","name": "島津義弘",          "years": "1535-1619", "region": "日本", "gender": "m" },
+        { "id": "honda-tadakatsu","name": "本多忠勝",            "years": "1548-1610", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "gi", "name": "義の人系", "catch": "損得より『筋』で動く",
+      "love_name": "一途系", "love_catch": "一度好きになったら、ずっと味方",
+      "proto": [-0.3, 0.6, 0.0, 0.8, 0.7, -0.6],
+      "figures": [
+        { "id": "naoe-kanetsugu","name": "直江兼続",             "years": "1560-1620", "region": "日本", "gender": "m" },
+        { "id": "kusunoki-masashige","name": "楠木正成",         "years": "?-1336", "region": "日本", "gender": "m" },
+        { "id": "tubman",        "name": "ハリエット・タブマン", "years": "1822?-1913", "region": "アメリカ", "gender": "f" },
+        { "id": "uesugi-kenshin","name": "上杉謙信",             "years": "1530-1578", "region": "日本", "gender": "m" },
+        { "id": "sanada-yukimura","name": "真田幸村（信繁）",    "years": "1567-1615", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "tetsu", "name": "鉄の規律系", "catch": "ルールを作り、ルールで勝つ",
+      "love_name": "ちゃんとしたい系", "love_catch": "恋にも、段取りとけじめを",
+      "proto": [-0.4, 1.0, -0.2, -0.7, 0.5, 0.2],
+      "figures": [
+        { "id": "ishida-mitsunari","name": "石田三成",           "years": "1560-1600", "region": "日本", "gender": "m" },
+        { "id": "ii-naomasa",    "name": "井伊直政",             "years": "1561-1602", "region": "日本", "gender": "m" },
+        { "id": "okubo-toshimichi","name": "大久保利通",         "years": "1830-1878", "region": "日本", "gender": "m" },
+        { "id": "bismarck",      "name": "ビスマルク",           "years": "1815-1898", "region": "ドイツ", "gender": "m" },
+        { "id": "hijikata-toshizo","name": "土方歳三",           "years": "1835-1869", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "nintai", "name": "忍耐系", "catch": "待てる者が最後に笑う",
+      "love_name": "待てる系", "love_catch": "返事が来るまで、何年でも",
+      "proto": [-0.5, 0.8, -0.4, 0.3, 0.6, 0.4],
+      "figures": [
+        { "id": "hojo-ujiyasu",  "name": "北条氏康",             "years": "1515-1571", "region": "日本", "gender": "m" },
+        { "id": "mori-motonari", "name": "毛利元就",             "years": "1497-1571", "region": "日本", "gender": "m" },
+        { "id": "ninomiya-sontoku","name": "二宮尊徳",           "years": "1787-1856", "region": "日本", "gender": "m" },
+        { "id": "washington",    "name": "ジョージ・ワシントン", "years": "1732-1799", "region": "アメリカ", "gender": "m" },
+        { "id": "tokugawa-ieyasu","name": "徳川家康",            "years": "1543-1616", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "jiai", "name": "慈愛系", "catch": "目の前の一人を放っておけない",
+      "love_name": "尽くし系", "love_catch": "相手の笑顔が、いちばんのごほうび",
+      "proto": [0.2, 0.4, 0.3, 1.0, -0.2, -0.7],
+      "figures": [
+        { "id": "ogata-koan",    "name": "緒方洪庵",             "years": "1810-1863", "region": "日本", "gender": "m" },
+        { "id": "tsuda-umeko",   "name": "津田梅子",             "years": "1864-1929", "region": "日本", "gender": "f" },
+        { "id": "dunant",        "name": "アンリ・デュナン",     "years": "1828-1910", "region": "スイス", "gender": "m" },
+        { "id": "helen-keller",  "name": "ヘレン・ケラー",       "years": "1880-1968", "region": "アメリカ", "gender": "f" },
+        { "id": "nightingale",   "name": "ナイチンゲール",       "years": "1820-1910", "region": "イギリス", "gender": "f" }
+      ]
+    },
+    {
+      "id": "jinbou", "name": "人望系", "catch": "この人のためなら、と思わせる",
+      "love_name": "包容力系", "love_catch": "何があっても、まるごと受けとめる",
+      "proto": [-0.2, -0.4, 0.6, 0.8, 0.7, -0.3],
+      "figures": [
+        { "id": "katsu-kaishu",  "name": "勝海舟",               "years": "1823-1899", "region": "日本", "gender": "m" },
+        { "id": "garibaldi",     "name": "ガリバルディ",         "years": "1807-1882", "region": "イタリア", "gender": "m" },
+        { "id": "lincoln",       "name": "リンカーン",           "years": "1809-1865", "region": "アメリカ", "gender": "m" },
+        { "id": "liu-bei",       "name": "劉備",                 "years": "161-223", "region": "中国", "gender": "m" },
+        { "id": "saigo-takamori","name": "西郷隆盛",             "years": "1828-1877", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "fuunji", "name": "風雲児系", "catch": "まだ誰も見ていない景色を見に行く",
+      "love_name": "冒険デート系", "love_catch": "恋も旅も、行き先は決めない",
+      "proto": [0.8, -0.6, 0.5, 0.0, 0.8, 0.4],
+      "figures": [
+        { "id": "yoshida-shoin", "name": "吉田松陰",             "years": "1830-1859", "region": "日本", "gender": "m" },
+        { "id": "takasugi-shinsaku","name": "高杉晋作",          "years": "1839-1867", "region": "日本", "gender": "m" },
+        { "id": "marco-polo",    "name": "マルコ・ポーロ",       "years": "1254-1324", "region": "イタリア", "gender": "m" },
+        { "id": "amundsen",      "name": "アムンセン",           "years": "1872-1928", "region": "ノルウェー", "gender": "m" },
+        { "id": "sakamoto-ryoma","name": "坂本龍馬",             "years": "1836-1867", "region": "日本", "gender": "m" }
+      ]
+    },
+    {
+      "id": "kabuki", "name": "傾奇者系", "catch": "人生はおもしろがったもん勝ち",
+      "love_name": "気まぐれ系", "love_catch": "読めないところが、最大の魅力",
+      "proto": [0.7, -0.9, 0.8, 0.0, 0.3, -0.6],
+      "figures": [
+        { "id": "ikkyu",         "name": "一休宗純",             "years": "1394-1481", "region": "日本", "gender": "m" },
+        { "id": "hiraga-gennai", "name": "平賀源内",             "years": "1728-1780", "region": "日本", "gender": "m" },
+        { "id": "izumo-no-okuni","name": "出雲阿国",             "years": "1572?-?", "region": "日本", "gender": "f", "flags": ["uncertain"] },
+        { "id": "mozart",        "name": "モーツァルト",         "years": "1756-1791", "region": "オーストリア", "gender": "m" },
+        { "id": "maeda-keiji",   "name": "前田慶次",             "years": "?-1612?", "region": "日本", "gender": "m", "flags": ["uncertain"] }
+      ]
+    },
+    {
+      "id": "kokou", "name": "孤高の天才系", "catch": "世界がついてくるのを待たない",
+      "love_name": "ひとりも好き系", "love_catch": "近づきすぎないのが、ちょうどいい距離",
+      "proto": [1.0, -0.2, -0.9, -0.5, 0.0, -0.2],
+      "figures": [
+        { "id": "minakata-kumagusu","name": "南方熊楠",          "years": "1867-1941", "region": "日本", "gender": "m" },
+        { "id": "katsushika-hokusai","name": "葛飾北斎",         "years": "1760-1849", "region": "日本", "gender": "m" },
+        { "id": "tesla",         "name": "ニコラ・テスラ",       "years": "1856-1943", "region": "セルビア/アメリカ", "gender": "m" },
+        { "id": "da-vinci",      "name": "レオナルド・ダ・ヴィンチ","years": "1452-1519", "region": "イタリア", "gender": "m" },
+        { "id": "newton",        "name": "ニュートン",           "years": "1643-1727", "region": "イギリス", "gender": "m" }
+      ]
+    },
+    {
+      "id": "tankyu", "name": "探究者系", "catch": "わかるまで、ずっと続ける",
+      "love_name": "じっくり派系", "love_catch": "知れば知るほど、好きになる",
+      "proto": [0.7, 0.7, -0.6, 0.3, 0.0, -0.6],
+      "figures": [
+        { "id": "fabre",         "name": "ファーブル",           "years": "1823-1915", "region": "フランス", "gender": "m" },
+        { "id": "mendel",        "name": "メンデル",             "years": "1822-1884", "region": "オーストリア", "gender": "m" },
+        { "id": "ino-tadataka",  "name": "伊能忠敬",             "years": "1745-1818", "region": "日本", "gender": "m" },
+        { "id": "darwin",        "name": "ダーウィン",           "years": "1809-1882", "region": "イギリス", "gender": "m" },
+        { "id": "marie-curie",   "name": "マリー・キュリー",     "years": "1867-1934", "region": "ポーランド/フランス", "gender": "f" }
+      ]
+    },
+    {
+      "id": "kaitaku", "name": "開拓実業系", "catch": "アイデアを『仕組み』にして世に出す",
+      "love_name": "未来設計系", "love_catch": "ふたりの将来まで、もう描いている",
+      "proto": [0.7, 0.6, 0.4, 0.0, 0.2, 0.8],
+      "figures": [
+        { "id": "watt",          "name": "ジェームズ・ワット",   "years": "1736-1819", "region": "イギリス", "gender": "m" },
+        { "id": "gutenberg",     "name": "グーテンベルク",       "years": "1400?-1468", "region": "ドイツ", "gender": "m" },
+        { "id": "shibusawa-eiichi","name": "渋沢栄一",           "years": "1840-1931", "region": "日本", "gender": "m" },
+        { "id": "franklin",      "name": "ベンジャミン・フランクリン","years": "1706-1790", "region": "アメリカ", "gender": "m" },
+        { "id": "edison",        "name": "エジソン",             "years": "1847-1931", "region": "アメリカ", "gender": "m" }
+      ]
+    },
+    {
+      "id": "sensai", "name": "繊細な芸術家系", "catch": "世界の美しさにも痛みにも気づいてしまう",
+      "love_name": "感受性ゆたか系", "love_catch": "小さな一言が、ずっと胸に残る",
+      "proto": [0.8, -0.4, -0.5, 0.4, -0.9, -0.3],
+      "figures": [
+        { "id": "takehisa-yumeji","name": "竹久夢二",            "years": "1884-1934", "region": "日本", "gender": "m" },
+        { "id": "higuchi-ichiyo","name": "樋口一葉",             "years": "1872-1896", "region": "日本", "gender": "f" },
+        { "id": "chopin",        "name": "ショパン",             "years": "1810-1849", "region": "ポーランド", "gender": "m" },
+        { "id": "miyazawa-kenji","name": "宮沢賢治",             "years": "1896-1933", "region": "日本", "gender": "m" },
+        { "id": "van-gogh",      "name": "ゴッホ",               "years": "1853-1890", "region": "オランダ", "gender": "m" }
+      ]
+    },
+    {
+      "id": "jounetsu", "name": "情熱の芸術家系", "catch": "爆発させないと気が済まない",
+      "love_name": "燃え上がり系", "love_catch": "恋をすると、全部が全力",
+      "proto": [0.9, -0.6, 0.4, -0.4, -0.3, 0.5],
+      "figures": [
+        { "id": "yosano-akiko",  "name": "与謝野晶子",           "years": "1878-1942", "region": "日本", "gender": "f" },
+        { "id": "rodin",         "name": "ロダン",               "years": "1840-1917", "region": "フランス", "gender": "m" },
+        { "id": "liszt",         "name": "フランツ・リスト",     "years": "1811-1886", "region": "ハンガリー", "gender": "m" },
+        { "id": "michelangelo",  "name": "ミケランジェロ",       "years": "1475-1564", "region": "イタリア", "gender": "m" },
+        { "id": "beethoven",     "name": "ベートーヴェン",       "years": "1770-1827", "region": "ドイツ", "gender": "m" }
+      ]
+    },
+    {
+      "id": "miyabi", "name": "雅（みやび）系", "catch": "センスと言葉で場の空気を変える",
+      "love_name": "言葉で落とす系", "love_catch": "ひと言で、相手の心をつかむ",
+      "proto": [0.4, -0.2, 0.9, 0.2, -0.6, 0.2],
+      "figures": [
+        { "id": "ariwara-narihira","name": "在原業平",           "years": "825-880", "region": "日本", "gender": "m" },
+        { "id": "ono-no-komachi","name": "小野小町",             "years": "生没年不詳", "region": "日本", "gender": "f", "flags": ["uncertain"] },
+        { "id": "izumi-shikibu", "name": "和泉式部",             "years": "978?-?", "region": "日本", "gender": "f" },
+        { "id": "pompadour",     "name": "ポンパドゥール夫人",   "years": "1721-1764", "region": "フランス", "gender": "f" },
+        { "id": "sei-shonagon",  "name": "清少納言",             "years": "966?-1025?", "region": "日本", "gender": "f" }
+      ]
+    },
+    {
+      "id": "kansatsu", "name": "観察者系", "catch": "黙って見ている。全部見ている",
+      "love_name": "見守り系", "love_catch": "気持ちには、誰より先に気づいている",
+      "proto": [0.6, 0.4, -0.8, 0.0, -0.3, -0.4],
+      "figures": [
+        { "id": "yoshida-kenko", "name": "吉田兼好",             "years": "1283?-1352?", "region": "日本", "gender": "m" },
+        { "id": "natsume-soseki","name": "夏目漱石",             "years": "1867-1916", "region": "日本", "gender": "m" },
+        { "id": "austen",        "name": "ジェイン・オースティン","years": "1775-1817", "region": "イギリス", "gender": "f" },
+        { "id": "shakespeare",   "name": "シェイクスピア",       "years": "1564-1616", "region": "イギリス", "gender": "m" },
+        { "id": "murasaki-shikibu","name": "紫式部",             "years": "973?-1014?", "region": "日本", "gender": "f" }
+      ]
+    },
+    {
+      "id": "suberu", "name": "統べる者系", "catch": "場を仕切り、国ごと動かす",
+      "love_name": "主導権系", "love_catch": "恋の舵は、私がとる",
+      "proto": [0.0, 0.7, 0.5, -0.3, 0.6, 0.9],
+      "figures": [
+        { "id": "himiko",        "name": "卑弥呼",               "years": "?-248?", "region": "日本", "gender": "f", "flags": ["uncertain"] },
+        { "id": "hino-tomiko",   "name": "日野富子",             "years": "1440-1496", "region": "日本", "gender": "f" },
+        { "id": "hojo-masako",   "name": "北条政子",             "years": "1157-1225", "region": "日本", "gender": "f" },
+        { "id": "cleopatra",     "name": "クレオパトラ",         "years": "前69-前30", "region": "エジプト", "gender": "f" },
+        { "id": "elizabeth-1",   "name": "エリザベス1世",        "years": "1533-1603", "region": "イギリス", "gender": "f" }
+      ]
+    },
+    {
+      "id": "kinkou", "name": "均衡の賢者系", "catch": "どっちにも振れないのが、いちばん難しい",
+      "love_name": "ちょうどいい距離系", "love_catch": "近すぎず遠すぎず、がいちばん長続き",
+      "proto": null,
+      "special": "balance",
+      "figures": [
+        { "id": "hojo-yasutoki", "name": "北条泰時",             "years": "1183-1242", "region": "日本", "gender": "m" },
+        { "id": "uesugi-yozan",  "name": "上杉鷹山",             "years": "1751-1822", "region": "日本", "gender": "m" },
+        { "id": "ooka-tadasuke", "name": "大岡忠相",             "years": "1677-1752", "region": "日本", "gender": "m" },
+        { "id": "tokugawa-yoshimune","name": "徳川吉宗",         "years": "1684-1751", "region": "日本", "gender": "m" },
+        { "id": "marcus-aurelius","name": "マルクス・アウレリウス","years": "121-180", "region": "ローマ", "gender": "m" }
+      ]
+    }
+  ]
+}

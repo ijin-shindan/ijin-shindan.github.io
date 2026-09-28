@@ -1,0 +1,229 @@
+{
+ "_note": "scripts/build_app.py が自動で作る。手で編集しない。",
+ "themes": {
+  "haou": {
+   "bg": "#F4CBC6",
+   "bg2": "#EDB3AD",
+   "bg3": "#F9DDD9",
+   "accent": "#B8232F"
+  },
+  "hitotarashi": {
+   "bg": "#FDEFB3",
+   "bg2": "#F9E18A",
+   "bg3": "#FEF6D6",
+   "accent": "#D99A00"
+  },
+  "gunshi": {
+   "bg": "#D2E2E2",
+   "bg2": "#BCD3D4",
+   "bg3": "#E4EEEE",
+   "accent": "#36696C"
+  },
+  "moushou": {
+   "bg": "#FCE0B6",
+   "bg2": "#F8CD92",
+   "bg3": "#FEEDD3",
+   "accent": "#DE7A12"
+  },
+  "gi": {
+   "bg": "#CEDDF6",
+   "bg2": "#B4CBF0",
+   "bg3": "#E2EBFA",
+   "accent": "#2A5DB8"
+  },
+  "tetsu": {
+   "bg": "#D6DBE3",
+   "bg2": "#C1C8D3",
+   "bg3": "#E6E9EE",
+   "accent": "#3A4760"
+  },
+  "nintai": {
+   "bg": "#D9E8C6",
+   "bg2": "#C6DCAC",
+   "bg3": "#E8F1DC",
+   "accent": "#5A8A34"
+  },
+  "jiai": {
+   "bg": "#FCDDDD",
+   "bg2": "#F8C7C7",
+   "bg3": "#FEEDED",
+   "accent": "#E0676F"
+  },
+  "jinbou": {
+   "bg": "#F2E0C8",
+   "bg2": "#E8CDAA",
+   "bg3": "#F8ECDD",
+   "accent": "#A5672B"
+  },
+  "fuunji": {
+   "bg": "#C7EEDD",
+   "bg2": "#A9E3CA",
+   "bg3": "#DDF5EA",
+   "accent": "#129C6C"
+  },
+  "kabuki": {
+   "bg": "#FBD0E2",
+   "bg2": "#F7B6D1",
+   "bg3": "#FDE3EE",
+   "accent": "#E0307E"
+  },
+  "kokou": {
+   "bg": "#D3D3F0",
+   "bg2": "#BDBDE6",
+   "bg3": "#E4E4F7",
+   "accent": "#4B45A8"
+  },
+  "tankyu": {
+   "bg": "#C8E7F2",
+   "bg2": "#A9D8EA",
+   "bg3": "#DDF0F7",
+   "accent": "#1A86B0"
+  },
+  "kaitaku": {
+   "bg": "#E6F2B8",
+   "bg2": "#D6E893",
+   "bg3": "#F0F7D4",
+   "accent": "#6E9410"
+  },
+  "sensai": {
+   "bg": "#E9DEE8",
+   "bg2": "#DCCBDA",
+   "bg3": "#F2EAF1",
+   "accent": "#8C6284"
+  },
+  "jounetsu": {
+   "bg": "#FBD3BE",
+   "bg2": "#F6BC9F",
+   "bg3": "#FDE4D7",
+   "accent": "#E8502A"
+  },
+  "miyabi": {
+   "bg": "#F0D6EE",
+   "bg2": "#E6BFE3",
+   "bg3": "#F6E5F5",
+   "accent": "#A94A9E"
+  },
+  "kansatsu": {
+   "bg": "#E7E3C8",
+   "bg2": "#DAD4AF",
+   "bg3": "#F0EDDC",
+   "accent": "#857A37"
+  },
+  "suberu": {
+   "bg": "#E1D4F2",
+   "bg2": "#CFBCEB",
+   "bg3": "#ECE4F7",
+   "accent": "#6E38AE"
+  },
+  "kinkou": {
+   "bg": "#E4E4E0",
+   "bg2": "#D5D5CF",
+   "bg3": "#EEEEEB",
+   "accent": "#6E7068"
+  }
+ },
+ "alt": {
+  "hojo-soun": "鶏（家訓の早寝早起き・朝4時）",
+  "saito-dosan": "油壺（油売りから国盗り、の伝説）",
+  "date-masamune": "三日月の前立て、眼帯",
+  "alexander": "羽根飾りの兜、赤いマント",
+  "oda-nobunaga": "地球儀、南蛮マント",
+  "okuma-shigenobu": "「125」の小旗（人生125歳説）",
+  "maeda-toshiie": "そろばん（利家愛用と伝わる）",
+  "dumas": "銃士風の羽根つき帽（『三銃士』）",
+  "lorenzo-medici": "百合（花の都フィレンツェ）、胸の6つの玉の紋",
+  "toyotomi-hideyoshi": "草履（懐で温めた伝説）",
+  "takenaka-hanbei": "手のひらの城（16人で稲葉山城を乗っ取った）",
+  "kuroda-kanbei": "お椀形の赤い兜（合子形兜）",
+  "akechi-mitsuhide": "水色桔梗の旗",
+  "machiavelli": "赤い本『君主論』",
+  "zhuge-liang": "羽扇",
+  "fukushima-masanori": "大盃（黒田節の飲み比べ）",
+  "kato-kiyomasa": "縦に長い烏帽子形の兜",
+  "richard-1": "胸の獅子の紋、王冠",
+  "shimazu-yoshihiro": "斜めの集中線（敵中突破）、白い長ひげの老将",
+  "honda-tadakatsu": "穂先にトンボがとまる槍（蜻蛉切）、鹿角の兜",
+  "naoe-kanetsugu": "「愛」の前立て",
+  "kusunoki-masashige": "「非理法権天」の旗",
+  "tubman": "頭上の北極星（夜の逃亡の道しるべ）",
+  "uesugi-kenshin": "塩の袋（敵に塩を送る）、白い頭巾",
+  "sanada-yukimura": "六文銭の前立て、全身の赤",
+  "ishida-mitsunari": "温度のちがう3杯の茶（三献茶）",
+  "ii-naomasa": "金の天衝（板状の脇立て）、赤備え",
+  "okubo-toshimichi": "生糸の糸巻き（殖産興業）",
+  "bismarck": "とがった軍帽、カイゼルひげ",
+  "hijikata-toshizo": "「誠」の旗",
+  "hojo-ujiyasu": "汁かけ飯の茶碗",
+  "mori-motonari": "3本の矢",
+  "ninomiya-sontoku": "背負った薪、本",
+  "washington": "小さな斧（桜の木の逸話）",
+  "tokugawa-ieyasu": "指にとまるホトトギス（鳴くまで待とう）、肩の葵の紋",
+  "ogata-koan": "往診の薬箱",
+  "tsuda-umeko": "ABCの本（最年少の女子留学生）",
+  "dunant": "包帯の束",
+  "helen-keller": "手のひらに流れ落ちる水（ポンプ）",
+  "nightingale": "ランプ（夜の見回り）",
+  "katsu-kaishu": "咸臨丸の模型",
+  "garibaldi": "赤シャツ、ポンチョ",
+  "lincoln": "長いシルクハット、口ひげなしのあごひげ（少女の手紙がきっかけ）",
+  "liu-bei": "桃（桃園の誓い）、大きな耳",
+  "saigo-takamori": "連れた犬",
+  "yoshida-shoin": "櫂（小舟で黒船へこぎ出した）",
+  "takasugi-shinsaku": "三味線",
+  "marco-polo": "黄金の島が描かれた地図",
+  "amundsen": "毛皮のフード、極点に立てる旗",
+  "sakamoto-ryoma": "懐手、横に置いた洋式ブーツ",
+  "ikkyu": "朱鞘の木刀",
+  "hiraga-gennai": "エレキテル（箱とハンドル）",
+  "izumo-no-okuni": "舞いの扇、腰の刀（男装のかぶき踊り）",
+  "mozart": "羽根ペン、サブ:楽譜",
+  "maeda-keiji": "朱槍",
+  "minakata-kumagusu": "顕微鏡",
+  "katsushika-hokusai": "大きな筆、大波",
+  "tesla": "テスラコイル、稲妻",
+  "da-vinci": "鏡文字のメモ帳",
+  "newton": "手のりんご、プリズム",
+  "fabre": "フンを転がす虫（スカラベ）",
+  "mendel": "エンドウ豆のさや",
+  "ino-tadataka": "日本地図、旅の笠",
+  "darwin": "手にとまるフィンチ",
+  "marie-curie": "ほのかに光る試験管",
+  "watt": "湯気の出るやかん",
+  "gutenberg": "活字の組版",
+  "shibusawa-eiichi": "論語の本、サブ:そろばん（論語と算盤）",
+  "franklin": "鍵のついた凧、稲妻",
+  "edison": "電球",
+  "takehisa-yumeji": "宵待草（黄色い花）",
+  "higuchi-ichiyo": "筆、サブ:原稿",
+  "chopin": "横に置いた小さなピアノ",
+  "miyazawa-kenji": "星の中を走る小さな汽車（銀河鉄道）",
+  "van-gogh": "ひまわり、麦わら帽子",
+  "yosano-akiko": "乱れ髪、短冊",
+  "rodin": "考える人（あごに手）、のみと槌",
+  "liszt": "飛んでくるバラ（リストマニア）、長い髪",
+  "michelangelo": "長い筆（天井画）",
+  "beethoven": "爆発した髪、楽譜",
+  "ariwara-narihira": "かきつばた",
+  "ono-no-komachi": "桜の枝（花の色は）",
+  "izumi-shikibu": "蛍（沢の蛍）",
+  "pompadour": "高く盛った髪、レースの扇",
+  "sei-shonagon": "檜扇（香炉峰の雪の簾は元ネタで）",
+  "yoshida-kenko": "『徒然』の冊子、眠そうな目",
+  "natsume-soseki": "抱いた猫（吾輩は猫である）",
+  "austen": "羽根ペン、白いハイウエストのドレス",
+  "shakespeare": "喜劇と悲劇の仮面（この世はすべて舞台）",
+  "murasaki-shikibu": "高く積み上げた冊子（長い長い物語）",
+  "himiko": "金印",
+  "hino-tomiko": "ひもに通した銭の束",
+  "hojo-masako": "尼頭巾、演説の巻物",
+  "cleopatra": "巻いた絨毯（寝具袋に隠れて会いに行った）",
+  "elizabeth-1": "大きなひだ襟、真珠、指輪（国家と結婚した）",
+  "hojo-yasutoki": "「51」の巻物（御成敗式目）",
+  "uesugi-yozan": "「成」の扇（なせば成る）",
+  "ooka-tadasuke": "町火消しの纏",
+  "tokugawa-yoshimune": "目安箱",
+  "marcus-aurelius": "覚え書きの書字板、月桂冠"
+ },
+ "contact": "https://github.com/ijin-shindan/ijin-shindan.github.io/issues",
+ "updated": "2026-09-28"
+}
