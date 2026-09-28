@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=657453f";
+import { AXES, Shindan, loadData } from "./shindan.js?v=de271fd";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=657453f"), getJSON("../data/rarity.json?v=657453f")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=de271fd"), getJSON("../data/rarity.json?v=de271fd")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -93,6 +93,31 @@ async function doLogout() {
   store.del("cloudUid"); store.del("cloudName"); store.del("cloudPhoto");
   toast("ログアウトしました（この端末の記録は残ります）");
   route();
+}
+// この端末の記録（cloudUid）と、Firebase Authの実際のログイン状態を起動時に1回だけ照らし合わせる。
+// ずれていた場合だけ直して再描画する。常時監視はしない（1回で購読解除）ので、通信・コストは増えない。
+let authChecked = false;
+async function syncAuthState() {
+  if (authChecked) return;
+  try {
+    const cloud = await import("./cloud.js");
+    if (!(await cloud.isCloudEnabled())) return;
+    const unsub = await cloud.onAuthChange((user) => {
+      if (authChecked) return; // 2回目以降の通知（実際のログイン操作など）は doLogin/doLogout 側で扱う
+      authChecked = true;
+      const hadLocal = !!store.get("cloudUid");
+      if (user && !hadLocal) {
+        // Firebaseはログイン済みなのに、この端末の記録が無い・消えていた → 記録のほうを直す
+        store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
+        route();
+      } else if (!user && hadLocal) {
+        // Firebaseはログアウト済み（他の端末でログアウトした等）なのに、この端末の記録が残っていた → 記録のほうを消す
+        store.del("cloudUid"); store.del("cloudName"); store.del("cloudPhoto");
+        route();
+      }
+      if (typeof unsub === "function") unsub();
+    });
+  } catch {}
 }
 let currentMode = "none", nextSrc = null;
 const ctaSeen = new Set();
@@ -1079,3 +1104,4 @@ addEventListener("pagehide", () => {
 });
 route();
 store.set("visited", true);
+syncAuthState(); // 起動時に1回だけ、Firebase Authの実際の状態とこの端末の記録を照らし合わせる（既存の診断・表示は待たせない）
