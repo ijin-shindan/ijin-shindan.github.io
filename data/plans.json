@@ -36,8 +36,12 @@
       "name": "偉人性格診断",
       "questions_file": "questions.json",
       "matchup_labels": {
-        "strong": "強い相手",
-        "weak": "弱い相手"
+        "strong": "得意な相手",
+        "weak": "苦手な相手"
+      },
+      "matchup_verbs": {
+        "strong": "得意",
+        "weak": "苦手"
       }
     },
     "love": {
@@ -46,6 +50,10 @@
       "matchup_labels": {
         "strong": "主導権を握れる相手",
         "weak": "振り回される相手"
+      },
+      "matchup_verbs": {
+        "strong": "リード",
+        "weak": "振り回され"
       }
     }
   }

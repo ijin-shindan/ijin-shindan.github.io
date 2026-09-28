@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=ddfbdba";
+import { AXES, Shindan, loadData } from "./shindan.js?v=9922290";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=ddfbdba"), getJSON("../data/rarity.json?v=ddfbdba")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=9922290"), getJSON("../data/rarity.json?v=9922290")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -118,7 +118,17 @@ function meet(id, src) {
   if (!z[id] || src === "me") z[id] = { src: z[id]?.src === "me" ? "me" : src, at: Date.now() };
   store.set("zukan", z);
 }
-const zukanCount = () => Object.keys(store.get("zukan", {})).filter(isFree).length;
+// 図鑑の状態（保存形式は変えない。src の意味で3段階に読み分ける）
+//   DISCOVERED：自分の正式な診断結果（通常・恋愛）＝ src "me"。全身画像・説明・動きを見せる
+//   KNOWN     ：相性・もしも・共有結果などで名前だけ知った ＝ src "match" | "next" | "friend"。名前＋シルエット＋🔒未発見
+//   UNKNOWN   ：まだ記録がない。？？？＋シルエット
+const zState = (id) => { const e = store.get("zukan", {})[id]; return !e ? "unknown" : e.src === "me" ? "discovered" : "known"; };
+const isDiscovered = (id) => zState(id) === "discovered";
+const zukanCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => e.src === "me" && SD.figures[id] && isFree(id)).length;
+const knownCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => e.src !== "me" && SD.figures[id] && isFree(id)).length;
+// 関連表示（相性・もしも・友達）の顔：発見済みだけ通常の絵、それ以外はシルエット＋「🔒 未発見」
+const relFace = (id) => avatar(id, !isDiscovered(id));
+const undiscTag = (id) => (isDiscovered(id) ? "" : `<span class="undisc">🔒 未発見</span>`);
 
 // ---------------- トップ ----------------
 let firstTop = true;
@@ -143,9 +153,10 @@ function renderTop() {
       ${["normal", "love"].filter((m) => me[m]).map((m) => `
         <a class="row" href="#/r/${m}/${me[m].code}" style="text-decoration:none;color:inherit">
           <img class="tile" src="${avatar(me[m].fig)}" alt="" style="${themeVars(fig(me[m].fig).type)}">
-          <div><div class="lbl">前回の${m === "love" ? "恋の" : ""}あなた</div><div class="nm">${esc(fig(me[m].fig).name)}</div></div>
+          <div><div class="lbl">前回の${m === "love" ? "恋の" : ""}あなた${me[m].via === "link" ? "（リンクから保存）" : ""}</div><div class="nm">${esc(fig(me[m].fig).name)}</div></div>
         </a>`).join("")}
       <a class="btn sub" href="#/zukan">図鑑を見る（${zukanCount()} / ${FREE.length}）</a>
+      <a class="btn sub" href="#/me">マイページ（自分の結果・受け取った結果）</a>
     </div>` : "";
   app.innerHTML = `
     <section class="hero">
@@ -163,7 +174,7 @@ function renderTop() {
     <div class="teaser" aria-live="polite"></div>
     <div class="type-strip" aria-hidden="true">${SD.types.map((t) => `<i style="background:${THEMES[t.id].bg2}"></i>`).join("")}</div>
     <p class="note">${LOCKED.length ? `無料で出会えるのは${FREE.length}人。ほか${LOCKED.length}人はシルエットで待機中。` : `${FREE.length}人すべてに、無料で出会えます。`}<br>逸話には伝承や諸説あるものを含みます。</p>
-    <p class="note"><a href="#/about">このサイトについて</a></p>`;
+    <p class="note"><a href="#/me">マイページ</a>　・　<a href="#/about">このサイトについて</a></p>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => (a.onclick = () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   disposeGuide = mountGuide($("#guide"));
   window.scrollTo(0, 0);
@@ -308,11 +319,32 @@ function reasonText(sd, a, b, strong, names = ["あなた", "相手"]) {  // 勝
   for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
     if (!sd.M[i][j]) continue;
     const v = a[i] * sd.M[i][j] * b[j];
-    if (!best || Math.abs(v) > Math.abs(best.v)) best = { v, i, j };
+    if (!best || (strong ? v > best.v : v < best.v)) best = { v, i, j };
   }
   const mine = pole(AXES[best.i], a[best.i]), theirs = pole(AXES[best.j], b[best.j]);
   const [A, B] = names;
-  return strong ? `${A}の【${mine}】が、${B}の【${theirs}】に効く` : `${B}の【${theirs}】に、${A}の【${mine}】が通じない`;
+  return strong ? `${A}の【${mine}】が、${B}の【${theirs}】に強みを出しやすい` : `${A}の【${mine}】は、${B}の【${theirs}】に押されやすい`;
+}
+
+// 相性の関係図：左はいつも「あなた」。矢印の向きで、どちらのタイプが得意かを見せる（性格タイプの組み合わせ。史実の勝ち負けではない）
+//   dir: "right"＝あなた→相手（得意） / "left"＝相手→あなた（苦手） / "both"＝互角
+function relRow({ label, me, other, dir, verb, cls, why, meWho = "あなた", otherWho = "相手", otherFace }) {
+  const side = (id, who, src) => `<div class="rel-side"><img class="tile" src="${src ?? relFace(id)}" alt="" style="${themeVars(fig(id).type)}">
+      <div class="rel-who">${esc(who)}</div><div class="rel-nm">${esc(fig(id).name)}</div>${src ? "" : undiscTag(id)}</div>`;
+  const ar = dir === "right" ? "→" : dir === "left" ? "←" : "⇄";
+  return `<div class="rel ${cls}">${label ? `<div class="rel-lbl">${esc(label)}</div>` : ""}
+    ${side(me, meWho, avatar(me))}<div class="rel-arrow" aria-label="${esc(verb)}"><span class="rel-verb">${esc(verb)}</span><span class="rel-ar" aria-hidden="true">${ar}</span></div>${side(other, otherWho, otherFace)}
+    ${why ? `<p class="rel-why">${esc(why)}</p>` : ""}</div>`;
+}
+const verbsOf = (sd) => sd.modeConf.matchup_verbs ?? { strong: "得意", weak: "苦手" };  // 古いデータが残っていても動くように
+// 2人の性格タイプの相性（v = battle(あなた, 相手)）を関係図にする
+function duelRow(sd, mu, ou, meId, otherId, { label, otherWho, otherFace }) {
+  const v = sd.battle(mu, ou), vb = verbsOf(sd);
+  if (Math.abs(v) < 0.05) return relRow({ label: `${label}：互角`, me: meId, other: otherId, dir: "both", verb: "互角", cls: "even", why: "似た者どうし。張り合うと長引く組み合わせ", otherWho, otherFace });
+  const lead = sd.mode === "love" ? (v > 0 ? "あなたがリードしやすい" : `${otherWho}に振り回されやすい`) : (v > 0 ? "あなたのタイプが少し有利" : `${otherWho}のタイプが少し有利`);
+  return relRow({ label: `${label}：${lead}`, me: meId, other: otherId,
+    dir: v > 0 ? "right" : "left", verb: v > 0 ? vb.strong : vb.weak, cls: v > 0 ? "good" : "bad",
+    why: reasonText(sd, mu, ou, v > 0, ["あなた", otherWho]), otherWho, otherFace });
 }
 
 function stars(tier) {
@@ -322,7 +354,7 @@ function stars(tier) {
 
 function resultCard(r, mode, who, reveal) {
   const f = r.figure, t = r.type, tl = typeLabel(t, mode), pct = rare(f.id, mode);
-  const lead = who === "friend" ? "この人自身の回答から見える姿" : (mode === "love" ? "恋愛についての回答から見えるあなた" : "あなた自身の回答から見えるあなた");
+  const lead = who === "friend" ? "この人自身の回答から見える姿" : who === "past" ? "以前のあなたの回答から見える姿" : who === "saved" ? "リンクから保存した、この端末の「自分の結果」" : (mode === "love" ? "恋愛についての回答から見えるあなた" : "あなた自身の回答から見えるあなた");
   return `
   <section class="rcard ${reveal ? "reveal-wait" : ""}" style="${themeVars(t.id)}">
     <p class="anata">${lead}</p>
@@ -378,38 +410,35 @@ function renderResult(mode, code) {
 
   // 自分の結果として記録する
   if (fresh) {
+    if (mine && mine.code !== code) store.set("me.prev." + mode, mine);
     store.set("me." + mode, { code, fig: f.id, at: Date.now() });
     store.set("seen_results", [...new Set([...seen, mode + code])].slice(-30));
   }
-  meet(f.id, "me");
+  // 図鑑：自分でこの端末で診断した結果だけ DISCOVERED。リンクから保存した結果（via:"link"）は KNOWN のまま
+  meet(f.id, !fresh && mine?.via === "link" ? "friend" : "me");
   const fate = fateOf(f.id);
   const ms = r.matchups;
   const strongId = ms.strong.find((id) => id !== fate?.other), weakId = ms.weak.find((id) => id !== fate?.other);
-  [strongId, weakId].forEach((id) => meet(id, "match"));
+  [strongId, weakId, fate?.other].forEach((id) => meet(id, "match"));
   if (r.levelup && !r.levelup.locked) meet(r.levelup.to, "next");
   const friend = store.get("lastFriend." + mode);
   const other = store.get("me." + OTHER[mode]);
 
   const tx = texts[f.id];
   const search = (s) => `https://ja.wikipedia.org/w/index.php?search=${encodeURIComponent(s)}`;
-  const matchCard = (cls, label, id, why) => id ? `
-    <div class="${cls}"><img class="tile" src="${avatar(id)}" alt="" style="${themeVars(fig(id).type)}">
-      <div class="lbl">${esc(label)}</div><div class="nm">${esc(fig(id).name)}</div>
-      <div class="tp">${esc(typeLabel(sd.type(fig(id).type), mode).name)}</div>
-      <div class="why">${esc(why)}</div></div>` : "";
+  const matchRow = (kind, id) => id ? relRow({ label: labels[kind], me: f.id, other: id, dir: kind === "strong" ? "right" : "left",
+    verb: verbsOf(sd)[kind], cls: kind === "strong" ? "good" : "bad",
+    why: reasonText(sd, r.u, unit(id), kind === "strong") }) : "";
   const unit = (id) => sd.type(fig(id).type).unit;
   const labels = sd.modeConf.matchup_labels;
   const fateHtml = fate ? `
-    <div class="fate"><img class="tile" src="${avatar(fate.other, !isFree(fate.other))}" alt="" style="${themeVars(fig(fate.other).type)}">
-      <div><div class="lbl">⚔️ 因縁の相手 ― ${esc(fate.label)}（${fate.win ? "あなたの勝ち" : "あなたの負け"}）</div>
-        <div class="nm">${esc(fig(fate.other).name)}</div><div class="tx">${esc(fate.text)}</div></div></div>` : "";
+    <div class="fate"><img class="tile" src="${relFace(fate.other)}" alt="" style="${themeVars(fig(fate.other).type)}">
+      <div><div class="lbl">⚔️ 史実の因縁 ― ${esc(fate.label)}（史実ネタ。性格の相性とは別）</div>
+        <div class="nm">${esc(fig(fate.other).name)}${undiscTag(fate.other)}</div><div class="tx">${esc(fate.text)}</div></div></div>` : "";
   let friendHtml = "";
   if (friend && friend.code !== code && validCode(sd, friend.code)) {
-    const fu = sd.score(answersOf(sd, friend.code)), v = sd.battle(r.u, fu), fr = fig(friend.fig);
-    const verdict = Math.abs(v) < 0.05 ? "互角" : v > 0 ? "あなたが優勢" : "友達が優勢";
-    friendHtml = `<div class="fate" style="background:var(--ai-soft)"><img class="tile" src="${avatar(friend.fig)}" alt="" style="${themeVars(fr.type)}">
-      <div><div class="lbl" style="color:var(--ai)">リンクをくれた友達との相性 ― ${verdict}</div>
-      <div class="nm">${esc(fr.name)}</div><div class="tx">${esc(Math.abs(v) < 0.05 ? "似た者どうし。張り合うと長引くタイプ" : reasonText(sd, v > 0 ? r.u : fu, v > 0 ? fu : r.u, true, v > 0 ? ["あなた", "友達"] : ["友達", "あなた"]))}</div></div></div>`;
+    const fu = sd.score(answersOf(sd, friend.code));
+    friendHtml = duelRow(sd, r.u, fu, f.id, friend.fig, { label: "リンクをくれた友達", otherWho: "友達" });
   }
   const h = r.levelup;
   let levelHtml;
@@ -426,8 +455,8 @@ function renderResult(mode, code) {
       ? `<div class="next"><div class="next-tile" style="--t-bg:${THEMES[nf.type].bg}"><img src="${avatar(h.to, true)}" alt="まだ見ぬ偉人のシルエット"><span class="lock">🔒</span></div>
            <div><div class="qq">？？？</div><div class="hint">ヒント：${esc(texts[h.to]?.silhouette_hint)}</div></div></div>
          <button class="btn gold" style="margin-top:12px" data-premium="levelup">🔒 この人の正体は本格診断で（準備中）</button>`
-      : `<div class="next"><div class="next-tile" style="--t-bg:${THEMES[nf.type].bg}"><img src="${avatar(h.to)}" alt=""></div>
-           <div><div class="hint">あなたは</div><div class="qq">${esc(nf.name)}</div><div class="hint">になっていた</div></div></div>`);
+      : `<div class="next"><div class="next-tile" style="--t-bg:${THEMES[nf.type].bg}"><img src="${relFace(h.to)}" alt=""></div>
+           <div><div class="hint">あなたは</div><div class="qq">${esc(nf.name)}</div><div class="hint">になっていた${undiscTag(h.to)}</div></div></div>`);
   }
   const sc = r.scores, hi = AXES.reduce((a, b) => (sc[b] > sc[a] ? b : a)), lo = AXES.reduce((a, b) => (sc[b] < sc[a] ? b : a));
   const otherHtml = other && validCode(engines[OTHER[mode]], other.code) ? (() => {
@@ -444,13 +473,15 @@ function renderResult(mode, code) {
 
   app.style.cssText = themeVars(r.type.id);
   app.innerHTML = `
-    ${resultCard(r, mode, "me", reveal)}
+    ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="image">画像で保存・シェア</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
       <a class="btn sub" data-share="x" target="_blank" rel="noopener">Xでポスト</a>
       <button class="btn sub wide" data-share="copy">リンクをコピー</button>
     </div>
+    ${(() => { const prev = store.get("me.prev." + mode); return prev && prev.code !== code && validCode(sd, prev.code) && SD.figures[prev.fig]
+      ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
     <section class="card"><h2>あなたはこんな人</h2>
       ${mode === "love" && tx.love.note ? `<p class="love-note">※${esc(tx.love.note)}</p>` : ""}
       <p class="body">${esc(tx.body)}</p>
@@ -458,15 +489,16 @@ function renderResult(mode, code) {
         <div class="chips">${tx.motoneta.search.map((s) => `<a class="chip" href="${search(s)}" target="_blank" rel="noopener">🔍 ${esc(s)}</a>`).join("")}</div></details>
     </section>
     <section class="card"><h2>相性</h2>
-      ${fateHtml}${friendHtml}
-      <div class="match">${matchCard("strong", labels.strong, strongId, strongId ? reasonText(sd, r.u, unit(strongId), true) : "")}${matchCard("weak", labels.weak, weakId, weakId ? reasonText(sd, r.u, unit(weakId), false) : "")}</div>
+      <p class="rel-note">性格タイプの組み合わせで見た相性です（史実の勝ち負けではありません）。矢印の先が、押されやすい側。</p>
+      <div class="rels">${friendHtml}${matchRow("strong", strongId)}${matchRow("weak", weakId)}</div>
+      ${fateHtml ? `<div class="fate-wrap">${fateHtml}</div>` : ""}
     </section>
     <section class="card levelup"><h2>もしも…</h2>${levelHtml}</section>
     <section class="card"><h2>あなたの6つの軸</h2>${radar(sc)}
       <div class="tags"><span class="tag good">武器：${esc(pole(hi, 1))}</span><span class="tag weak">控えめ：${esc(axisById[lo].name)}</span></div></section>
     ${otherHtml}
     <section class="card"><h2>図鑑</h2>
-      <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人に出会った</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
+      <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人を発見</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
       <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a></section>
     <section class="card premium" data-view="premium_cta_view"><h2>本格診断でわかること（準備中）</h2>
       ${lockedTwo.length ? `<div class="locks">${lockedTwo.map((id) => `<img class="tile" src="${avatar(id, true)}" alt="鍵つきの偉人" style="${themeVars(r.type.id)}">`).join("")}</div>` : ""}
@@ -474,6 +506,7 @@ function renderResult(mode, code) {
       <button class="btn gold" data-premium="result">くわしく見る</button></section>
     <div style="display:grid;gap:10px;margin-top:20px">
       <a class="btn sub" data-fresh="${mode}" data-src="retry" href="#/q/${mode}">もう一度診断する</a>
+      <a class="btn sub" href="#/me">マイページ</a>
       <a class="btn sub" href="#/">トップへ</a></div>
     <p class="note" style="margin-top:16px"><a href="#/about">このサイトについて</a></p>
     <button class="fab" data-share="image" hidden>シェア</button>`;
@@ -513,37 +546,53 @@ function renderResult(mode, code) {
 // 友達の結果（シェアされたリンクを開いた人）
 function renderFriend(sd, mode, code, r) {
   const f = r.figure;
-  const friends = store.get("friends", []).filter((x) => !(x.mode === mode && x.code === code));
-  store.set("friends", [{ mode, code, fig: f.id, at: Date.now() }, ...friends].slice(0, 20));
-  store.set("lastFriend." + mode, { code, fig: f.id });
-  meet(f.id, "friend");
+  const own = store.get("seen_results", []).includes(mode + code);  // この端末で自分で診断したことがある結果
+  const prevE = store.get("me.prev." + mode);
+  const prevHere = prevE?.code === code;                                // 入れかえ前の結果
+  const prevLink = !own && prevHere && prevE.via === "link";            // 入れかえ前の結果が、リンクから保存したもの
+  const past = own || (prevHere && !prevLink);                         // 以前のあなた自身の結果
+  if (!past) {
+    const friends = store.get("friends", []);
+    if (!friends.some((x) => x.mode === mode && x.code === code))
+      store.set("friends", [{ mode, code, fig: f.id, at: Date.now() }, ...friends].slice(0, 20));
+    store.set("lastFriend." + mode, { code, fig: f.id });
+    meet(f.id, "friend");
+  }
   const tx = texts[f.id];
   app.style.cssText = themeVars(r.type.id);
   const mine = store.get("me." + mode);
   let compat = "";
-  if (mine && validCode(sd, mine.code)) {
-    const mu = sd.score(answersOf(sd, mine.code)), v = sd.battle(mu, r.u), m = fig(mine.fig);
-    const verdict = Math.abs(v) < 0.05 ? "互角" : v > 0 ? "あなたが優勢" : "このリンクの人が優勢";
-    compat = `<section class="card"><h2>あなた（${esc(m.name)}）との相性</h2>
-      <div class="fate" style="background:var(--ai-soft)"><img class="tile" src="${avatar(mine.fig)}" alt="" style="${themeVars(m.type)}">
-      <div><div class="lbl" style="color:var(--ai)">${verdict}</div><div class="tx">${esc(Math.abs(v) < 0.05 ? "似た者どうし。張り合うと長引くタイプ" : reasonText(sd, v > 0 ? mu : r.u, v > 0 ? r.u : mu, true, v > 0 ? ["あなた", "この人"] : ["この人", "あなた"]))}</div></div></div></section>`;
+  if (!past && mine && validCode(sd, mine.code)) {
+    const mu = sd.score(answersOf(sd, mine.code));
+    compat = `<section class="card"><h2>あなたとの相性</h2>
+      <p class="rel-note">性格タイプの組み合わせで見た相性です（史実の勝ち負けではありません）。矢印の先が、押されやすい側。</p>
+      <div class="rels">${duelRow(sd, mu, r.u, mine.fig, f.id, { label: "このリンクの人", otherWho: "この人", otherFace: avatar(f.id) })}</div></section>`;
   }
-  track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
+  if (!past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
   app.innerHTML = `
-    <div class="friend-head"><h1>このリンクの人は<br>「${esc(f.name)}」タイプでした</h1></div>
-    ${resultCard(r, mode, "friend", false)}
+    <div class="friend-head">${past || prevLink
+      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」タイプ</h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
+      : `<h1>このリンクの人は<br>「${esc(f.name)}」タイプでした</h1><p class="note" style="margin:6px 0 0">リンクで届いた結果です（この端末に保存された、あなたの結果とは別です）</p>`}
+      <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="#/r/${mode}/${mine.code}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">マイページ</a></p></div>
+    ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
     <div style="display:grid;gap:8px;margin:16px 0">
-      ${mine ? compat : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
+      ${mine ? (past || prevLink ? "" : compat) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">${esc(f.name)}との相性もわかります</p>`}
-      <button class="btn sub" data-mine>${mine ? "自分の結果をこれに置きかえる" : "これは自分の結果です"}</button>
     </div>
-    <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>`;
+    <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
+    <div class="claim">${past || prevLink
+      ? `<button class="btn sub" data-mine>この結果を、自分の結果に戻す</button>`
+      : `<button class="btn sub" data-mine>${mine ? `自分の結果として保存（いまの「${esc(fig(mine.fig).name)}」と入れかえ）` : "自分の結果として保存"}</button>
+         <p class="note" style="margin:6px 0 0">この端末だけの保存です。図鑑の「発見」にはなりません。<br>友達の結果を見ているだけなら、押さなくて大丈夫です。</p>`}</div>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
   $("[data-mine]").onclick = () => {
-    if (mine && !confirm(`いまの自分の結果（${fig(mine.fig).name}）を、この結果に置きかえますか？`)) return;
-    store.set("me." + mode, { code, fig: f.id, at: Date.now() });
+    if (mine && !confirm(`いまの自分の結果（${fig(mine.fig).name}）を、この結果（${f.name}）に入れかえますか？\n元の結果（${fig(mine.fig).name}）は、マイページや結果画面の「前の結果」からあとで戻せます。${own ? "" : "\n※リンクから保存した結果は、図鑑の「発見」にはなりません。"}`)) return;
+    if (!mine && !confirm(`この結果（${f.name}）を、この端末の「自分の結果」として保存しますか？${own ? "" : "\n※リンクから保存した結果は、図鑑の「発見」にはなりません。"}`)) return;
+    if (mine && mine.code !== code) store.set("me.prev." + mode, mine);
+    // via：自分で診断した結果なら付けない。入れかえ前の結果に戻すときは、その印を引き継ぐ。それ以外（友達のリンク）は "link"
+    const via = own ? null : prevHere ? prevE.via ?? null : "link";
+    store.set("me." + mode, via ? { code, fig: f.id, at: Date.now(), via } : { code, fig: f.id, at: Date.now() });
     store.del("lastFriend." + mode);
-    store.set("friends", store.get("friends", []).filter((x) => !(x.mode === mode && x.code === code)));
     track("claim_own_result", { mode });
     route();
   };
@@ -689,19 +738,20 @@ function renderZukan() {
   app.style.cssText = "";
   app.innerHTML = `
     <div class="zhead"><h1>偉人図鑑</h1><span class="cnt">発見 <b>${zukanCount()}</b> / ${FREE.length}${LOCKED.length ? `（＋鍵つき ${LOCKED.length}）` : ""}</span></div>
-    <p class="note" style="text-align:left">診断の結果・相性の相手・友達から届いた結果で、出会った偉人が登録されます。</p>
+    <p class="note" style="text-align:left">自分の診断（通常・恋愛）の結果に出た偉人が「発見」として登録されます。相性や友達の結果で名前を見かけた偉人は🔒のまま（${knownCount()}人）。</p>
     ${SD.types.map((t) => `<div class="zrow"><h2><i style="background:${THEMES[t.id].accent}"></i>${esc(t.name)}</h2>
       <div class="zcells">${t.figures.map((f, k) => {
-        const st = k > MAX_TIER ? "locked" : z[f.id] ? (z[f.id].src === "me" ? "me" : "met") : "unseen";
+        const st = k > MAX_TIER ? "locked" : z[f.id] ? (z[f.id].src === "me" ? "me" : "known") : "unseen";
         return `<button class="zcell ${st}" data-id="${f.id}" data-st="${st}" style="--t-bg:${THEMES[t.id].bg}"
-          aria-label="${st === "met" || st === "me" ? esc(f.name) : "？？？"}"><img src="${avatar(f.id, st === "locked" || st === "unseen")}" alt="">
-          <span class="star">★${k + 1}</span>${st === "locked" ? '<span class="lock">🔒</span>' : ""}</button>`;
+          aria-label="${st === "me" ? esc(f.name) : st === "known" ? `${esc(f.name)}（未発見）` : "？？？"}"><img src="${avatar(f.id, st !== "me")}" alt="">
+          <span class="star">★${k + 1}</span>${st === "known" ? `<span class="znm">${esc(f.name)}</span>` : ""}${st === "locked" || st === "known" ? '<span class="lock">🔒</span>' : ""}</button>`;
       }).join("")}</div></div>`).join("")}
-    <a class="btn sub" href="#/">トップへ</a>`;
+    <div style="display:grid;gap:10px"><a class="btn sub" href="#/me">マイページ</a><a class="btn sub" href="#/">トップへ</a></div>`;
   app.querySelectorAll(".zcell").forEach((b) => (b.onclick = () => {
     const { id, st } = b.dataset;
     if (st === "locked") return openPremium("zukan");
     if (st === "unseen") return toast("まだ出会っていません");
+    if (st === "known") return toast(`${fig(id).name}：あなた自身の診断結果に出ると、図鑑に登録されます`);
     const tx = texts[id];
     sheet.hidden = false;
     sheet.innerHTML = `<div class="panel"><div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
@@ -717,6 +767,48 @@ function renderZukan() {
   window.scrollTo(0, 0);
 }
 const sd_type = (id) => SD.type(fig(id).type);
+
+// ---------------- マイページ（#/me）：この端末の保存データを読むだけ。新しい保存はしない ----------------
+function renderMe() {
+  document.title = "マイページ｜世界の偉人性格診断";
+  app.style.cssText = "";
+  const MODES = [["normal", "性格診断"], ["love", "恋愛診断"]];
+  const ok = (m, e) => e && engines[m] && validCode(engines[m], e.code) && SD.figures[e.fig];
+  const date = (t) => (t ? new Date(t).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }) : "");
+  const row = (m, e, lbl, face) => `<a class="me-row" href="#/r/${m}/${e.code}">
+      <img class="tile" src="${face ?? avatar(e.fig)}" alt="" style="${themeVars(fig(e.fig).type)}">
+      <span><span class="lbl">${esc(lbl)}</span><span class="nm">${esc(fig(e.fig).name)}</span></span><span class="go">›</span></a>`;
+  // 自分の結果：いま・前の結果・この端末で診断した過去の結果（seen_results から計算し直す）
+  const mineHtml = MODES.map(([m, name]) => {
+    const cur = store.get("me." + m), prev = store.get("me.prev." + m);
+    const shown = new Set([cur?.code, prev?.code]);
+    const hist = store.get("seen_results", []).filter((x) => x.startsWith(m)).map((x) => x.slice(m.length)).reverse()
+      .filter((c) => !shown.has(c) && validCode(engines[m], c)).slice(0, 5)
+      .map((c) => ({ code: c, fig: engines[m].diagnose(answersOf(engines[m], c)).figure.id }));
+    if (!ok(m, cur) && !ok(m, prev) && !hist.length)
+      return `<div class="me-empty">${name}：まだ結果がありません　<a href="#/q/${m}" data-fresh="${m}">診断する</a></div>`;
+    return (ok(m, cur) ? row(m, cur, `いまの${name}の結果${cur.via === "link" ? "（リンクから保存）" : ""}`) : "")
+      + (ok(m, prev) ? row(m, prev, `前の${name}の結果${prev.via === "link" ? "（リンクから保存）" : ""} ${date(prev.at)}`) : "")
+      + hist.map((h) => row(m, h, `以前の${name}の結果`)).join("");
+  }).join("");
+  const friends = store.get("friends", []).filter((x) => ok(x.mode, x));
+  app.innerHTML = `
+    <div class="zhead"><h1>マイページ</h1></div>
+    <section class="card"><h2>自分の結果</h2><div class="me-list">${mineHtml}</div></section>
+    <section class="card"><h2>図鑑</h2>
+      <p style="margin:0 0 10px">発見 <b>${zukanCount()}</b> / ${FREE.length}人　・　名前だけ知っている 🔒 <b>${knownCount()}</b>人</p>
+      <a class="btn sub" href="#/zukan">図鑑を見る</a></section>
+    <section class="card"><h2>リンクで受け取った結果</h2>
+      ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に受け取り${store.get("me." + x.mode)?.code === x.code ? "（いまの自分の結果に保存中）" : ""}`, relFace(x.fig))).join("")}</div>
+        <p class="note" style="text-align:left;margin:8px 0 0">友達などから届いたリンクの結果です。あなたの結果とは別に保存されています（最大20件）。</p>`
+        : `<p class="note" style="text-align:left;margin:0">まだありません。友達から結果のリンクが届くと、ここに並びます。</p>`}</section>
+    <section class="card"><h2>保存について</h2>
+      <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています（アカウントはありません）。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
+      <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a></section>
+    <a class="btn sub" href="#/">トップへ</a>`;
+  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  window.scrollTo(0, 0);
+}
 
 // このサイトについて（文案：docs/about-draft.md、根拠：docs/legal-check.md）
 function renderAbout() {
@@ -816,6 +908,7 @@ function route() {
   if (page === "q" && engines[mode]) return renderQuiz(mode);
   if (page === "r" && engines[mode] && code) return renderResult(mode, code);
   if (page === "zukan") return renderZukan();
+  if (page === "me") return renderMe();
   if (page === "about") return renderAbout();
   if (page === "f" && engines[mode] && SD.figures[code] && isFree(code)) return renderFigure(mode, code);
   quiz = null;

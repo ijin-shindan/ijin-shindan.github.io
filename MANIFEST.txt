@@ -1,8 +1,8 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: ddfbdba
+版番号: 9922290
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 828（この一覧を含む）
-合計サイズ: 28.97 MB
+合計サイズ: 28.98 MB
 
 主なフォルダ（ファイル数・サイズ）:
   app/og/                    201 件    23.42 MB
@@ -10,7 +10,7 @@
   app/assets/                  1 件     1.68 MB
   app/s/                     200 件     0.22 MB
   data/                        8 件     0.16 MB
-  app/                        10 件     0.12 MB
+  app/                        10 件     0.13 MB
   app/icons/                   3 件     0.01 MB
   （一番上）                        4 件     0.00 MB
 
@@ -428,7 +428,7 @@
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
   app/index.html  3095
-  app/main.js  57159
+  app/main.js  67584
   app/meta.json  7795
   app/motion.css  2141
   app/motion.js  10614
@@ -834,9 +834,9 @@
   app/s/normal/yoshida-shoin.html  1060
   app/s/normal/zhuge-liang.html  1078
   app/shindan.js  7072
-  app/style.css  23113
+  app/style.css  26441
   data/axes.json  2449
-  data/plans.json  1362
+  data/plans.json  1554
   data/questions.json  5660
   data/questions_love.json  6452
   data/rarity.json  4637
