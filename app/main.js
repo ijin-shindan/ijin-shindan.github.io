@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=54566d2";
+import { AXES, Shindan, loadData } from "./shindan.js?v=891992e";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=54566d2"), getJSON("../data/rarity.json?v=54566d2")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=891992e"), getJSON("../data/rarity.json?v=891992e")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -57,6 +57,31 @@ function accountBanner(place) {
     me: "ログインすると、もっと楽しくなります" }[place] || "ログインすると、もっと楽しくなります";
   return `<div class="login-nudge"><p>${esc(msg)}</p><button class="btn-google sm" data-login>${googleBtnInner()}</button></div>`;
 }
+// ログインの診断ログ（起きたことだけを記録。メールアドレス等は保存しない）。マイページの「設定」から見られる
+function recordAuthDebug(step, data = {}) {
+  try {
+    const log = store.get("authDebug", []);
+    log.push({ t: Date.now(), step, ...data });
+    store.set("authDebug", log.slice(-10));
+  } catch {}
+}
+// ログインの診断ログを、マイページで見える形にする（起きたことだけ。メールアドレス等は表示しない）
+function authDebugHtml() {
+  const log = store.get("authDebug", []);
+  if (!log.length) return "";
+  const step = { begin: "①ログイン開始", begin_returned_without_navigating: "⚠️ページ移動が始まらなかった",
+    begin_error: "❌ログイン開始でエラー", redirect_result: "②Googleから戻った直後の結果", auth_state: "③ログイン状態の確認" };
+  const line = (e) => {
+    const time = new Date(e.t).toLocaleTimeString("ja-JP");
+    let detail = "";
+    if (e.step === "redirect_result") detail = e.ok ? (e.hasUser ? "ログイン成功" : "ログイン情報なし（未完了）") : `エラー：${e.code || e.message || "不明"}`;
+    else if (e.step === "auth_state") detail = e.hasUser ? "ログイン中" : "未ログイン";
+    else if (e.step === "begin_error") detail = `エラー：${e.code || e.message || "不明"}`;
+    return `${time}　${esc(step[e.step] || e.step)}${detail ? "　" + esc(detail) : ""}`;
+  };
+  return `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--ink-soft);font-size:12px">ログインの診断ログ（直近${log.length}件）</summary>
+    <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);line-height:1.8;font-family:monospace">${log.map(line).join("<br>")}</div></details>`;
+}
 // ログイン成功後の共通処理（リダイレクト帰り・永続化されたセッションの両方から呼ぶ）。
 // クラウドの図鑑をこの端末の図鑑と足し合わせ（上書きしない）、Firestoreへまとめて書く。
 async function applyLoggedInProfile(cloud, user) {
@@ -73,19 +98,28 @@ async function applyLoggedInProfile(cloud, user) {
   await cloud.pushProfile(user.uid, patch);
   await cloud.ensureInvite(user.uid, token);
 }
+let loginInFlight = false; // 二重クリック・二重実行を防ぐ
 async function doLogin() {
+  if (loginInFlight) return;
+  loginInFlight = true;
+  recordAuthDebug("begin", { href: location.href });
   try {
     const cloud = await import("./cloud.js");
-    if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); return; }
+    if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); loginInFlight = false; return; }
     // ページ遷移方式（signInWithRedirect）。ここでGoogleのページへ移動する。戻ってきたら起動時の syncAuthState() が続きを行う
     await cloud.beginSignIn();
+    // 通常、上の行でページ遷移が始まるのでここには来ない。来た場合は遷移が起きなかったということなので記録する
+    recordAuthDebug("begin_returned_without_navigating");
   } catch (e) {
-    const msg = String(e);
+    const msg = String(e), code = e && e.code ? String(e.code) : "";
     let t = "ログインできませんでした";
     if (msg.includes("not_configured")) t = "ログイン機能は準備中です";
     else if (msg.includes("unauthorized-domain")) t = "このサイトのドメインがFirebaseに未登録です（運営者向け：承認済みドメインを確認）";
     toast(t);
+    recordAuthDebug("begin_error", { code, message: msg.slice(0, 200) });
     console.error("[login]", e);
+  } finally {
+    loginInFlight = false;
   }
 }
 async function doLogout() {
@@ -103,7 +137,13 @@ async function syncAuthState() {
   try {
     const cloud = await import("./cloud.js");
     if (!(await cloud.isCloudEnabled())) return;
-    const redirected = await cloud.consumeRedirectResult().catch((e) => { console.error("[login]", e); return null; });
+    let redirectError = null;
+    const redirected = await cloud.consumeRedirectResult().catch((e) => {
+      redirectError = e; console.error("[login]", e); return null;
+    });
+    recordAuthDebug("redirect_result", redirectError
+      ? { ok: false, code: redirectError.code || "", message: String(redirectError).slice(0, 200) }
+      : { ok: true, hasUser: !!redirected });
     if (redirected) {
       authChecked = true;
       await applyLoggedInProfile(cloud, redirected);
@@ -111,12 +151,14 @@ async function syncAuthState() {
       route();
       return;
     }
+    if (redirectError) toast("ログインでエラーが起きました（設定の診断ログを確認してください）");
     // 注意：onAuthStateChanged はコールバックを同期的に（登録直後、この行の代入が終わるより前に）呼ぶことがある。
     // そのため、コールバックの中で「代入されたばかりの unsub」を直接参照すると、
     // 代入前に参照してしまう不具合（ReferenceError）が起きる。外側の変数に入れ、購読解除は次のイベントループへ回して防ぐ。
     authUnsub = await cloud.onAuthChange((user) => {
       if (authChecked) return; // 2回目以降の通知は doLogin/doLogout 側で扱う
       authChecked = true;
+      recordAuthDebug("auth_state", { hasUser: !!user });
       const hadLocal = !!store.get("cloudUid");
       if (user && !hadLocal) {
         // Firebaseはログイン済みなのに、この端末の記録が無い・消えていた → 記録のほうを直す
@@ -945,7 +987,8 @@ function renderMe() {
     <section class="card"><h2>設定</h2>
       <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
       <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a>
-      ${loggedIn ? `<button class="btn-text" data-logout>ログアウト</button>` : ""}</section>
+      ${loggedIn ? `<button class="btn-text" data-logout>ログアウト</button>` : ""}
+      ${authDebugHtml()}</section>
     <a class="btn sub" href="#/how">このサイトの使い方</a>
     <a class="btn sub" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
