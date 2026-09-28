@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=891992e";
+import { AXES, Shindan, loadData } from "./shindan.js?v=db74260";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=891992e"), getJSON("../data/rarity.json?v=891992e")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=db74260"), getJSON("../data/rarity.json?v=db74260")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -69,12 +69,12 @@ function recordAuthDebug(step, data = {}) {
 function authDebugHtml() {
   const log = store.get("authDebug", []);
   if (!log.length) return "";
-  const step = { begin: "①ログイン開始", begin_returned_without_navigating: "⚠️ページ移動が始まらなかった",
-    begin_error: "❌ログイン開始でエラー", redirect_result: "②Googleから戻った直後の結果", auth_state: "③ログイン状態の確認" };
+  const step = { begin: "①ログイン開始", popup_result: "②ポップアップの結果",
+    begin_error: "❌ログインでエラー", auth_state: "③ログイン状態の確認" };
   const line = (e) => {
     const time = new Date(e.t).toLocaleTimeString("ja-JP");
     let detail = "";
-    if (e.step === "redirect_result") detail = e.ok ? (e.hasUser ? "ログイン成功" : "ログイン情報なし（未完了）") : `エラー：${e.code || e.message || "不明"}`;
+    if (e.step === "popup_result") detail = e.ok ? "ログイン成功" : `エラー：${e.code || e.message || "不明"}`;
     else if (e.step === "auth_state") detail = e.hasUser ? "ログイン中" : "未ログイン";
     else if (e.step === "begin_error") detail = `エラー：${e.code || e.message || "不明"}`;
     return `${time}　${esc(step[e.step] || e.step)}${detail ? "　" + esc(detail) : ""}`;
@@ -82,8 +82,7 @@ function authDebugHtml() {
   return `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--ink-soft);font-size:12px">ログインの診断ログ（直近${log.length}件）</summary>
     <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);line-height:1.8;font-family:monospace">${log.map(line).join("<br>")}</div></details>`;
 }
-// ログイン成功後の共通処理（リダイレクト帰り・永続化されたセッションの両方から呼ぶ）。
-// クラウドの図鑑をこの端末の図鑑と足し合わせ（上書きしない）、Firestoreへまとめて書く。
+// ログイン成功後の共通処理。クラウドの図鑑をこの端末の図鑑と足し合わせ（上書きしない）、Firestoreへまとめて書く。
 async function applyLoggedInProfile(cloud, user) {
   store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
   const cloudProfile = await cloud.pullProfile(user.uid).catch(() => null);
@@ -106,17 +105,20 @@ async function doLogin() {
   try {
     const cloud = await import("./cloud.js");
     if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); loginInFlight = false; return; }
-    // ページ遷移方式（signInWithRedirect）。ここでGoogleのページへ移動する。戻ってきたら起動時の syncAuthState() が続きを行う
-    await cloud.beginSignIn();
-    // 通常、上の行でページ遷移が始まるのでここには来ない。来た場合は遷移が起きなかったということなので記録する
-    recordAuthDebug("begin_returned_without_navigating");
+    const user = await cloud.signIn(); // ポップアップ方式。ここでGoogleの選択画面が別ウィンドウで開く
+    recordAuthDebug("popup_result", { ok: true });
+    await applyLoggedInProfile(cloud, user);
+    toast("ログインしました");
+    route();
   } catch (e) {
     const msg = String(e), code = e && e.code ? String(e.code) : "";
     let t = "ログインできませんでした";
     if (msg.includes("not_configured")) t = "ログイン機能は準備中です";
     else if (msg.includes("unauthorized-domain")) t = "このサイトのドメインがFirebaseに未登録です（運営者向け：承認済みドメインを確認）";
+    else if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) t = "ログインがキャンセルされました";
+    else if (code.includes("popup-blocked")) t = "ポップアップがブロックされました。ブラウザの設定を確認してください";
     toast(t);
-    recordAuthDebug("begin_error", { code, message: msg.slice(0, 200) });
+    recordAuthDebug("popup_result", { ok: false, code, message: msg.slice(0, 200) });
     console.error("[login]", e);
   } finally {
     loginInFlight = false;
@@ -128,30 +130,14 @@ async function doLogout() {
   toast("ログアウトしました（この端末の記録は残ります）");
   route();
 }
-// 起動時に1回だけ、①Googleからのリダイレクト帰りか確認し、そうならログイン完了処理をする。
-// ②リダイレクト帰りでなければ、この端末の記録（cloudUid）と、Firebase Authの実際の状態（永続化されたセッション）を照らし合わせる。
-// どちらも1回確認したら終わり（常時監視はしない）ので、通信・コストは増えない。
+// 起動時に1回だけ、この端末の記録（cloudUid）と、Firebase Authの実際の状態（永続化されたセッション）を照らし合わせる。
+// 1回確認したら終わり（常時監視はしない）ので、通信・コストは増えない。
 let authChecked = false, authUnsub = null;
 async function syncAuthState() {
   if (authChecked) return;
   try {
     const cloud = await import("./cloud.js");
     if (!(await cloud.isCloudEnabled())) return;
-    let redirectError = null;
-    const redirected = await cloud.consumeRedirectResult().catch((e) => {
-      redirectError = e; console.error("[login]", e); return null;
-    });
-    recordAuthDebug("redirect_result", redirectError
-      ? { ok: false, code: redirectError.code || "", message: String(redirectError).slice(0, 200) }
-      : { ok: true, hasUser: !!redirected });
-    if (redirected) {
-      authChecked = true;
-      await applyLoggedInProfile(cloud, redirected);
-      toast("ログインしました");
-      route();
-      return;
-    }
-    if (redirectError) toast("ログインでエラーが起きました（設定の診断ログを確認してください）");
     // 注意：onAuthStateChanged はコールバックを同期的に（登録直後、この行の代入が終わるより前に）呼ぶことがある。
     // そのため、コールバックの中で「代入されたばかりの unsub」を直接参照すると、
     // 代入前に参照してしまう不具合（ReferenceError）が起きる。外側の変数に入れ、購読解除は次のイベントループへ回して防ぐ。

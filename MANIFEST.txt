@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 891992e
+版番号: db74260
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 830（この一覧を含む）
 合計サイズ: 29.01 MB
@@ -422,14 +422,14 @@
   app/avatars/yoshida-kenko.svg  4871
   app/avatars/yoshida-shoin.svg  4841
   app/avatars/zhuge-liang.svg  7446
-  app/cloud.js  6193
+  app/cloud.js  6505
   app/guide.css  1211
   app/guide.js  3961
   app/icons/apple-touch-icon.png  3502
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
   app/index.html  3095
-  app/main.js  84889
+  app/main.js  83956
   app/meta.json  7795
   app/motion.css  2141
   app/motion.js  10614

@@ -45,25 +45,27 @@ export async function onAuthChange(cb) {
   return ctx.authMod.onAuthStateChanged(ctx.auth, (user) => cb(user ? { uid: user.uid, name: user.displayName, photo: user.photoURL, email: user.email } : null));
 }
 
-// ログイン開始：ポップアップ方式（signInWithPopup）ではなく、ページ遷移方式（signInWithRedirect）を使う。
-// ポップアップは、内部でストレージ確認用の隠しiframeを使うため、モバイルのSafari／LINEやX等アプリ内ブラウザの
-// サードパーティCookie制限で、ポップアップも出ないままハングする（エラーにもならず、画面が固まって見える）ことがある。
-// リダイレクト方式は隠しiframeを使わないため、この種の環境でも確実に動く（Firebase公式が推奨する方式）。
-// この関数を呼ぶと、この場でGoogleのページへ移動する（戻り値はない）。戻ってきたら consumeRedirectResult() で受け取る。
-export async function beginSignIn() {
+// ログイン開始：ポップアップ方式（signInWithPopup）を使う。
+//
+// 実測の経緯（2026-09-29）：
+// 最初はポップアップ方式で実装し、実機で最後まで（Firestoreへの保存まで）成功していた。
+// その後、①別の不具合（onAuthStateChangedのコールバック内でのReferenceError）が原因で
+// 画面が固まる症状が出たため、②切り分けのためページ遷移方式（signInWithRedirect）へ変更した。
+// ところが redirect 方式では、Googleの画面から戻ってきた直後、エラーは出ないまま
+// getRedirectResult() が一貫して「ログイン情報なし」を返した（実機のログで確認）。
+// これは、authDomain（ijin-shindan.firebaseapp.com）とアプリ本体（ijin-shindan.github.io）が
+// 別ドメインであることに起因する、既知のFirebaseの制約が原因と考えられる：
+// redirect方式は、Googleから戻る際の認証情報を、両ドメインをまたいだストレージ経由で
+// 橋渡しする必要があり、ブラウザのサードパーティストレージ制限下ではこれが
+// エラーも出さずに失敗することがある。
+// 一方popup方式は、別ウィンドウとの postMessage で直接やり取りするため、この制約を受けにくい。
+// ①の不具合はすでに修正済みのため、実績のあるpopup方式に戻した。
+export async function signIn() {
   const ctx = await initApp();
   if (!ctx) throw new Error("not_configured");
   const provider = new ctx.authMod.GoogleAuthProvider();
-  await ctx.authMod.signInWithRedirect(ctx.auth, provider);
-}
-
-// Googleのページから戻ってきた直後に1回だけ呼ぶ。ログインが完了していれば本人の情報を返す。そうでなければ null
-export async function consumeRedirectResult() {
-  const ctx = await initApp();
-  if (!ctx) return null;
-  const cred = await ctx.authMod.getRedirectResult(ctx.auth);
-  const user = cred?.user;
-  return user ? { uid: user.uid, name: user.displayName, photo: user.photoURL, email: user.email } : null;
+  const { user } = await ctx.authMod.signInWithPopup(ctx.auth, provider);
+  return { uid: user.uid, name: user.displayName, photo: user.photoURL, email: user.email };
 }
 
 export async function signOutUser() {
