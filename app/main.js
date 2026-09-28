@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=db74260";
+import { AXES, Shindan, loadData } from "./shindan.js?v=7542fb8";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=db74260"), getJSON("../data/rarity.json?v=db74260")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=7542fb8"), getJSON("../data/rarity.json?v=7542fb8")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;

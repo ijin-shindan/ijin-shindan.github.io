@@ -2,6 +2,27 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <script>
+    // LINEのアプリ内ブラウザからのアクセスだけ、外部ブラウザ（Safari／Chrome等）へ自動で移動する。
+    // X・Instagram・Threads・通常のブラウザは対象外（何もしない。誤判定を避けるため、LINEだけを狭く判定する）。
+    // 仕組み：LINEアプリは、開こうとしているリンクのURLに openExternalBrowser=1 が含まれていると、
+    // そのリンクを外部ブラウザで開く（LINE公式ドキュメントの仕様ではないが、広く知られ実績のあるやり方）。
+    // スクリプトからの直接の画面遷移（location.href=…）ではこの判定が働かないため、
+    // リンク要素を作って「タップされた」形にして開かせる。他アプリのブラウザは何もしないので安全側。
+    (function () {
+      var ua = navigator.userAgent || "";
+      if (!/Line\//.test(ua)) return; // LINE以外（X・Instagram・Threads・Safari・Chrome等）はここで終了、何もしない
+      if (location.href.indexOf("openExternalBrowser=1") > -1) return; // 既に一度試みた。無限ループにしない
+      var sep = location.href.indexOf("?") > -1 ? "&" : "?";
+      var a = document.createElement("a");
+      a.href = location.href + sep + "openExternalBrowser=1";
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.documentElement.appendChild(a);
+      a.click();
+      a.remove();
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>世界の偉人性格診断</title>
   <meta name="description" content="12の質問で、100人の偉人のうち誰に近いかがわかる。相性とレベルアップつき。登録なし・約1分半。">
@@ -19,10 +40,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- フォントは表示を止めないように読みこむ -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@900&family=M+PLUS+Rounded+1c:wght@500;800&display=swap" onload="this.rel='stylesheet'">
-  <link rel="stylesheet" href="style.css?v=db74260">
+  <link rel="stylesheet" href="style.css?v=7542fb8">
   <link rel="stylesheet" href="motion.css?v=3">
   <link rel="stylesheet" href="guide.css?v=1">
-  <script src="analytics-privacy.js?v=db74260"></script>
+  <script src="analytics-privacy.js?v=7542fb8"></script>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="084caf0c-389c-4929-8a99-6e33effdbac5" data-exclude-hash="true" data-exclude-search="true" data-auto-track="false" data-do-not-track="true" data-before-send="ijinAnalyticsBeforeSend" data-domains="ijin-shindan.github.io"></script>
 </head>
 <body>
@@ -49,6 +70,6 @@
       if (b && !window.__ijinReady) { b.classList.add("waiting"); b.textContent = "準備中…"; }
     });
   </script>
-  <script type="module" src="main.js?v=db74260"></script>
+  <script type="module" src="main.js?v=7542fb8"></script>
 </body>
 </html>
