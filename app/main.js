@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=de271fd";
+import { AXES, Shindan, loadData } from "./shindan.js?v=54566d2";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=de271fd"), getJSON("../data/rarity.json?v=de271fd")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=54566d2"), getJSON("../data/rarity.json?v=54566d2")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -57,33 +57,33 @@ function accountBanner(place) {
     me: "ログインすると、もっと楽しくなります" }[place] || "ログインすると、もっと楽しくなります";
   return `<div class="login-nudge"><p>${esc(msg)}</p><button class="btn-google sm" data-login>${googleBtnInner()}</button></div>`;
 }
+// ログイン成功後の共通処理（リダイレクト帰り・永続化されたセッションの両方から呼ぶ）。
+// クラウドの図鑑をこの端末の図鑑と足し合わせ（上書きしない）、Firestoreへまとめて書く。
+async function applyLoggedInProfile(cloud, user) {
+  store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
+  const cloudProfile = await cloud.pullProfile(user.uid).catch(() => null);
+  const isNewUser = !cloudProfile;
+  const merged = { ...(cloudProfile?.zukan || {}), ...store.get("zukan", {}) };
+  store.set("zukan", merged);
+  const token = inviteToken();
+  // uid・email・displayName・photoURL は毎回のログインで最新化。createdAt は初回だけ書く（merge:true なので既存値は消えない）
+  const patch = { uid: user.uid, displayName: user.name || "", email: user.email || "", photoURL: user.photo || "",
+    zukan: merged, inviteToken: token, diagCount: store.get("diagCount", 0), lastLoginAt: Date.now() };
+  if (isNewUser) patch.createdAt = Date.now();
+  await cloud.pushProfile(user.uid, patch);
+  await cloud.ensureInvite(user.uid, token);
+}
 async function doLogin() {
   try {
     const cloud = await import("./cloud.js");
     if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); return; }
-    const user = await cloud.signIn();
-    store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
-    // クラウドの図鑑と、この端末の図鑑を足し合わせる（上書きしない）
-    const cloudProfile = await cloud.pullProfile(user.uid).catch(() => null);
-    const isNewUser = !cloudProfile;
-    const merged = { ...(cloudProfile?.zukan || {}), ...store.get("zukan", {}) };
-    store.set("zukan", merged);
-    const token = inviteToken();
-    // uid・email・displayName・photoURL は毎回のログインで最新化。createdAt は初回だけ書く（merge:true なので既存値は消えない）
-    const patch = { uid: user.uid, displayName: user.name || "", email: user.email || "", photoURL: user.photo || "",
-      zukan: merged, inviteToken: token, diagCount: store.get("diagCount", 0), lastLoginAt: Date.now() };
-    if (isNewUser) patch.createdAt = Date.now();
-    await cloud.pushProfile(user.uid, patch);
-    await cloud.ensureInvite(user.uid, token);
-    toast("ログインしました");
-    route();
+    // ページ遷移方式（signInWithRedirect）。ここでGoogleのページへ移動する。戻ってきたら起動時の syncAuthState() が続きを行う
+    await cloud.beginSignIn();
   } catch (e) {
     const msg = String(e);
     let t = "ログインできませんでした";
     if (msg.includes("not_configured")) t = "ログイン機能は準備中です";
     else if (msg.includes("unauthorized-domain")) t = "このサイトのドメインがFirebaseに未登録です（運営者向け：承認済みドメインを確認）";
-    else if (msg.includes("popup-closed-by-user") || msg.includes("cancelled-popup-request")) t = "ログインがキャンセルされました";
-    else if (msg.includes("popup-blocked")) t = "ポップアップがブロックされました。設定を確認してください";
     toast(t);
     console.error("[login]", e);
   }
@@ -94,16 +94,28 @@ async function doLogout() {
   toast("ログアウトしました（この端末の記録は残ります）");
   route();
 }
-// この端末の記録（cloudUid）と、Firebase Authの実際のログイン状態を起動時に1回だけ照らし合わせる。
-// ずれていた場合だけ直して再描画する。常時監視はしない（1回で購読解除）ので、通信・コストは増えない。
-let authChecked = false;
+// 起動時に1回だけ、①Googleからのリダイレクト帰りか確認し、そうならログイン完了処理をする。
+// ②リダイレクト帰りでなければ、この端末の記録（cloudUid）と、Firebase Authの実際の状態（永続化されたセッション）を照らし合わせる。
+// どちらも1回確認したら終わり（常時監視はしない）ので、通信・コストは増えない。
+let authChecked = false, authUnsub = null;
 async function syncAuthState() {
   if (authChecked) return;
   try {
     const cloud = await import("./cloud.js");
     if (!(await cloud.isCloudEnabled())) return;
-    const unsub = await cloud.onAuthChange((user) => {
-      if (authChecked) return; // 2回目以降の通知（実際のログイン操作など）は doLogin/doLogout 側で扱う
+    const redirected = await cloud.consumeRedirectResult().catch((e) => { console.error("[login]", e); return null; });
+    if (redirected) {
+      authChecked = true;
+      await applyLoggedInProfile(cloud, redirected);
+      toast("ログインしました");
+      route();
+      return;
+    }
+    // 注意：onAuthStateChanged はコールバックを同期的に（登録直後、この行の代入が終わるより前に）呼ぶことがある。
+    // そのため、コールバックの中で「代入されたばかりの unsub」を直接参照すると、
+    // 代入前に参照してしまう不具合（ReferenceError）が起きる。外側の変数に入れ、購読解除は次のイベントループへ回して防ぐ。
+    authUnsub = await cloud.onAuthChange((user) => {
+      if (authChecked) return; // 2回目以降の通知は doLogin/doLogout 側で扱う
       authChecked = true;
       const hadLocal = !!store.get("cloudUid");
       if (user && !hadLocal) {
@@ -115,9 +127,9 @@ async function syncAuthState() {
         store.del("cloudUid"); store.del("cloudName"); store.del("cloudPhoto");
         route();
       }
-      if (typeof unsub === "function") unsub();
+      setTimeout(() => { if (typeof authUnsub === "function") authUnsub(); }, 0);
     });
-  } catch {}
+  } catch (e) { console.error("[auth-sync]", e); }
 }
 let currentMode = "none", nextSrc = null;
 const ctaSeen = new Set();

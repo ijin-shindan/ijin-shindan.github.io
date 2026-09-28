@@ -45,12 +45,25 @@ export async function onAuthChange(cb) {
   return ctx.authMod.onAuthStateChanged(ctx.auth, (user) => cb(user ? { uid: user.uid, name: user.displayName, photo: user.photoURL, email: user.email } : null));
 }
 
-export async function signIn() {
+// ログイン開始：ポップアップ方式（signInWithPopup）ではなく、ページ遷移方式（signInWithRedirect）を使う。
+// ポップアップは、内部でストレージ確認用の隠しiframeを使うため、モバイルのSafari／LINEやX等アプリ内ブラウザの
+// サードパーティCookie制限で、ポップアップも出ないままハングする（エラーにもならず、画面が固まって見える）ことがある。
+// リダイレクト方式は隠しiframeを使わないため、この種の環境でも確実に動く（Firebase公式が推奨する方式）。
+// この関数を呼ぶと、この場でGoogleのページへ移動する（戻り値はない）。戻ってきたら consumeRedirectResult() で受け取る。
+export async function beginSignIn() {
   const ctx = await initApp();
   if (!ctx) throw new Error("not_configured");
   const provider = new ctx.authMod.GoogleAuthProvider();
-  const { user } = await ctx.authMod.signInWithPopup(ctx.auth, provider);
-  return { uid: user.uid, name: user.displayName, photo: user.photoURL, email: user.email };
+  await ctx.authMod.signInWithRedirect(ctx.auth, provider);
+}
+
+// Googleのページから戻ってきた直後に1回だけ呼ぶ。ログインが完了していれば本人の情報を返す。そうでなければ null
+export async function consumeRedirectResult() {
+  const ctx = await initApp();
+  if (!ctx) return null;
+  const cred = await ctx.authMod.getRedirectResult(ctx.auth);
+  const user = cred?.user;
+  return user ? { uid: user.uid, name: user.displayName, photo: user.photoURL, email: user.email } : null;
 }
 
 export async function signOutUser() {
