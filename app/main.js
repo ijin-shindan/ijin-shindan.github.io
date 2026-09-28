@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=e25784a";
+import { AXES, Shindan, loadData } from "./shindan.js?v=657453f";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,7 +10,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=e25784a"), getJSON("../data/rarity.json?v=e25784a")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=657453f"), getJSON("../data/rarity.json?v=657453f")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -41,6 +41,10 @@ if (!store.get("price")) store.set("price", [300, 480, 680][Math.floor(Math.rand
 if (new URLSearchParams(location.search).get("notrack") === "1") { try { localStorage.setItem("umami.disabled", "1"); } catch {} }
 const RETURNING = !!store.get("visited");
 // この端末の招待トークン（ログイン前でも仮に持てる。ログイン後は cloud.ensureInvite で uid と結びつける）
+// Googleでログインするボタンの中身（アイコン＋文言）。白背景・薄い枠の、控えめなボタンにする
+function googleBtnInner(label = "Googleで続ける") {
+  return `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.19l-2.92-2.26c-.81.54-1.85.87-3.04.87-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg><span>${esc(label)}</span>`;
+}
 function inviteToken() {
   let t = store.get("inviteToken");
   if (!t) { t = Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); store.set("inviteToken", t); }
@@ -49,16 +53,16 @@ function inviteToken() {
 // ログインボタンの見出し文（場所ごとに少し変える）
 function accountBanner(place) {
   if (store.get("cloudUid")) return "";
-  const msg = { zukan: "ログインすると、図鑑をずっと保存できます", result: "この偉人をずっと図鑑に残すなら",
-    me: "ログインすると、図鑑を保存でき、友達を招待できます" }[place] || "ログインすると、もっと楽しくなります";
-  return `<div class="login-banner"><p>🔑 ${esc(msg)}</p><button class="btn sub" data-login>Googleでログイン</button></div>`;
+  const msg = { zukan: "図鑑をクラウドに保存しませんか？", result: "この偉人を、ずっと図鑑に残すなら",
+    me: "ログインすると、もっと楽しくなります" }[place] || "ログインすると、もっと楽しくなります";
+  return `<div class="login-nudge"><p>${esc(msg)}</p><button class="btn-google sm" data-login>${googleBtnInner()}</button></div>`;
 }
 async function doLogin() {
   try {
     const cloud = await import("./cloud.js");
     if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); return; }
     const user = await cloud.signIn();
-    store.set("cloudUid", user.uid); store.set("cloudName", user.name || "");
+    store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
     // クラウドの図鑑と、この端末の図鑑を足し合わせる（上書きしない）
     const cloudProfile = await cloud.pullProfile(user.uid).catch(() => null);
     const isNewUser = !cloudProfile;
@@ -86,7 +90,7 @@ async function doLogin() {
 }
 async function doLogout() {
   try { const cloud = await import("./cloud.js"); await cloud.signOutUser(); } catch {}
-  store.del("cloudUid"); store.del("cloudName");
+  store.del("cloudUid"); store.del("cloudName"); store.del("cloudPhoto");
   toast("ログアウトしました（この端末の記録は残ります）");
   route();
 }
@@ -795,8 +799,10 @@ function renderZukan() {
   trackCta("zukan");
   const z = store.get("zukan", {});
   app.style.cssText = "";
+  const zPct = Math.round((zukanCount() / Math.max(1, FREE.length)) * 100);
   app.innerHTML = `
     <div class="zhead"><h1>偉人図鑑</h1><span class="cnt">発見 <b>${zukanCount()}</b> / ${FREE.length}${LOCKED.length ? `（＋鍵つき ${LOCKED.length}）` : ""}</span></div>
+    <div class="progress-line" style="margin:0 0 10px"><div class="bar"><i style="width:${zPct}%"></i></div></div>
     <p class="note" style="text-align:left">自分の診断（通常・恋愛）の結果に出た偉人が「発見」として登録されます。相性や友達の結果で名前を見かけた偉人は🔒のまま（${knownCount()}人）。</p>
     ${accountBanner("zukan")}
     ${SD.types.map((t) => `<div class="zrow"><h2><i style="background:${THEMES[t.id].accent}"></i>${esc(t.name)}</h2>
@@ -830,19 +836,40 @@ const sd_type = (id) => SD.type(fig(id).type);
 
 // ---------------- マイページ（#/me）：この端末の保存データを読むだけ。新しい保存はしない ----------------
 function accountCard() {
-  const uid = store.get("cloudUid"), name = store.get("cloudName");
+  const uid = store.get("cloudUid"), name = store.get("cloudName"), photo = store.get("cloudPhoto");
   if (!uid) return `<section class="card login-card">
-      <h2 style="margin-top:0">ログインして図鑑を育てよう</h2>
-      <p class="note" style="text-align:left;margin:0 0 12px">Googleでログインすると、出会った偉人の図鑑を保存できます。友達を診断に招待して、届いた分だけ偉人を集めることもできます。ログインしなくても、診断・結果閲覧・シェアはこれまでどおり自由に使えます。</p>
-      <button class="btn start" data-login>🔑 Googleでログイン</button></section>`;
+      <h2 style="margin:0 0 6px">あなたの偉人図鑑を育てよう</h2>
+      <p class="note" style="text-align:left;margin:0 0 12px">診断した偉人を集めて、あなただけの図鑑をつくれます。</p>
+      <ul class="login-perks"><li>図鑑をクラウドに保存</li><li>機種が変わっても引き継げる</li><li>友達にも診断してもらえる</li></ul>
+      <button class="btn-google" data-login>${googleBtnInner()}</button>
+      <p class="note" style="text-align:center;margin:10px 0 0">ログインしなくても診断はそのまま遊べます</p></section>`;
+  return `<section class="card profile-card">
+      <div class="profile-row">
+        <div class="profile-avatar">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.remove()">` : ""}<span>${esc((name || "?").slice(0, 1))}</span></div>
+        <div><div class="profile-name">${esc(name || "ログイン中")}</div><div class="note" style="margin:2px 0 0">図鑑をクラウドに保存しています</div></div>
+      </div></section>`;
+}
+// 図鑑の集まり具合を大きく見せる（マイページ・優先順位2位）
+function zukanSummaryCard() {
+  const n = zukanCount(), total = FREE.length, pct = Math.round((n / Math.max(1, total)) * 100);
+  return `<section class="card zukan-summary">
+      <h2 style="margin:0 0 10px">偉人図鑑</h2>
+      <div class="zukan-big"><b>${n}</b><span>/ ${total}</span></div>
+      <div class="progress-line" style="margin:10px 0 4px"><div class="bar"><i style="width:${pct}%"></i></div></div>
+      <p class="note" style="text-align:left;margin:8px 0 14px">名前だけ知っている偉人　🔒 ${knownCount()}人</p>
+      <a class="btn sub" href="#/zukan">図鑑を見る</a></section>`;
+}
+// 友達招待（ログインしていないと、届いた結果を本人のところへ集められないため、ログイン時のみ表示）
+function inviteCard() {
+  const uid = store.get("cloudUid");
+  if (!uid) return "";
   const token = inviteToken(), inviteUrl = `${location.origin}${location.pathname}#/invite/${token}`;
-  return `<section class="card login-card on">
-      <h2 style="margin-top:0">👤 ${esc(name || "ログイン中")}</h2>
-      <p class="note" style="text-align:left;margin:0 0 14px">図鑑はこの端末とクラウドの両方に保存されます。</p>
-      <p class="note" style="text-align:left;margin:0 0 6px;font-weight:800;color:var(--ink)">友達を招待するリンク</p>
-      <div class="invite-url"><input readonly value="${esc(inviteUrl)}" onclick="this.select()"><button class="btn sub" data-copy-invite="${esc(inviteUrl)}">コピー</button></div>
-      <p class="note" style="text-align:left;margin:8px 0 0" id="invite-count">友達がこのリンクから診断すると、ここに数が出ます</p>
-      <button class="btn sub" data-logout style="margin-top:16px">ログアウト</button></section>`;
+  return `<section class="card invite-card">
+      <h2 style="margin:0 0 6px">友達にも診断してもらおう</h2>
+      <p class="note" style="text-align:left;margin:0 0 14px">リンクを送ると、友達が12問に答えて偉人と出会えます。診断してくれた人数が、ここに届きます。</p>
+      <button class="btn gold" data-invite-send data-invite-url="${esc(inviteUrl)}">友達に送る</button>
+      <button class="btn-text" data-copy-invite="${esc(inviteUrl)}">🔗 リンクをコピー</button>
+      <p class="note" id="invite-count" style="text-align:left;margin:10px 0 0">まだ届いていません</p></section>`;
 }
 function renderMe() {
   document.title = "マイページ｜世界の偉人性格診断";
@@ -867,20 +894,21 @@ function renderMe() {
       + hist.map((h) => row(m, h, `以前の${name}の結果`)).join("");
   }).join("");
   const friends = store.get("friends", []).filter((x) => ok(x.mode, x));
+  const loggedIn = !!store.get("cloudUid");
   app.innerHTML = `
     <div class="zhead"><h1>マイページ</h1></div>
     ${accountCard()}
-    <section class="card"><h2>自分の結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
-    <section class="card"><h2>図鑑</h2>
-      <p style="margin:0 0 10px">発見 <b>${zukanCount()}</b> / ${FREE.length}人　・　名前だけ知っている 🔒 <b>${knownCount()}</b>人</p>
-      <a class="btn sub" href="#/zukan">図鑑を見る</a></section>
+    ${zukanSummaryCard()}
+    <section class="card"><h2>自分の診断結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
+    ${inviteCard()}
     <section class="card"><h2>リンクで受け取った結果</h2>
       ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に受け取り${store.get("me." + x.mode)?.code === x.code ? "（いまの自分の結果に保存中）" : ""}`, relFace(x.fig))).join("")}</div>
         <p class="note" style="text-align:left;margin:8px 0 0">友達などから届いたリンクの結果です。あなたの結果とは別に保存されています（最大20件）。</p>`
         : `<p class="note" style="text-align:left;margin:0">まだありません。友達から結果のリンクが届くと、ここに並びます。</p>`}</section>
-    <section class="card"><h2>保存について</h2>
-      <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています（アカウントはありません）。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
-      <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a></section>
+    <section class="card"><h2>設定</h2>
+      <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
+      <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a>
+      ${loggedIn ? `<button class="btn-text" data-logout>ログアウト</button>` : ""}</section>
     <a class="btn sub" href="#/how">このサイトの使い方</a>
     <a class="btn sub" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
@@ -1008,6 +1036,12 @@ app.addEventListener("click", (e) => { const el = e.target.closest("[data-src]")
 app.addEventListener("click", (e) => {
   if (e.target.closest("[data-login]")) doLogin();
   else if (e.target.closest("[data-logout]")) doLogout();
+  else if (e.target.closest("[data-invite-send]")) {
+    const url = e.target.closest("[data-invite-send]").dataset.inviteUrl;
+    const text = "偉人性格診断、あなたも12問に答えて偉人と出会ってみて！";
+    if (navigator.share) navigator.share({ text, url }).catch(() => {});
+    else { navigator.clipboard?.writeText(url).then(() => toast("リンクをコピーしました。友達に貼って送ってください")).catch(() => toast("コピーできませんでした")); }
+  }
   else { const c = e.target.closest("[data-copy-invite]"); if (c) { navigator.clipboard?.writeText(c.dataset.copyInvite).then(() => toast("リンクをコピーしました")).catch(() => toast("コピーできませんでした")); } }
 });
 function route() {
