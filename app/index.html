@@ -2,6 +2,20 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
+  <script>
+    // アドレスバーのURLを正規化する（openExternalBrowser=1を必ず含む形に）。
+    // ページ遷移・再読み込みはしない（history.replaceStateのみ）。既存のquery/hashは壊さない。
+    // LINE等のUser-Agent判定は行わない・強制的な外部ブラウザ遷移も行わない。
+    (function () {
+      try {
+        var u = new URL(location.href);
+        if (u.searchParams.get("openExternalBrowser") === "1") return; // 既に正規化済み
+        u.searchParams.set("openExternalBrowser", "1");
+        if (!u.hash) u.hash = "#/"; // 素のトップURLだけ、hashを補う
+        history.replaceState(null, "", u.href);
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>世界の偉人性格診断</title>
   <meta name="description" content="12の質問で、100人の偉人のうち誰に近いかがわかる。相性とレベルアップつき。登録なし・約1分半。">
@@ -19,10 +33,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- フォントは表示を止めないように読みこむ -->
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@900&family=M+PLUS+Rounded+1c:wght@500;800&display=swap" onload="this.rel='stylesheet'">
-  <link rel="stylesheet" href="style.css?v=59ce973">
+  <link rel="stylesheet" href="style.css?v=2594426">
   <link rel="stylesheet" href="motion.css?v=3">
   <link rel="stylesheet" href="guide.css?v=1">
-  <script src="analytics-privacy.js?v=59ce973"></script>
+  <script src="analytics-privacy.js?v=2594426"></script>
   <script defer src="https://cloud.umami.is/script.js" data-website-id="084caf0c-389c-4929-8a99-6e33effdbac5" data-exclude-hash="true" data-exclude-search="true" data-auto-track="false" data-do-not-track="true" data-before-send="ijinAnalyticsBeforeSend" data-domains="ijin-shindan.github.io"></script>
 </head>
 <body>
@@ -49,6 +63,6 @@
       if (b && !window.__ijinReady) { b.classList.add("waiting"); b.textContent = "準備中…"; }
     });
   </script>
-  <script type="module" src="main.js?v=59ce973"></script>
+  <script type="module" src="main.js?v=2594426"></script>
 </body>
 </html>
