@@ -1,16 +1,16 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 2594426
+版番号: 22035b3
 公開先: https://ijin-shindan.github.io/app/
-ファイル数: 830（この一覧を含む）
-合計サイズ: 29.01 MB
+ファイル数: 831（この一覧を含む）
+合計サイズ: 29.02 MB
 
 主なフォルダ（ファイル数・サイズ）:
   app/og/                    201 件    23.42 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
   app/s/                     200 件     0.22 MB
-  data/                        9 件     0.16 MB
-  app/                        11 件     0.16 MB
+  data/                       10 件     0.17 MB
+  app/                        11 件     0.17 MB
   app/icons/                   3 件     0.01 MB
   （一番上）                        4 件     0.00 MB
 
@@ -422,14 +422,14 @@
   app/avatars/yoshida-kenko.svg  4871
   app/avatars/yoshida-shoin.svg  4841
   app/avatars/zhuge-liang.svg  7446
-  app/cloud.js  6505
+  app/cloud.js  7148
   app/guide.css  1211
   app/guide.js  3961
   app/icons/apple-touch-icon.png  3502
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
   app/index.html  3832
-  app/main.js  84533
+  app/main.js  90860
   app/meta.json  7795
   app/motion.css  2141
   app/motion.js  10614
@@ -834,15 +834,16 @@
   app/s/normal/yoshida-kenko.html  1063
   app/s/normal/yoshida-shoin.html  1060
   app/s/normal/zhuge-liang.html  1078
-  app/shindan.js  7072
-  app/style.css  29768
+  app/shindan.js  7161
+  app/style.css  30042
   data/axes.json  2449
   data/firebase.json  754
-  data/plans.json  1554
+  data/plans.json  1866
   data/questions.json  5660
+  data/questions_friend.json  2538
   data/questions_love.json  6452
   data/rarity.json  4637
-  data/rules.json  5200
+  data/rules.json  6121
   data/texts.json  116900
   data/types.json  20106
   index.html  450

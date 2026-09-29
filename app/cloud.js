@@ -96,7 +96,8 @@ export async function ensureInvite(uid, token) {
   await ctx.fsMod.setDoc(ctx.fsMod.doc(ctx.db, "invites", token), { ownerUid: uid, createdAt: Date.now() }, { merge: true });
 }
 
-// 招待リンク経由で友達が診断した結果を記録する（現状は友達自身のSELF結果。本人についての他己診断は将来）
+// 招待リンク経由で友達が診断した結果を記録する。
+// entry.mode = "friend" は「友達から見た招待主」の結果（本人についての他己診断）。回答者の身元は保存しない
 export async function recordInviteResponse(token, entry) {
   const ctx = await initApp();
   if (!ctx) return false;
@@ -111,6 +112,19 @@ export async function countInviteResponses(token) {
   if (!ctx) return 0;
   const snap = await ctx.fsMod.getCountFromServer(ctx.fsMod.collection(ctx.db, "invites", token, "responses"));
   return snap.data().count;
+}
+
+// 招待の持ち主が、届いた「友達診断」だけをまとめて読む（本人ログイン時のみ）。
+// Security Rulesで、招待の持ち主本人だけがこのサブコレクションを読めるよう制限している
+export async function pullFriendResponses(token) {
+  const ctx = await initApp();
+  if (!ctx) return [];
+  const q = ctx.fsMod.query(
+    ctx.fsMod.collection(ctx.db, "invites", token, "responses"),
+    ctx.fsMod.where("mode", "==", "friend")
+  );
+  const snap = await ctx.fsMod.getDocs(q);
+  return snap.docs.map((d) => d.data());
 }
 
 export async function isCloudEnabled() {

@@ -7,8 +7,8 @@ const norm = (v) => Math.hypot(...v);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 
 export async function loadData(base = "../data/") {
-  const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "texts"];
-  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=2594426`).then((r) => r.json())));
+  const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "questions_friend", "texts"];
+  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=22035b3`).then((r) => r.json())));
   return Object.fromEntries(names.map((n, i) => [n, jsons[i]]));
 }
 
@@ -22,7 +22,8 @@ export class Shindan {
     this.plan = data.plans.plans[plan];
     this.mode = mode;
     this.modeConf = data.plans.modes[mode];
-    const qs = (mode === "love" ? data.questions_love : data.questions).questions;
+    const qsData = mode === "love" ? data.questions_love : mode === "friend" ? data.questions_friend : data.questions;
+    const qs = qsData.questions;
     this.questions = qs.filter((q) => this.plan.questions === "all" || q.free);
     this.calib = data.rules.calib[mode === "normal" ? plan : `${mode}-${plan}`];
     this.types = data.types.types.map((t) => ({

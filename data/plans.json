@@ -55,6 +55,18 @@
         "strong": "リード",
         "weak": "振り回され"
       }
+    },
+    "friend": {
+      "name": "友達から見た性格診断",
+      "questions_file": "questions_friend.json",
+      "matchup_labels": {
+        "strong": "得意な相手",
+        "weak": "苦手な相手"
+      },
+      "matchup_verbs": {
+        "strong": "得意",
+        "weak": "苦手"
+      }
     }
   }
 }

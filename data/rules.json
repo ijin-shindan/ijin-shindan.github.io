@@ -105,6 +105,38 @@
         1.581
       ]
     },
+    "friend-free": {
+      "_note": "友達診断（questions_friend.json, 12問）用。scripts/calibrate.py はまだ対応していないため、質問数・軸配分が同じ free をそのまま流用した暫定値。データが貯まったら再較正する。",
+      "norm_threshold": 0.829,
+      "type_bias": {
+        "haou": 0.144,
+        "hitotarashi": 0.023,
+        "gunshi": 0.053,
+        "moushou": 0.002,
+        "gi": -0.117,
+        "tetsu": -0.067,
+        "nintai": -0.13,
+        "jiai": -0.16,
+        "jinbou": -0.046,
+        "fuunji": 0.138,
+        "kabuki": 0.017,
+        "kokou": 0.044,
+        "tankyu": -0.019,
+        "kaitaku": 0.036,
+        "sensai": -0.094,
+        "jounetsu": 0.096,
+        "miyabi": -0.051,
+        "kansatsu": 0.006,
+        "suberu": 0.058
+      },
+      "breaks": [
+        0.693,
+        0.904,
+        1.091,
+        1.309,
+        1.581
+      ]
+    },
     "full": {
       "norm_threshold": 0.735,
       "type_bias": {

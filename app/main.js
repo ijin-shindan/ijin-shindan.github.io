@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=2594426";
+import { AXES, Shindan, loadData } from "./shindan.js?v=22035b3";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 
@@ -10,13 +10,13 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta, rarity;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=2594426"), getJSON("../data/rarity.json?v=2594426")]);
+  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=22035b3"), getJSON("../data/rarity.json?v=22035b3")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
 }
 window.__ijinReady = true;
-const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
+const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love"), friend: new Shindan(data, "free", "friend") };
 const SD = engines.normal;
 const texts = data.texts.figures;
 const axisById = Object.fromEntries(data.axes.axes.map((a) => [a.id, a]));
@@ -230,21 +230,35 @@ const digits = (code) => { const m = /^(?:(\d+)\.)?([1-5]+)$/.exec(code || ""); 
 const answersOf = (sd, code) => { const d = digits(code); return Object.fromEntries(ordered(sd).map((q, i) => [q.id, Number(d[i])])); };
 const validCode = (sd, code) => { const d = digits(code); return !!d && d.length === ordered(sd).length; };
 
-// 図鑑：{figureId: {src: "me|match|next|friend", at}}
+// 図鑑：{figureId: {src: "me|friend_diag|match|next|friend", sources: string[], at}}
+// src は「今のところいちばん強い発見経路」（後方互換のため残す）。sources は出会った経路を全部ためる配列（新設）
+const DISCOVER_SRC = new Set(["me", "friend_diag"]); // この2つだけが正式な図鑑「発見」（旧データの src:"me" もそのまま discovered 扱い）
 function meet(id, src) {
   if (!id || !isFree(id)) return;
   const z = store.get("zukan", {});
-  if (!z[id] || src === "me") z[id] = { src: z[id]?.src === "me" ? "me" : src, at: Date.now() };
+  const cur = z[id];
+  const prevSources = cur?.sources ?? (cur ? [cur.src] : []);
+  const sources = prevSources.includes(src) ? prevSources : [...prevSources, src];
+  const discovering = DISCOVER_SRC.has(src);
+  const wasDiscovered = cur && DISCOVER_SRC.has(cur.src);
+  if (!cur || discovering || !wasDiscovered) {
+    z[id] = { src: discovering ? src : (wasDiscovered ? cur.src : src), sources, at: Date.now() };
+  } else {
+    z[id] = { ...cur, sources };
+  }
   store.set("zukan", z);
 }
 // 図鑑の状態（保存形式は変えない。src の意味で3段階に読み分ける）
-//   DISCOVERED：自分の正式な診断結果（通常・恋愛）＝ src "me"。全身画像・説明・動きを見せる
+//   DISCOVERED：自分の正式な診断結果（通常・恋愛）src "me"、または友達診断で登録 src "friend_diag"。全身画像・説明・動きを見せる
 //   KNOWN     ：相性・もしも・共有結果などで名前だけ知った ＝ src "match" | "next" | "friend"。名前＋シルエット＋🔒未発見
 //   UNKNOWN   ：まだ記録がない。？？？＋シルエット
-const zState = (id) => { const e = store.get("zukan", {})[id]; return !e ? "unknown" : e.src === "me" ? "discovered" : "known"; };
+const zState = (id) => { const e = store.get("zukan", {})[id]; return !e ? "unknown" : DISCOVER_SRC.has(e.src) ? "discovered" : "known"; };
 const isDiscovered = (id) => zState(id) === "discovered";
-const zukanCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => e.src === "me" && SD.figures[id] && isFree(id)).length;
-const knownCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => e.src !== "me" && SD.figures[id] && isFree(id)).length;
+const zukanCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
+const knownCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => !DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
+// 図鑑の「取得元」を日本語表示用に（discoveredな経路だけ）
+const SRC_LABEL = { me: "自分の診断", friend_diag: "友達診断" };
+const sourceLabels = (id) => { const e = store.get("zukan", {})[id]; return [...new Set(e?.sources ?? (e ? [e.src] : []))].map((s) => SRC_LABEL[s]).filter(Boolean); };
 // 関連表示（相性・もしも・友達）の顔：発見済みだけ通常の絵、それ以外はシルエット＋「🔒 未発見」
 const relFace = (id) => avatar(id, !isDiscovered(id));
 const undiscTag = (id) => (isDiscovered(id) ? "" : `<span class="undisc">🔒 未発見</span>`);
@@ -314,6 +328,7 @@ function renderTop() {
 // ---------------- 質問 ----------------
 let quiz = null;
 let justFinished = null;  // 演出を出すのは、いま答え終えた結果だけ
+let friendToken = null;  // 友達診断（#/q/friend/<token>）の間だけ、対象の招待トークンを覚えておく
 
 function partialU(sd, answers) {  // 途中までの回答で軸スコアを出す（未回答の軸は0）
   return AXES.map((a) => {
@@ -343,7 +358,8 @@ function renderQuiz(mode, anim = false) {
   const { qs, answers, i } = quiz;
   const q = qs[i];
   document.title = `質問 ${i + 1}｜${sd.modeConf.name}`;
-  const intro = mode === "love" && i === 0 ? `<div class="intro">${esc(data.questions_love.intro)}</div>` : "";
+  const intro = mode === "love" && i === 0 ? `<div class="intro">${esc(data.questions_love.intro)}</div>`
+    : mode === "friend" && i === 0 ? `<div class="intro">${esc(data.questions_friend.intro)}</div>` : "";
   app.innerHTML = `
     <div class="qhead">
       <button class="back" ${i === 0 ? "disabled" : ""}>← 戻る</button>
@@ -406,6 +422,12 @@ function renderCheckpoint(mode, n) {
 function finishQuiz(mode) {
   const code = makeCode(quiz.answers);
   store.del("progress." + mode);
+  if (mode === "friend") {
+    const token = friendToken;
+    quiz = null;
+    location.hash = `#/fr/${token}/${code}`;
+    return;
+  }
   justFinished = { mode, code, source: quiz.source };
   quiz = null;
   location.hash = `#/r/${mode}/${code}`;
@@ -550,9 +572,6 @@ function renderResult(mode, code) {
     store.set("diagCount", store.get("diagCount", 0) + 1);
     const uid = store.get("cloudUid");
     if (uid) import("./cloud.js").then((cloud) => cloud.pushProfile(uid, { zukan: store.get("zukan", {}), diagCount: store.get("diagCount", 0) })).catch(() => {});
-    // 招待リンクから来た診断なら、招待もとへ結果を1件記録する（友達自身の匿名の結果として。中身の回答は送らない）
-    const from = store.get("inviteFrom");
-    if (from) { store.del("inviteFrom"); import("./cloud.js").then((cloud) => cloud.recordInviteResponse(from, { mode, fig: f.id })).catch(() => {}); }
   }
   const fate = fateOf(f.id);
   const ms = r.matchups;
@@ -879,11 +898,11 @@ function renderZukan() {
   app.innerHTML = `
     <div class="zhead"><h1>偉人図鑑</h1><span class="cnt">発見 <b>${zukanCount()}</b> / ${FREE.length}${LOCKED.length ? `（＋鍵つき ${LOCKED.length}）` : ""}</span></div>
     <div class="progress-line" style="margin:0 0 10px"><div class="bar"><i style="width:${zPct}%"></i></div></div>
-    <p class="note" style="text-align:left">自分の診断（通常・恋愛）の結果に出た偉人が「発見」として登録されます。相性や友達の結果で名前を見かけた偉人は🔒のまま（${knownCount()}人）。</p>
+    <p class="note" style="text-align:left">自分の診断（通常・恋愛）や、友達から見た診断で出た偉人が「発見」として登録されます。相性や友達の結果で名前を見かけただけの偉人は🔒のまま（${knownCount()}人）。</p>
     ${accountBanner("zukan")}
     ${SD.types.map((t) => `<div class="zrow"><h2><i style="background:${THEMES[t.id].accent}"></i>${esc(t.name)}</h2>
       <div class="zcells">${t.figures.map((f, k) => {
-        const st = k > MAX_TIER ? "locked" : z[f.id] ? (z[f.id].src === "me" ? "me" : "known") : "unseen";
+        const st = k > MAX_TIER ? "locked" : z[f.id] ? (DISCOVER_SRC.has(z[f.id].src) ? "me" : "known") : "unseen";
         return `<button class="zcell ${st}" data-id="${f.id}" data-st="${st}" style="--t-bg:${THEMES[t.id].bg}"
           aria-label="${st === "me" ? esc(f.name) : st === "known" ? `${esc(f.name)}（未発見）` : "？？？"}"><img src="${avatar(f.id, st !== "me")}" alt="">
           <span class="star">★${k + 1}</span>${st === "known" ? `<span class="znm">${esc(f.name)}</span>` : ""}${st === "locked" || st === "known" ? '<span class="lock">🔒</span>' : ""}</button>`;
@@ -895,10 +914,12 @@ function renderZukan() {
     if (st === "unseen") return toast("まだ出会っていません");
     if (st === "known") return toast(`${fig(id).name}：あなた自身の診断結果に出ると、図鑑に登録されます`);
     const tx = texts[id];
+    const srcTxt = sourceLabels(id).join("・");
     sheet.hidden = false;
     sheet.innerHTML = `<div class="panel"><div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
         <img class="tile" src="${avatar(id)}" alt="" style="width:72px;height:72px;${themeVars(fig(id).type)}">
-        <div><h2 style="margin:0">${esc(fig(id).name)}</h2><div class="note" style="text-align:left">${esc(sd_type(id).name)}・★${fig(id).tier + 1}</div></div></div>
+        <div><h2 style="margin:0">${esc(fig(id).name)}</h2><div class="note" style="text-align:left">${esc(sd_type(id).name)}・★${fig(id).tier + 1}</div>
+          ${srcTxt ? `<div class="note" style="text-align:left">取得元：${esc(srcTxt)}</div>` : ""}</div></div>
       <p style="font-family:var(--serif);font-weight:900;margin:0 0 8px">「${esc(tx.serif)}」</p><p class="body">${esc(tx.body)}</p>
       <details><summary>元ネタを見る</summary><p>${esc(tx.motoneta.text)}</p></details>
       <button class="btn sub close" style="margin-top:14px">閉じる</button></div>`;
@@ -947,6 +968,25 @@ function inviteCard() {
       <button class="btn-text" data-copy-invite="${esc(inviteUrl)}">🔗 リンクをコピー</button>
       <p class="note" id="invite-count" style="text-align:left;margin:10px 0 0">まだ届いていません</p></section>`;
 }
+// 友達から見たあなた（友達診断の集計）。表示だけ先に出し、Firestoreから届いたら#friend-diag-bodyだけ差し替える
+function friendDiagBody(agg) {
+  const mine = store.get("me.normal");
+  const entries = Object.entries(agg.counts).sort((a, b) => b[1] - a[1]);
+  if (!agg.total) return `<p class="note" style="text-align:left;margin:0">友達から見たあなたはどの偉人？　友達に診断してもらおう。</p>`;
+  const top = entries[0]?.[0];
+  return `<p class="note" style="text-align:left;margin:0 0 8px">${agg.total}人が診断しました</p>
+    <ul class="friend-diag-list">${entries.map(([id, n]) => `<li>${esc(fig(id)?.name ?? id)}　${n}人</li>`).join("")}</ul>
+    ${mine && SD.figures[mine.fig] ? `<p class="note" style="text-align:left;margin:8px 0 0">あなた自身の診断は「${esc(fig(mine.fig).name)}」でした。${top && top !== mine.fig ? "友達から見た結果とは違うみたいです。" : "友達から見た結果と同じでした！"}</p>` : ""}`;
+}
+function friendDiagCard() {
+  const uid = store.get("cloudUid");
+  if (!uid) return "";
+  const agg = store.get("friendDiagAgg", { counts: {}, total: 0 });
+  const inviteUrl = withExternalBrowserParam(`${location.origin}${location.pathname}#/invite/${inviteToken()}`);
+  return `<section class="card"><h2 style="margin:0 0 6px">友達から見たあなた</h2>
+      <div id="friend-diag-body">${friendDiagBody(agg)}</div>
+      <button class="btn-text" data-invite-send data-invite-url="${esc(inviteUrl)}">もっと友達に診断してもらう</button></section>`;
+}
 function renderMe() {
   document.title = "マイページ｜世界の偉人性格診断";
   app.style.cssText = "";
@@ -976,6 +1016,7 @@ function renderMe() {
     ${accountCard()}
     ${zukanSummaryCard()}
     <section class="card"><h2>自分の診断結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
+    ${friendDiagCard()}
     ${inviteCard()}
     <section class="card"><h2>リンクで受け取った結果</h2>
       ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に受け取り${store.get("me." + x.mode)?.code === x.code ? "（いまの自分の結果に保存中）" : ""}`, relFace(x.fig))).join("")}</div>
@@ -993,6 +1034,22 @@ function renderMe() {
   const uid = store.get("cloudUid");
   if (uid) import("./cloud.js").then((cloud) => cloud.countInviteResponses(inviteToken())).then((n) => {
     const el = $("#invite-count"); if (el && n) el.textContent = `友達が ${n} 件、このリンクから診断しました`;
+  }).catch(() => {});
+  // 友達診断の結果を、本人の権限で安全に回収する（Security Rulesで招待の持ち主だけが読める）。
+  // 届いた分を自分のzukanへ合流させ（friend_diagは正式発見）、変化があればクラウドへ書き戻す
+  if (uid) import("./cloud.js").then((cloud) => cloud.pullFriendResponses(inviteToken())).then((list) => {
+    if (!list.length) return;
+    const counts = {};
+    list.forEach((r) => { if (r.fig && SD.figures[r.fig]) counts[r.fig] = (counts[r.fig] || 0) + 1; });
+    store.set("friendDiagAgg", { counts, total: list.length });
+    let changed = false;
+    Object.keys(counts).forEach((id) => {
+      const before = isDiscovered(id);
+      meet(id, "friend_diag");
+      if (!before && isDiscovered(id)) changed = true;
+    });
+    if (changed) import("./cloud.js").then((cloud2) => cloud2.pushProfile(uid, { zukan: store.get("zukan", {}) })).catch(() => {});
+    const body = $("#friend-diag-body"); if (body) body.innerHTML = friendDiagBody({ counts, total: list.length });
   }).catch(() => {});
 }
 
@@ -1019,16 +1076,44 @@ function renderHow() {
 }
 
 // ---------------- 招待リンクのランディング（#/invite/<token>） ----------------
+// 「友達から見たあなた診断」の入口。友達（回答者）はログイン不要・自分のことではなく招待主について答える
 function renderInvite(token) {
-  document.title = "診断に招待されました｜世界の偉人性格診断";
+  document.title = "友達を診断する｜世界の偉人性格診断";
   app.style.cssText = "";
-  store.set("inviteFrom", token);
   app.innerHTML = `
     <section class="card invite-land">
-      <h1 style="margin-top:0">診断に招待されました</h1>
-      <p>12問に答えると、あなたに似た偉人と出会えます。結果は、このリンクを送ってくれた人にも「診断してくれた人がいます」という形で届きます（あなたの回答の中身が伝わることはありません）。</p>
-      <a class="btn start" data-fresh="normal" data-src="invite" href="#/q/normal">診断してみる（12問・約1分半）</a>
+      <h1 style="margin-top:0">友達から診断をお願いされました</h1>
+      <p>あなた自身のことではなく、<b>このリンクを送ってくれた人について</b>、12問答えてください。「友達から見たら、その人はどんな偉人タイプか」がわかる診断です。結果はその人に届きますが、あなたが答えた中身が伝わることはありません。ログインは不要です。</p>
+      <a class="btn start" href="#/q/friend/${esc(token)}">診断する（12問・約1分半）</a>
       <a class="btn sub" style="margin-top:10px" href="#/how">使い方を見る</a></section>`;
+  window.scrollTo(0, 0);
+}
+
+// ---------------- 友達診断の結果（#/fr/<token>/<回答コード>） ----------------
+// 回答者（友達）に見せる、招待主についての結果。回答者自身の図鑑・診断結果には一切保存しない
+function renderFriendResult(token, code) {
+  const sd = engines.friend;
+  if (!token || !validCode(sd, code)) { renderTop(); return toast("このリンクは開けませんでした"); }
+  const r = sd.diagnose(answersOf(sd, code));
+  const f = r.figure, tx = texts[f.id];
+  document.title = `友達から見ると「${f.name}」タイプ｜世界の偉人性格診断`;
+  app.style.cssText = themeVars(r.type.id);
+  const key = `${token}:${code}`, sent = store.get("friendSent", []);
+  if (!sent.includes(key)) {
+    store.set("friendSent", [...sent, key].slice(-30));
+    track("friend_diag_complete", { figure: f.id, type: r.type.id });
+    import("./cloud.js").then((cloud) => cloud.recordInviteResponse(token, { mode: "friend", fig: f.id })).catch(() => {});
+  }
+  app.innerHTML = `
+    <div class="friend-head"><h1>友達から見たその人は<br>「${esc(f.name)}」タイプでした</h1>
+      <p class="note" style="margin:6px 0 0">回答ありがとうございました。この結果はリンクを送ってくれた人に届きます。</p></div>
+    <section class="card" style="text-align:center">
+      <img class="tile" src="${avatar(f.id)}" alt="" style="width:120px;height:120px;margin:0 auto 10px;display:block">
+      <h2 style="margin:0 0 4px">${esc(f.name)}</h2>
+      <p class="note">${esc(sd_type(f.id).name)}</p>
+      <p style="font-family:var(--serif);font-weight:900;margin:10px 0 0">「${esc(tx.serif)}」</p></section>
+    <a class="btn start" data-fresh="normal" href="#/q/normal">自分も診断してみる（12問）</a>
+    <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress.normal"); quiz = null; }));
   window.scrollTo(0, 0);
 }
@@ -1138,6 +1223,8 @@ function route() {
   overlay.hidden = true; sheet.hidden = true;
   app.style.cssText = "";
   const [, page, mode, code] = location.hash.split("/");
+  if (page === "q" && mode === "friend" && code) { friendToken = code; return renderQuiz("friend"); }
+  if (page === "fr" && mode && code) return renderFriendResult(mode, code);
   if (page === "q" && engines[mode]) return renderQuiz(mode);
   if (page === "r" && engines[mode] && code) return renderResult(mode, code);
   if (page === "zukan") return renderZukan();
