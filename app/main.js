@@ -1,22 +1,23 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=c098414";
+import { AXES, Shindan, loadData } from "./shindan.js?v=a7fe851-202610171417";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
+import { separateLegacyLinkedResults } from "./legacy_data.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
-let data, meta, rarity;
+let data, meta;
 try {
-  [data, meta, rarity] = await Promise.all([loadData(), getJSON("meta.json?v=c098414"), getJSON("../data/rarity.json?v=c098414")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=a7fe851-202610171417")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
 }
 window.__ijinReady = true;
-const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love"), friend: new Shindan(data, "free", "friend") };
+const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
 const SD = engines.normal;
 const texts = data.texts.figures;
 const axisById = Object.fromEntries(data.axes.axes.map((a) => [a.id, a]));
@@ -33,151 +34,10 @@ const store = {
   set(k, v) { try { localStorage.setItem("ijin." + k, JSON.stringify(v)); } catch {} },
   del(k) { try { localStorage.removeItem("ijin." + k); } catch {} },
 };
-// 計測：解析ツール（Plausible / GA4）が入っていれば送る。回答の数字の列は送らない
-// 計測（Umami）。イベントの定義は docs/metrics-plan.md。回答の数字の列は送らない
-// 予定価格の群は、初めて来たときに決める（課金テストの比較用）
-if (!store.get("price")) store.set("price", [300, 480, 680][Math.floor(Math.random() * 3)]);
-// ?notrack=1 で開くと、この端末からの計測を止める（自分たちのアクセスを数えない）
-if (new URLSearchParams(location.search).get("notrack") === "1") { try { localStorage.setItem("umami.disabled", "1"); } catch {} }
+// この公開版はローカル保存のみ。計測・ログイン・招待送信・課金は行わない。
 const RETURNING = !!store.get("visited");
-// この端末の招待トークン（ログイン前でも仮に持てる。ログイン後は cloud.ensureInvite で uid と結びつける）
-// Googleでログインするボタンの中身（アイコン＋文言）。白背景・薄い枠の、控えめなボタンにする
-function googleBtnInner(label = "Googleで続ける") {
-  return `<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.61z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.19l-2.92-2.26c-.81.54-1.85.87-3.04.87-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.71A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.28-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l3 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg><span>${esc(label)}</span>`;
-}
-function inviteToken() {
-  let t = store.get("inviteToken");
-  if (!t) { t = Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); store.set("inviteToken", t); }
-  return t;
-}
-// ログインボタンの見出し文（場所ごとに少し変える）
-function accountBanner(place) {
-  if (store.get("cloudUid")) return "";
-  const msg = { zukan: "図鑑をクラウドに保存しませんか？", result: "この偉人を、ずっと図鑑に残すなら",
-    me: "ログインすると、もっと楽しくなります" }[place] || "ログインすると、もっと楽しくなります";
-  return `<div class="login-nudge"><p>${esc(msg)}</p><button class="btn-google sm" data-login>${googleBtnInner()}</button></div>`;
-}
-// ログインの診断ログ（起きたことだけを記録。メールアドレス等は保存しない）。マイページの「設定」から見られる
-function recordAuthDebug(step, data = {}) {
-  try {
-    const log = store.get("authDebug", []);
-    log.push({ t: Date.now(), step, ...data });
-    store.set("authDebug", log.slice(-10));
-  } catch {}
-}
-// ログインの診断ログを、マイページで見える形にする（起きたことだけ。メールアドレス等は表示しない）
-function authDebugHtml() {
-  const log = store.get("authDebug", []);
-  if (!log.length) return "";
-  const step = { begin: "①ログイン開始", popup_result: "②ポップアップの結果",
-    begin_error: "❌ログインでエラー", auth_state: "③ログイン状態の確認" };
-  const line = (e) => {
-    const time = new Date(e.t).toLocaleTimeString("ja-JP");
-    let detail = "";
-    if (e.step === "popup_result") detail = e.ok ? "ログイン成功" : `エラー：${e.code || e.message || "不明"}`;
-    else if (e.step === "auth_state") detail = e.hasUser ? "ログイン中" : "未ログイン";
-    else if (e.step === "begin_error") detail = `エラー：${e.code || e.message || "不明"}`;
-    return `${time}　${esc(step[e.step] || e.step)}${detail ? "　" + esc(detail) : ""}`;
-  };
-  return `<details style="margin-top:14px"><summary style="cursor:pointer;color:var(--ink-soft);font-size:12px">ログインの診断ログ（直近${log.length}件）</summary>
-    <div style="margin-top:8px;font-size:11px;color:var(--ink-soft);line-height:1.8;font-family:monospace">${log.map(line).join("<br>")}</div></details>`;
-}
-// ログイン成功後の共通処理。クラウドの図鑑をこの端末の図鑑と足し合わせ（上書きしない）、Firestoreへまとめて書く。
-async function applyLoggedInProfile(cloud, user) {
-  store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
-  const cloudProfile = await cloud.pullProfile(user.uid).catch(() => null);
-  const isNewUser = !cloudProfile;
-  const merged = { ...(cloudProfile?.zukan || {}), ...store.get("zukan", {}) };
-  store.set("zukan", merged);
-  const token = inviteToken();
-  // uid・email・displayName・photoURL は毎回のログインで最新化。createdAt は初回だけ書く（merge:true なので既存値は消えない）
-  const patch = { uid: user.uid, displayName: user.name || "", email: user.email || "", photoURL: user.photo || "",
-    zukan: merged, inviteToken: token, diagCount: store.get("diagCount", 0), lastLoginAt: Date.now() };
-  if (isNewUser) patch.createdAt = Date.now();
-  await cloud.pushProfile(user.uid, patch);
-  await cloud.ensureInvite(user.uid, token);
-}
-let loginInFlight = false; // 二重クリック・二重実行を防ぐ
-async function doLogin() {
-  if (loginInFlight) return;
-  loginInFlight = true;
-  recordAuthDebug("begin", { href: location.href });
-  try {
-    const cloud = await import("./cloud.js");
-    if (!(await cloud.isCloudEnabled())) { toast("ログイン機能は準備中です"); loginInFlight = false; return; }
-    const user = await cloud.signIn(); // ポップアップ方式。ここでGoogleの選択画面が別ウィンドウで開く
-    recordAuthDebug("popup_result", { ok: true });
-    await applyLoggedInProfile(cloud, user);
-    toast("ログインしました");
-    route();
-  } catch (e) {
-    const msg = String(e), code = e && e.code ? String(e.code) : "";
-    let t = "ログインできませんでした";
-    if (msg.includes("not_configured")) t = "ログイン機能は準備中です";
-    else if (msg.includes("unauthorized-domain")) t = "このサイトのドメインがFirebaseに未登録です（運営者向け：承認済みドメインを確認）";
-    else if (code.includes("popup-closed-by-user") || code.includes("cancelled-popup-request")) t = "ログインがキャンセルされました";
-    else if (code.includes("popup-blocked")) t = "ポップアップがブロックされました。ブラウザの設定を確認してください";
-    toast(t);
-    recordAuthDebug("popup_result", { ok: false, code, message: msg.slice(0, 200) });
-    console.error("[login]", e);
-  } finally {
-    loginInFlight = false;
-  }
-}
-async function doLogout() {
-  try { const cloud = await import("./cloud.js"); await cloud.signOutUser(); } catch {}
-  store.del("cloudUid"); store.del("cloudName"); store.del("cloudPhoto");
-  toast("ログアウトしました（この端末の記録は残ります）");
-  route();
-}
-// 起動時に1回だけ、この端末の記録（cloudUid）と、Firebase Authの実際の状態（永続化されたセッション）を照らし合わせる。
-// 1回確認したら終わり（常時監視はしない）ので、通信・コストは増えない。
-let authChecked = false, authUnsub = null;
-async function syncAuthState() {
-  if (authChecked) return;
-  try {
-    const cloud = await import("./cloud.js");
-    if (!(await cloud.isCloudEnabled())) return;
-    // 注意：onAuthStateChanged はコールバックを同期的に（登録直後、この行の代入が終わるより前に）呼ぶことがある。
-    // そのため、コールバックの中で「代入されたばかりの unsub」を直接参照すると、
-    // 代入前に参照してしまう不具合（ReferenceError）が起きる。外側の変数に入れ、購読解除は次のイベントループへ回して防ぐ。
-    authUnsub = await cloud.onAuthChange((user) => {
-      if (authChecked) return; // 2回目以降の通知は doLogin/doLogout 側で扱う
-      authChecked = true;
-      recordAuthDebug("auth_state", { hasUser: !!user });
-      const hadLocal = !!store.get("cloudUid");
-      if (user && !hadLocal) {
-        // Firebaseはログイン済みなのに、この端末の記録が無い・消えていた → 記録のほうを直す
-        store.set("cloudUid", user.uid); store.set("cloudName", user.name || ""); store.set("cloudPhoto", user.photo || "");
-        route();
-      } else if (!user && hadLocal) {
-        // Firebaseはログアウト済み（他の端末でログアウトした等）なのに、この端末の記録が残っていた → 記録のほうを消す
-        store.del("cloudUid"); store.del("cloudName"); store.del("cloudPhoto");
-        route();
-      }
-      setTimeout(() => { if (typeof authUnsub === "function") authUnsub(); }, 0);
-    });
-  } catch (e) { console.error("[auth-sync]", e); }
-}
 let currentMode = "none", nextSrc = null;
-const ctaSeen = new Set();
-const pending = [];
-function track(name, props = {}) {
-  // Umami は付けた値1つごとにもイベントとして数えるので、共通の値は3つに絞る（returning は visit だけ）
-  const p = { price: String(store.get("price") ?? "none"), mode: currentMode, via: store.get("friends", []).length ? "friend" : "direct", ...props };
-  for (const k in p) p[k] = String(p[k]);
-  if (window.umami?.track) { try { window.umami.track(name, p); } catch {} return; }
-  // Umami の読みこみ前に呼ばれたら、ためておいて後で送る（最大10秒待つ）
-  pending.push([name, p]);
-  if (pending.length === 1) {
-    let n = 0;
-    const iv = setInterval(() => {
-      if (window.umami?.track) { pending.splice(0).forEach(([a, b]) => { try { window.umami.track(a, b); } catch {} }); clearInterval(iv); }
-      else if (++n > 50) { pending.length = 0; clearInterval(iv); }
-    }, 200);
-  }
-}
-function trackCta(place) { if (!ctaSeen.has(place)) { ctaSeen.add(place); track("premium_cta_view", { place }); } }
+function track() {} // この公開版ではアクセス・診断結果を計測しない。
 let disposeGuide = () => {};
 let disposeMotion = () => {};
 function attachMotion(name) {
@@ -211,7 +71,6 @@ const onAccent = (hex) => ((lum(hex) + 0.05) / 0.05 > 1.05 / (lum(hex) + 0.05) ?
 const themeVars = (typeId) => { const t = THEMES[typeId]; return `--t-bg:${t.bg};--t-bg2:${t.bg2};--t-bg3:${t.bg3};--t-accent:${t.accent};--t-on:${onAccent(t.accent)}`; };
 const typeLabel = (t, mode) => (mode === "love" ? { name: t.love_name, catch: t.love_catch } : { name: t.name, catch: t.catch });
 const mainLine = (id, mode) => (mode === "love" ? texts[id]?.love?.line : texts[id]?.serif) ?? "";
-const rare = (id, mode) => rarity[mode]?.[id];
 function toast(msg) {
   const el = document.createElement("div");
   el.className = "toast"; el.textContent = msg; document.body.append(el);
@@ -229,6 +88,7 @@ const makeCode = (answers) => `${CODE_VER}.${answers.join("")}`;
 const digits = (code) => { const m = /^(?:(\d+)\.)?([1-5]+)$/.exec(code || ""); return m && (m[1] ?? "1") === CODE_VER ? m[2] : null; };
 const answersOf = (sd, code) => { const d = digits(code); return Object.fromEntries(ordered(sd).map((q, i) => [q.id, Number(d[i])])); };
 const validCode = (sd, code) => { const d = digits(code); return !!d && d.length === ordered(sd).length; };
+separateLegacyLinkedResults(store, engines, validCode, (id) => !!SD.figures[id]);
 
 // 図鑑：{figureId: {src: "me|friend_diag|match|next|friend", sources: string[], at}}
 // src は「今のところいちばん強い発見経路」（後方互換のため残す）。sources は出会った経路を全部ためる配列（新設）
@@ -328,7 +188,6 @@ function renderTop() {
 // ---------------- 質問 ----------------
 let quiz = null;
 let justFinished = null;  // 演出を出すのは、いま答え終えた結果だけ
-let friendToken = null;  // 友達診断（#/q/friend/<token>）の間だけ、対象の招待トークンを覚えておく
 
 function partialU(sd, answers) {  // 途中までの回答で軸スコアを出す（未回答の軸は0）
   return AXES.map((a) => {
@@ -358,8 +217,7 @@ function renderQuiz(mode, anim = false) {
   const { qs, answers, i } = quiz;
   const q = qs[i];
   document.title = `質問 ${i + 1}｜${sd.modeConf.name}`;
-  const intro = mode === "love" && i === 0 ? `<div class="intro">${esc(data.questions_love.intro)}</div>`
-    : mode === "friend" && i === 0 ? `<div class="intro">${esc(data.questions_friend.intro)}</div>` : "";
+  const intro = mode === "love" && i === 0 ? `<div class="intro">${esc(data.questions_love.intro)}</div>` : "";
   app.innerHTML = `
     <div class="qhead">
       <button class="back" ${i === 0 ? "disabled" : ""}>← 戻る</button>
@@ -422,12 +280,6 @@ function renderCheckpoint(mode, n) {
 function finishQuiz(mode) {
   const code = makeCode(quiz.answers);
   store.del("progress." + mode);
-  if (mode === "friend") {
-    const token = friendToken;
-    quiz = null;
-    location.hash = `#/fr/${token}/${code}`;
-    return;
-  }
   justFinished = { mode, code, source: quiz.source };
   quiz = null;
   location.hash = `#/r/${mode}/${code}`;
@@ -494,7 +346,8 @@ function stars(tier) {
 }
 
 function resultCard(r, mode, who, reveal) {
-  const f = r.figure, t = r.type, tl = typeLabel(t, mode), pct = rare(f.id, mode);
+  const f = r.figure, t = r.type, tl = typeLabel(t, mode);
+  const artNote = f.id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : "";
   const lead = who === "friend" ? "この人自身の回答から見える姿" : who === "past" ? "以前のあなたの回答から見える姿" : who === "saved" ? "リンクから保存した、この端末の「自分の結果」" : (mode === "love" ? "恋愛についての回答から見えるあなた" : "あなた自身の回答から見えるあなた");
   return `
   <section class="rcard ${reveal ? "reveal-wait" : ""}" style="${themeVars(t.id)}">
@@ -504,12 +357,12 @@ function resultCard(r, mode, who, reveal) {
       <img class="avatar color" src="${avatar(f.id)}" alt="${esc(f.name)}のイラスト（${esc(meta.alt[f.id] ?? "")}）">
       <div class="burst" aria-hidden="true">${"<i></i>".repeat(8)}</div>
     </div>
+    ${artNote}
     <h1 class="fig-name" style="--len:${[...f.name].length}">${esc(f.name).replace(/・/g, "・<wbr>")}</h1>
     <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
     <p class="type-catch">${esc(tl.catch)}</p>
     <p class="serif-quote">${esc(mainLine(f.id, mode))}</p>
-    <div class="meta-row">${stars(r.tier)}<span class="lv ${r.capped ? "capped" : ""}">Lv.<b>${reveal ? 1 : r.lv}</b></span>
-      ${pct != null ? `<span class="rare">全体の${pct}%（推定）</span>` : ""}</div>
+    <div class="meta-row">${stars(r.tier)}<span class="lv ${r.capped ? "capped" : ""}">Lv.<b>${reveal ? 1 : r.lv}</b></span></div>
     <div class="brand"><i>偉</i>世界の偉人性格診断　${esc(location.host)}</div>
   </section>`;
 }
@@ -531,8 +384,8 @@ function shareUrl(mode, id, code) {
   return withExternalBrowserParam(url);
 }
 function shareText(r, mode, fate) {
-  const f = r.figure, pct = rare(f.id, mode);
-  return `${mode === "love" ? "恋をした私は" : "私は"}「${f.name}」タイプだった${pct != null ? `（全体の${pct}%・推定）` : ""}\n「${mainLine(f.id, mode)}」\n`
+  const f = r.figure;
+  return `${mode === "love" ? "恋をした私は" : "私は"}「${f.name}」タイプだった\n「${mainLine(f.id, mode)}」\n`
     + (fate ? `因縁の相手：${fig(fate.other).name}（${fate.label}）\n` : "")
     + `あなたはどの偉人？ 12問でわかる👇\n#${engines[mode].modeConf.name}`;
 }
@@ -570,8 +423,7 @@ function renderResult(mode, code) {
   meet(f.id, !fresh && mine?.via === "link" ? "friend" : "me");
   if (fresh) {
     store.set("diagCount", store.get("diagCount", 0) + 1);
-    const uid = store.get("cloudUid");
-    if (uid) import("./cloud.js").then((cloud) => cloud.pushProfile(uid, { zukan: store.get("zukan", {}), diagCount: store.get("diagCount", 0) })).catch(() => {});
+    // 公開版の診断記録は、この端末内にだけ保存する。
   }
   const fate = fateOf(f.id);
   const ms = r.matchups;
@@ -611,7 +463,7 @@ function renderResult(mode, code) {
     levelHtml = `<p>${lead}</p>` + (h.locked
       ? `<div class="next"><div class="next-tile" style="--t-bg:${THEMES[nf.type].bg}"><img src="${avatar(h.to, true)}" alt="まだ見ぬ偉人のシルエット"><span class="lock">🔒</span></div>
            <div><div class="qq">？？？</div><div class="hint">ヒント：${esc(texts[h.to]?.silhouette_hint)}</div></div></div>
-         <button class="btn gold" style="margin-top:12px" data-premium="levelup">🔒 この人の正体は本格診断で（準備中）</button>`
+         <p class="note">この人物は現在の診断結果ではありません。</p>`
       : `<div class="next"><div class="next-tile" style="--t-bg:${THEMES[nf.type].bg}"><img src="${relFace(h.to)}" alt=""></div>
            <div><div class="hint">あなたは</div><div class="qq">${esc(nf.name)}</div><div class="hint">になっていた${undiscTag(h.to)}</div></div></div>`);
   }
@@ -626,8 +478,6 @@ function renderResult(mode, code) {
   })() : `<section class="card"><h2>${mode === "normal" ? "恋愛バージョン" : "性格バージョン"}</h2>
       <p style="margin:0 0 12px">${mode === "normal" ? "恋をしたら、あなたは別の偉人かも？" : "ふだんのあなたは、どの偉人？"}（約1分半）</p>
       <a class="btn ${mode === "normal" ? "love-sub" : "sub"}" data-fresh="${OTHER[mode]}" data-src="other_mode" href="#/q/${OTHER[mode]}">${mode === "normal" ? "💘 恋愛診断をやる" : "性格診断をやる"}</a></section>`;
-  const lockedTwo = r.type.figures.slice(MAX_TIER + 1).map((x) => x.id);
-
   app.style.cssText = themeVars(r.type.id);
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
@@ -637,6 +487,7 @@ function renderResult(mode, code) {
       <a class="btn sub" data-share="x" target="_blank" rel="noopener">Xでポスト</a>
       <button class="btn sub wide" data-share="copy">リンクをコピー</button>
     </div>
+    <p class="note" style="margin:4px 0 12px">共有リンクには、12問の回答から作られたコードが含まれます。送る相手を選んで共有してください。</p>
     ${(() => { const prev = store.get("me.prev." + mode); return prev && prev.code !== code && validCode(sd, prev.code) && SD.figures[prev.fig]
       ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
     <section class="card"><h2>あなたはこんな人</h2>
@@ -657,11 +508,7 @@ function renderResult(mode, code) {
     <section class="card"><h2>図鑑</h2>
       <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人を発見</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
       <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a>
-      ${accountBanner("result")}</section>
-    <section class="card premium" data-view="premium_cta_view"><h2>本格診断でわかること（準備中）</h2>
-      ${lockedTwo.length ? `<div class="locks">${lockedTwo.map((id) => `<img class="tile" src="${avatar(id, true)}" alt="鍵つきの偉人" style="${themeVars(r.type.id)}">`).join("")}</div>` : ""}
-      <ul><li>30問で、もっとくわしく</li><li>あなたの偉人スペクトラム（上位3人の割合）</li><li>100人全員との相性</li><li>あなたの第2の系統</li></ul>
-      <button class="btn gold" data-premium="result">くわしく見る</button></section>
+      </section>
     <div style="display:grid;gap:10px;margin-top:20px">
       <a class="btn sub" data-fresh="${mode}" data-src="retry" href="#/q/${mode}">もう一度診断する</a>
       <a class="btn sub" href="#/me">マイページ</a>
@@ -679,7 +526,6 @@ function renderResult(mode, code) {
     if (ch === "copy") { e.preventDefault(); try { await navigator.clipboard.writeText(url); toast("リンクをコピーしました"); } catch { prompt("このリンクをコピーしてください", url); } }
     if (ch === "image") { e.preventDefault(); shareImage(r, mode, text, url); }
   }));
-  app.querySelectorAll("[data-premium]").forEach((b) => (b.onclick = () => openPremium(b.dataset.premium)));
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   $("[data-duo]")?.addEventListener("click", () => {
     const [n, l] = $("[data-duo]").dataset.duo.split(",");
@@ -691,9 +537,6 @@ function renderResult(mode, code) {
   const fab = $(".fab"), row = $(".share-row");
   new IntersectionObserver(([e]) => (fab.hidden = e.isIntersecting || e.boundingClientRect.top > 0)).observe(row);
   prerenderShare(r, mode);
-  [[$('[data-view="premium_cta_view"]'), "result"], [$('[data-premium="levelup"]'), "levelup"]].forEach(([el, place]) => {
-    if (el) new IntersectionObserver(([e], ob) => { if (e.isIntersecting) { trackCta(place); ob.disconnect(); } }).observe(el);
-  });
   window.scrollTo(0, 0);
   if (reveal) runReveal(r, mode, shortReveal);
   else later(0, () => { $(".stage").dataset.state = "done"; });
@@ -738,20 +581,14 @@ function renderFriend(sd, mode, code, r) {
       <p class="note" style="margin:0">${esc(f.name)}との相性もわかります</p>`}
     </div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
-    <div class="claim">${past || prevLink
-      ? `<button class="btn sub" data-mine>この結果を、自分の結果に戻す</button>`
-      : `<button class="btn sub" data-mine>${mine ? `自分の結果として保存（いまの「${esc(fig(mine.fig).name)}」と入れかえ）` : "自分の結果として保存"}</button>
-         <p class="note" style="margin:6px 0 0">この端末だけの保存です。図鑑の「発見」にはなりません。<br>友達の結果を見ているだけなら、押さなくて大丈夫です。</p>`}</div>`;
+    <div class="claim">${past
+      ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
+      : `<p class="note">${prevLink ? "以前リンクから保存した結果です。" : "受け取ったリンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
-  $("[data-mine]").onclick = () => {
-    if (mine && !confirm(`いまの自分の結果（${fig(mine.fig).name}）を、この結果（${f.name}）に入れかえますか？\n元の結果（${fig(mine.fig).name}）は、マイページや結果画面の「前の結果」からあとで戻せます。${own ? "" : "\n※リンクから保存した結果は、図鑑の「発見」にはなりません。"}`)) return;
-    if (!mine && !confirm(`この結果（${f.name}）を、この端末の「自分の結果」として保存しますか？${own ? "" : "\n※リンクから保存した結果は、図鑑の「発見」にはなりません。"}`)) return;
+  if (past) $("[data-restore-self]").onclick = () => {
+    if (!confirm(`以前の自己診断結果（${f.name}）を、現在の自分の結果に戻しますか？`)) return;
     if (mine && mine.code !== code) store.set("me.prev." + mode, mine);
-    // via：自分で診断した結果なら付けない。入れかえ前の結果に戻すときは、その印を引き継ぐ。それ以外（友達のリンク）は "link"
-    const via = own ? null : prevHere ? prevE.via ?? null : "link";
-    store.set("me." + mode, via ? { code, fig: f.id, at: Date.now(), via } : { code, fig: f.id, at: Date.now() });
-    store.del("lastFriend." + mode);
-    track("claim_own_result", { mode });
+    store.set("me." + mode, { code, fig: f.id, at: Date.now() });
     route();
   };
   $(".stage").dataset.state = "done";
@@ -832,8 +669,8 @@ async function drawShare(r, mode) {
   const line = `「${mainLine(r.figure.id, mode)}」`;
   const lf = Math.min(48, Math.floor(960 / [...line].length));
   center(line, Y + S + 170 + fs + 20, `900 ${lf}px "Noto Serif JP", serif`, "#26221d");
-  const pct = rare(r.figure.id, mode);
-  center(`${"★".repeat(r.tier + 1)}${"☆".repeat(MAX_TIER - r.tier)}🔒🔒　Lv.${r.lv}${pct != null ? `　全体の${pct}%（推定）` : ""}`, H - 110, '800 36px "M PLUS Rounded 1c", sans-serif', "#b08a3e");
+  if (r.figure.id === "washington") center("※ 斧と桜は後世の伝説イメージ", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
+  center(`${"★".repeat(r.tier + 1)}${"☆".repeat(MAX_TIER - r.tier)}　Lv.${r.lv}`, H - 110, '800 36px "M PLUS Rounded 1c", sans-serif', "#b08a3e");
   center(`世界の偉人性格診断　${location.host}`, H - 44, '500 30px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   return new Promise((ok) => c.toBlob(ok, "image/png"));
 }
@@ -862,44 +699,17 @@ async function shareImage(r, mode, text, url) {
   toast("画像を保存しました");
 }
 
-// ---------------- 本格診断（準備中）のシート：需要を測る ----------------
-function openPremium(place) {
-  let price = store.get("price");
-  if (!price) { price = pick([300, 480, 680], 1)[0]; store.set("price", price); }
-  track("premium_click", { place });
-  sheet.hidden = false;
-  sheet.innerHTML = `<div class="panel" role="dialog" aria-label="本格診断">
-    <h2>本格診断は準備中です</h2>
-    <p style="margin:0">30問で、もっとくわしく。あなたに近い偉人の割合（偉人スペクトラム）、100人全員との相性、あなたの第2の系統がわかる予定です。</p>
-    <p class="price">予定価格 <b>${price}円</b>（買い切り。値段や内容は変わることがあります）</p>
-    <p class="note" style="text-align:left;margin:-8px 0 12px">今は買えません。答えても、お金はかかりません。</p>
-    <div class="step1"><p style="margin:0;font-weight:800">この値段で出たら、買いたいと思う？</p>
-      <div class="poll intent">${[["yes", "買いたい"], ["maybe", "迷う"], ["no", "買わない"]].map(([k, o]) => `<button data-answer="${k}">${o}</button>`).join("")}</div></div>
-    <div class="step2" hidden><p style="margin:0;font-weight:800">どれがいちばん気になる？</p>
-      <div class="poll choice">${[["spectrum", "偉人スペクトラム（近い偉人の割合）"], ["compat100", "100人との相性表"], ["detail", "くわしい解説"], ["none", "特にない"]].map(([k, o]) => `<button data-choice="${k}">${o}</button>`).join("")}</div></div>
-    <button class="btn sub close">閉じる</button></div>`;
-  const close = () => { sheet.hidden = true; sheet.innerHTML = ""; };
-  sheet.onclick = (e) => { if (e.target === sheet) close(); };
-  $(".close", sheet).onclick = close;
-  sheet.querySelectorAll(".intent button").forEach((b) => (b.onclick = () => {
-    track("premium_intent", { answer: b.dataset.answer });
-    $(".step1", sheet).hidden = true; $(".step2", sheet).hidden = false;
-  }));
-  sheet.querySelectorAll(".choice button").forEach((b) => (b.onclick = () => { track("premium_poll", { choice: b.dataset.choice }); close(); toast("ありがとう！今後の参考にします"); }));
-}
 
 // ---------------- 図鑑 ----------------
 function renderZukan() {
   document.title = "図鑑｜世界の偉人性格診断";
-  trackCta("zukan");
   const z = store.get("zukan", {});
   app.style.cssText = "";
   const zPct = Math.round((zukanCount() / Math.max(1, FREE.length)) * 100);
   app.innerHTML = `
     <div class="zhead"><h1>偉人図鑑</h1><span class="cnt">発見 <b>${zukanCount()}</b> / ${FREE.length}${LOCKED.length ? `（＋鍵つき ${LOCKED.length}）` : ""}</span></div>
     <div class="progress-line" style="margin:0 0 10px"><div class="bar"><i style="width:${zPct}%"></i></div></div>
-    <p class="note" style="text-align:left">自分の診断（通常・恋愛）や、友達から見た診断で出た偉人が「発見」として登録されます。相性や友達の結果で名前を見かけただけの偉人は🔒のまま（${knownCount()}人）。</p>
-    ${accountBanner("zukan")}
+    <p class="note" style="text-align:left">自分の診断（通常・恋愛）で出た偉人が「発見」として登録されます。過去に保存した発見もこの端末に残ります。相性や共有リンクで名前を見かけただけの偉人は🔒のまま（${knownCount()}人）。</p>
     ${SD.types.map((t) => `<div class="zrow"><h2><i style="background:${THEMES[t.id].accent}"></i>${esc(t.name)}</h2>
       <div class="zcells">${t.figures.map((f, k) => {
         const st = k > MAX_TIER ? "locked" : z[f.id] ? (DISCOVER_SRC.has(z[f.id].src) ? "me" : "known") : "unseen";
@@ -910,7 +720,7 @@ function renderZukan() {
     <div style="display:grid;gap:10px"><a class="btn sub" href="#/me">マイページ</a><a class="btn sub" href="#/">トップへ</a></div>`;
   app.querySelectorAll(".zcell").forEach((b) => (b.onclick = () => {
     const { id, st } = b.dataset;
-    if (st === "locked") return openPremium("zukan");
+    if (st === "locked") return toast("この人物は現在の図鑑では表示できません");
     if (st === "unseen") return toast("まだ出会っていません");
     if (st === "known") return toast(`${fig(id).name}：あなた自身の診断結果に出ると、図鑑に登録されます`);
     const tx = texts[id];
@@ -921,6 +731,7 @@ function renderZukan() {
         <div><h2 style="margin:0">${esc(fig(id).name)}</h2><div class="note" style="text-align:left">${esc(sd_type(id).name)}・★${fig(id).tier + 1}</div>
           ${srcTxt ? `<div class="note" style="text-align:left">取得元：${esc(srcTxt)}</div>` : ""}</div></div>
       <p style="font-family:var(--serif);font-weight:900;margin:0 0 8px">「${esc(tx.serif)}」</p><p class="body">${esc(tx.body)}</p>
+      ${id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : ""}
       <details><summary>元ネタを見る</summary><p>${esc(tx.motoneta.text)}</p></details>
       <button class="btn sub close" style="margin-top:14px">閉じる</button></div>`;
     const close = () => { sheet.hidden = true; sheet.innerHTML = ""; };
@@ -933,18 +744,7 @@ const sd_type = (id) => SD.type(fig(id).type);
 
 // ---------------- マイページ（#/me）：この端末の保存データを読むだけ。新しい保存はしない ----------------
 function accountCard() {
-  const uid = store.get("cloudUid"), name = store.get("cloudName"), photo = store.get("cloudPhoto");
-  if (!uid) return `<section class="card login-card">
-      <h2 style="margin:0 0 6px">あなたの偉人図鑑を育てよう</h2>
-      <p class="note" style="text-align:left;margin:0 0 12px">診断した偉人を集めて、あなただけの図鑑をつくれます。</p>
-      <ul class="login-perks"><li>図鑑をクラウドに保存</li><li>機種が変わっても引き継げる</li><li>友達にも診断してもらえる</li></ul>
-      <button class="btn-google" data-login>${googleBtnInner()}</button>
-      <p class="note" style="text-align:center;margin:10px 0 0">ログインしなくても診断はそのまま遊べます</p></section>`;
-  return `<section class="card profile-card">
-      <div class="profile-row">
-        <div class="profile-avatar">${photo ? `<img src="${esc(photo)}" alt="" onerror="this.remove()">` : ""}<span>${esc((name || "?").slice(0, 1))}</span></div>
-        <div><div class="profile-name">${esc(name || "ログイン中")}</div><div class="note" style="margin:2px 0 0">図鑑をクラウドに保存しています</div></div>
-      </div></section>`;
+  return `<section class="card login-card"><h2>この端末の図鑑</h2><p class="note" style="text-align:left;margin:0">診断結果と図鑑は、このブラウザに保存されます。ログインは不要です。</p></section>`;
 }
 // 図鑑の集まり具合を大きく見せる（マイページ・優先順位2位）
 function zukanSummaryCard() {
@@ -955,37 +755,6 @@ function zukanSummaryCard() {
       <div class="progress-line" style="margin:10px 0 4px"><div class="bar"><i style="width:${pct}%"></i></div></div>
       <p class="note" style="text-align:left;margin:8px 0 14px">名前だけ知っている偉人　🔒 ${knownCount()}人</p>
       <a class="btn sub" href="#/zukan">図鑑を見る</a></section>`;
-}
-// 友達招待（ログインしていないと、届いた結果を本人のところへ集められないため、ログイン時のみ表示）
-function inviteCard() {
-  const uid = store.get("cloudUid");
-  if (!uid) return "";
-  const token = inviteToken(), inviteUrl = withExternalBrowserParam(`${location.origin}${location.pathname}#/invite/${token}`);
-  return `<section class="card invite-card">
-      <h2 style="margin:0 0 6px">友達にも診断してもらおう</h2>
-      <p class="note" style="text-align:left;margin:0 0 14px">リンクを送ると、友達が12問に答えて偉人と出会えます。診断してくれた人数が、ここに届きます。</p>
-      <button class="btn gold" data-invite-send data-invite-url="${esc(inviteUrl)}">友達に送る</button>
-      <button class="btn-text" data-copy-invite="${esc(inviteUrl)}">🔗 リンクをコピー</button>
-      <p class="note" id="invite-count" style="text-align:left;margin:10px 0 0">まだ届いていません</p></section>`;
-}
-// 友達から見たあなた（友達診断の集計）。表示だけ先に出し、Firestoreから届いたら#friend-diag-bodyだけ差し替える
-function friendDiagBody(agg) {
-  const mine = store.get("me.normal");
-  const entries = Object.entries(agg.counts).sort((a, b) => b[1] - a[1]);
-  if (!agg.total) return `<p class="note" style="text-align:left;margin:0">友達から見たあなたはどの偉人？　友達に診断してもらおう。</p>`;
-  const top = entries[0]?.[0];
-  return `<p class="note" style="text-align:left;margin:0 0 8px">${agg.total}人が診断しました</p>
-    <ul class="friend-diag-list">${entries.map(([id, n]) => `<li>${esc(fig(id)?.name ?? id)}　${n}人</li>`).join("")}</ul>
-    ${mine && SD.figures[mine.fig] ? `<p class="note" style="text-align:left;margin:8px 0 0">あなた自身の診断は「${esc(fig(mine.fig).name)}」でした。${top && top !== mine.fig ? "友達から見た結果とは違うみたいです。" : "友達から見た結果と同じでした！"}</p>` : ""}`;
-}
-function friendDiagCard() {
-  const uid = store.get("cloudUid");
-  if (!uid) return "";
-  const agg = store.get("friendDiagAgg", { counts: {}, total: 0 });
-  const inviteUrl = withExternalBrowserParam(`${location.origin}${location.pathname}#/invite/${inviteToken()}`);
-  return `<section class="card"><h2 style="margin:0 0 6px">友達から見たあなた</h2>
-      <div id="friend-diag-body">${friendDiagBody(agg)}</div>
-      <button class="btn-text" data-invite-send data-invite-url="${esc(inviteUrl)}">もっと友達に診断してもらう</button></section>`;
 }
 function renderMe() {
   document.title = "マイページ｜世界の偉人性格診断";
@@ -1010,14 +779,11 @@ function renderMe() {
       + hist.map((h) => row(m, h, `以前の${name}の結果`)).join("");
   }).join("");
   const friends = store.get("friends", []).filter((x) => ok(x.mode, x));
-  const loggedIn = !!store.get("cloudUid");
   app.innerHTML = `
     <div class="zhead"><h1>マイページ</h1></div>
     ${accountCard()}
     ${zukanSummaryCard()}
     <section class="card"><h2>自分の診断結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
-    ${friendDiagCard()}
-    ${inviteCard()}
     <section class="card"><h2>リンクで受け取った結果</h2>
       ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に受け取り${store.get("me." + x.mode)?.code === x.code ? "（いまの自分の結果に保存中）" : ""}`, relFace(x.fig))).join("")}</div>
         <p class="note" style="text-align:left;margin:8px 0 0">友達などから届いたリンクの結果です。あなたの結果とは別に保存されています（最大20件）。</p>`
@@ -1025,32 +791,11 @@ function renderMe() {
     <section class="card"><h2>設定</h2>
       <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
       <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a>
-      ${loggedIn ? `<button class="btn-text" data-logout>ログアウト</button>` : ""}
-      ${authDebugHtml()}</section>
+      </section>
     <a class="btn sub" href="#/how">このサイトの使い方</a>
     <a class="btn sub" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   window.scrollTo(0, 0);
-  const uid = store.get("cloudUid");
-  if (uid) import("./cloud.js").then((cloud) => cloud.countInviteResponses(inviteToken())).then((n) => {
-    const el = $("#invite-count"); if (el && n) el.textContent = `友達が ${n} 件、このリンクから診断しました`;
-  }).catch(() => {});
-  // 友達診断の結果を、本人の権限で安全に回収する（Security Rulesで招待の持ち主だけが読める）。
-  // 届いた分を自分のzukanへ合流させ（friend_diagは正式発見）、変化があればクラウドへ書き戻す
-  if (uid) import("./cloud.js").then((cloud) => cloud.pullFriendResponses(inviteToken())).then((list) => {
-    if (!list.length) return;
-    const counts = {};
-    list.forEach((r) => { if (r.fig && SD.figures[r.fig]) counts[r.fig] = (counts[r.fig] || 0) + 1; });
-    store.set("friendDiagAgg", { counts, total: list.length });
-    let changed = false;
-    Object.keys(counts).forEach((id) => {
-      const before = isDiscovered(id);
-      meet(id, "friend_diag");
-      if (!before && isDiscovered(id)) changed = true;
-    });
-    if (changed) import("./cloud.js").then((cloud2) => cloud2.pushProfile(uid, { zukan: store.get("zukan", {}) })).catch(() => {});
-    const body = $("#friend-diag-body"); if (body) body.innerHTML = friendDiagBody({ counts, total: list.length });
-  }).catch(() => {});
 }
 
 // このサイトについて（文案：docs/about-draft.md、根拠：docs/legal-check.md）
@@ -1062,8 +807,8 @@ function renderHow() {
     ["①", "性格診断をする", "12問・約1分半。登録なしですぐ始められます。"],
     ["②", "似た偉人と出会う", "6つの軸から、あなたに近い偉人が1人わかります。"],
     ["③", "偉人を図鑑に集める", "相性・もしもの分岐などで名前を知り、診断で出会うと図鑑に「発見」として残ります。"],
-    ["④", "友達にも診断してもらう", "結果はリンクでシェアでき、招待リンクからも友達を誘えます。"],
-    ["⑤", "いろんな角度から自分を知る", "性格版・恋愛版、友達との相性もあわせて楽しめます。"],
+    ["④", "結果を自分でシェアする", "共有リンクや画像は、自分で選んだときだけ送れます。受け取った結果は自分の結果と区別して表示します。"],
+    ["⑤", "いろんな角度から自分を知る", "性格版・恋愛版、図鑑や相性もあわせて楽しめます。"],
   ];
   app.innerHTML = `
     <div class="zhead"><h1>このサイトの使い方</h1></div>
@@ -1075,98 +820,39 @@ function renderHow() {
   window.scrollTo(0, 0);
 }
 
-// ---------------- 招待リンクのランディング（#/invite/<token>） ----------------
-// 「友達から見たあなた診断」の入口。友達（回答者）はログイン不要・自分のことではなく招待主について答える
-function renderInvite(token) {
-  document.title = "友達を診断する｜世界の偉人性格診断";
-  app.style.cssText = "";
-  app.innerHTML = `
-    <section class="card invite-land">
-      <h1 style="margin-top:0">友達から診断をお願いされました</h1>
-      <p>あなた自身のことではなく、<b>このリンクを送ってくれた人について</b>、12問答えてください。「友達から見たら、その人はどんな偉人タイプか」がわかる診断です。結果はその人に届きますが、あなたが答えた中身が伝わることはありません。ログインは不要です。</p>
-      <a class="btn start" href="#/q/friend/${esc(token)}">診断する（12問・約1分半）</a>
-      <a class="btn sub" style="margin-top:10px" href="#/how">使い方を見る</a></section>`;
-  window.scrollTo(0, 0);
-}
-
-// ---------------- 友達診断の結果（#/fr/<token>/<回答コード>） ----------------
-// 回答者（友達）に見せる、招待主についての結果。回答者自身の図鑑・診断結果には一切保存しない
-function renderFriendResult(token, code) {
-  const sd = engines.friend;
-  if (!token || !validCode(sd, code)) { renderTop(); return toast("このリンクは開けませんでした"); }
-  const r = sd.diagnose(answersOf(sd, code));
-  const f = r.figure, tx = texts[f.id];
-  document.title = `友達から見ると「${f.name}」タイプ｜世界の偉人性格診断`;
-  app.style.cssText = themeVars(r.type.id);
-  const key = `${token}:${code}`, sent = store.get("friendSent", []);
-  if (!sent.includes(key)) {
-    store.set("friendSent", [...sent, key].slice(-30));
-    track("friend_diag_complete", { figure: f.id, type: r.type.id });
-    import("./cloud.js").then((cloud) => cloud.recordInviteResponse(token, { mode: "friend", fig: f.id })).catch(() => {});
-  }
-  app.innerHTML = `
-    <div class="friend-head"><h1>友達から見たその人は<br>「${esc(f.name)}」タイプでした</h1>
-      <p class="note" style="margin:6px 0 0">回答ありがとうございました。この結果はリンクを送ってくれた人に届きます。</p></div>
-    <section class="card" style="text-align:center">
-      <img class="tile" src="${avatar(f.id)}" alt="" style="width:120px;height:120px;margin:0 auto 10px;display:block">
-      <h2 style="margin:0 0 4px">${esc(f.name)}</h2>
-      <p class="note">${esc(sd_type(f.id).name)}</p>
-      <p style="font-family:var(--serif);font-weight:900;margin:10px 0 0">「${esc(tx.serif)}」</p></section>
-    <a class="btn start" data-fresh="normal" href="#/q/normal">自分も診断してみる（12問）</a>
-    <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a>`;
-  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress.normal"); quiz = null; }));
-  window.scrollTo(0, 0);
-}
 
 function renderAbout() {
   document.title = "このサイトについて｜世界の偉人性格診断";
   app.style.cssText = "";
-  const contact = meta.contact
-    ? `ご意見や不具合は、<a href="${esc(meta.contact)}" target="_blank" rel="noopener">GitHub の Issues</a> に書いてください（GitHub のアカウントが必要です）。書いた内容は、だれでも見られます。名前や住所など、あなたのことがわかる情報は書かないでください。`
-    : "お問い合わせ先は準備中です。";
   app.innerHTML = `<article class="about">
     <h1>このサイトについて</h1>
-    <p>「世界の偉人性格診断」は、12の質問に答えると、あなたに近い偉人がわかる遊びのサイトです。登録もお金もいりません。</p>
-    <p><b>かんたんに言うと：</b>登録はいりません。質問への答えは、どこにも送りません。この端末に残る記録は、いつでも消せます。</p>
-    <h2>遊びとして楽しんでください</h2>
-    <p>この診断は、エンターテインメントです。心理検査ではなく、病気や心の状態を判断するものでもありません。結果は、あなたや誰かの価値を決めるものではありません。</p>
-    <h2>偉人の話と台詞について</h2>
-    <p>偉人のエピソードは、できるだけ調べて書いていますが、昔のことなので、いろいろな説があります。「と伝わる」「と言われる」と書いたものは、確かでない話です。偉人の台詞や恋愛版のひと言は、ほとんどがこのサイトで作ったものです。本人が言った・書いたとは限りません。</p>
-    <h2>イラストについて</h2>
-    <p>イラストは、このサイトが想像で描いたものです。本人の顔や姿をうつしたもの（肖像）ではありません。</p>
-    <h2>利用状況の計測について</h2>
-    <p>サイトをよくするために、Umami（ユーマミ）という計測サービスで、使われ方を数えています。Cookie は使いません。あなたが誰かは、わかりません。</p>
-    <ul><li>集めるもの
-        <ul><li>サイトでしたこと：診断を始めた・終えた（とちゅうでやめたときは、何問目までか）、どの偉人・系統・★になったか、友達の結果のリンクを開いたか、シェアしたか、「本格診断」の案内が出たか・押したか・アンケートの答え</li>
-          <li>開いた画面の名前、性格版か恋愛版か</li>
-          <li>この端末についての印：割り当てられた予定価格（300円・480円・680円のどれか）、前にも来たことがあるか、友達の結果のリンクを開いたことがあるか</li>
-          <li>自動で届くもの：ブラウザ・OS・端末の種類、画面の大きさ、言語、国（IP アドレスから推定）</li></ul></li>
-      <li>集めないもの：質問への一つひとつの答え、結果の URL の中の数字、前にいたページの URL、名前・メールアドレスなど、あなたが誰かわかる情報、広告のための情報</li></ul>
-    <p>ブラウザの「Do Not Track（追跡拒否）」が有効な場合は、Umami の計測を行いません。</p>
-    <h2>あなたの端末に保存するもの</h2>
-    <p>次のものは、あなたのブラウザの中（localStorage）に保存します。保存したものを、そのまま送ることはありません。</p>
-    <ul><li>とちゅうまでの答え、あなたの結果、友達の結果（最新20件まで）、図鑑に集めた偉人</li>
-      <li>予定価格の種類、前に来たことがあるかの印、前に見た画面の印（はじめての人向けの説明を2回出さないため）</li></ul>
-    <p>このうち「予定価格の種類」「前に来たことがあるか」「友達の結果を開いたことがあるか」は、上の計測で数えています。LINE や X の中で開いたときは、ふだんのブラウザとは別に保存されます。</p>
-    <p>消したいときは、下の「この端末の記録をすべて消す」ボタンを押すか、ブラウザの設定でこのサイトのデータを消してください。</p>
-    <h2>外部に送る情報</h2>
-    <p>このサイトを表示したり、使われ方を数えたりするために、次の会社のサーバーに情報が送られます。</p>
-    <ul><li>Umami Software, Inc.（Umami）：上の「集めるもの」。使われ方を数えて、サイトをよくするため</li>
-      <li>Google LLC（Google Fonts）：IP アドレス、ブラウザの種類、開いたページの情報。文字（フォント）を表示するため</li></ul>
-    <p>このほか、サイトの置き場所である GitHub, Inc.（GitHub Pages）にも、ページを届けるために IP アドレスなどが届きます。X・LINE・Wikipedia へのリンクは、押したときだけ、その先のサービスに移ります。</p>
-    <h2>本格診断について</h2>
-    <p>「本格診断」は、まだ準備中で、買うことはできません。表示している予定価格は、どのくらいの値段なら欲しいと思ってもらえるかを調べるためのもので、人によってちがう金額が出ます。内容や値段は、変わることがあります。</p>
-    <h2>お問い合わせ</h2><p>${contact}</p>
-    <h2>運営者</h2><p>世界の偉人性格診断　制作者（個人で運営しています）<br>最終更新：${esc(meta.updated ?? "")}</p>
+    <p>「世界の偉人性格診断」は、12問で100人の偉人のうち誰に近いかを楽しむ無料のサイトです。性格版と恋愛版があります。登録や購入は不要です。</p>
+    <p>結果は娯楽であり、心理検査や医学的診断ではありません。人物の台詞やイラストは創作を含み、史実や本人の発言そのものとは限りません。</p>
+    <h2>保存と共有</h2>
+    <p>回答途中の記録、結果、図鑑、受け取った共有リンクの結果は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
+    <p>結果の共有リンクには、12問の回答から作られたコードが含まれます。リンクを相手に送ると、受信者や共有先のサービスに結果とコードが伝わります。受信者がリンクを開くと、配信元のGitHub Pagesにもコード付きURLが届きます。画像を端末に保存するだけなら、このコードは送信されません。共有操作をしなければ、アプリから回答や結果を運営者へ送信しません。</p>
+    <p>この版ではアクセス解析、広告、ログイン、クラウド保存、招待による他己診断、購入は行いません。ページの表示に必要なファイルはGitHub Pagesから読み込まれ、配信元には通常の閲覧ログが残る場合があります。Wikipediaなど外部サイトへのリンクは、押したときだけ開きます。</p>
+    <h2>記録の削除</h2>
+    <p>下のボタンは、このブラウザの保存記録だけを消します。以前の版でGoogleログインを利用した場合の認証セッションやクラウド上の既存データは削除しません。</p>
     <button class="btn sub" data-clear>この端末の記録をすべて消す</button>
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></article>`;
   $("[data-clear]").onclick = () => {
-    if (!confirm("このサイトの記録（結果・図鑑・とちゅうの答えなど）をすべて消しますか？")) return;
+    if (!confirm("このサイトの端末内記録（結果・図鑑・とちゅうの答えなど）を消しますか？")) return;
     try { Object.keys(localStorage).filter((k) => k.startsWith("ijin.")).forEach((k) => localStorage.removeItem(k)); } catch {}
     quiz = null;
     toast("この端末の記録を消しました");
     location.hash = "#/";
   };
+  window.scrollTo(0, 0);
+}
+
+function renderUnavailable() {
+  document.title = "この機能は利用できません｜世界の偉人性格診断";
+  app.style.cssText = "";
+  app.innerHTML = `<section class="card"><h1>このリンクの機能は現在利用できません</h1>
+    <p>招待を使った他己診断と結果の自動送信は、この版では行っていません。性格版・恋愛版の自己診断は無料で遊べます。</p>
+    <a class="btn start" href="#/q/normal">自分の診断を始める</a>
+    <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
   window.scrollTo(0, 0);
 }
 
@@ -1180,6 +866,7 @@ function renderFigure(mode, id) {
     <div class="friend-head"><h1>友達は「${esc(f.name)}」タイプでした</h1></div>
     <section class="rcard" style="${themeVars(t.id)}">
       <div class="stage" data-state="done"><img class="avatar color" src="${avatar(id)}" alt="${esc(f.name)}のイラスト"></div>
+      ${id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : ""}
       <h1 class="fig-name" style="--len:${[...f.name].length}">${esc(f.name)}</h1>
       <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
       <p class="serif-quote">${esc(mainLine(id, mode))}</p>
@@ -1195,17 +882,6 @@ function renderFigure(mode, id) {
 // ---------------- ルーティング ----------------
 let visitSent = false;
 app.addEventListener("click", (e) => { const el = e.target.closest("[data-src]"); if (el) nextSrc = el.dataset.src; }, true);
-app.addEventListener("click", (e) => {
-  if (e.target.closest("[data-login]")) doLogin();
-  else if (e.target.closest("[data-logout]")) doLogout();
-  else if (e.target.closest("[data-invite-send]")) {
-    const url = e.target.closest("[data-invite-send]").dataset.inviteUrl;
-    const text = "偉人性格診断、あなたも12問に答えて偉人と出会ってみて！";
-    if (navigator.share) navigator.share({ text, url }).catch(() => {});
-    else { navigator.clipboard?.writeText(url).then(() => toast("リンクをコピーしました。友達に貼って送ってください")).catch(() => toast("コピーできませんでした")); }
-  }
-  else { const c = e.target.closest("[data-copy-invite]"); if (c) { navigator.clipboard?.writeText(c.dataset.copyInvite).then(() => toast("リンクをコピーしました")).catch(() => toast("コピーできませんでした")); } }
-});
 function route() {
   disposeGuide();
   disposeGuide = () => {};
@@ -1223,16 +899,14 @@ function route() {
   overlay.hidden = true; sheet.hidden = true;
   app.style.cssText = "";
   const [, page, mode, code] = location.hash.split("/");
-  if (page === "q" && mode === "friend" && code) { friendToken = code; return renderQuiz("friend"); }
-  if (page === "fr" && mode && code) return renderFriendResult(mode, code);
-  if (page === "q" && engines[mode]) return renderQuiz(mode);
-  if (page === "r" && engines[mode] && code) return renderResult(mode, code);
+  if (["fr", "invite"].includes(page) || (page === "q" && !engines[mode])) return renderUnavailable();
+  if (page === "q" && (mode === "normal" || mode === "love")) return renderQuiz(mode);
+  if (page === "r" && (mode === "normal" || mode === "love") && code) return renderResult(mode, code);
   if (page === "zukan") return renderZukan();
   if (page === "me") return renderMe();
   if (page === "how") return renderHow();
-  if (page === "invite" && mode) return renderInvite(mode);
   if (page === "about") return renderAbout();
-  if (page === "f" && engines[mode] && SD.figures[code] && isFree(code)) return renderFigure(mode, code);
+  if (page === "f" && (mode === "normal" || mode === "love") && SD.figures[code] && isFree(code)) return renderFigure(mode, code);
   quiz = null;
   renderTop();
 }
@@ -1243,4 +917,4 @@ addEventListener("pagehide", () => {
 });
 route();
 store.set("visited", true);
-syncAuthState(); // 起動時に1回だけ、Firebase Authの実際の状態とこの端末の記録を照らし合わせる（既存の診断・表示は待たせない）
+// ローカル版では Firebase Auth に接続しない。

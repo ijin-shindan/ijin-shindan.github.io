@@ -1,16 +1,16 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: c098414
+版番号: a7fe851-202610171417
 公開先: https://ijin-shindan.github.io/app/
-ファイル数: 831（この一覧を含む）
-合計サイズ: 29.02 MB
+ファイル数: 830（この一覧を含む）
+合計サイズ: 29.01 MB
 
 主なフォルダ（ファイル数・サイズ）:
-  app/og/                    201 件    23.42 MB
+  app/og/                    201 件    23.45 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
   app/s/                     200 件     0.22 MB
-  data/                       10 件     0.17 MB
-  app/                        11 件     0.16 MB
+  data/                        9 件     0.16 MB
+  app/                        11 件     0.13 MB
   app/icons/                   3 件     0.01 MB
   （一番上）                        4 件     0.00 MB
 
@@ -422,15 +422,15 @@
   app/avatars/yoshida-kenko.svg  4871
   app/avatars/yoshida-shoin.svg  4841
   app/avatars/zhuge-liang.svg  7446
-  app/cloud.js  7148
   app/guide.css  1211
   app/guide.js  3961
   app/icons/apple-touch-icon.png  3502
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
-  app/index.html  2732
-  app/main.js  90860
-  app/meta.json  7795
+  app/index.html  1876
+  app/legacy_data.js  1928
+  app/main.js  64357
+  app/meta.json  7834
   app/motion.css  2141
   app/motion.js  10614
   app/og/love/akechi-mitsuhide.png  121232
@@ -459,7 +459,7 @@
   app/og/love/hijikata-toshizo.png  116152
   app/og/love/himiko.png  113508
   app/og/love/hino-tomiko.png  120595
-  app/og/love/hiraga-gennai.png  121402
+  app/og/love/hiraga-gennai.png  124184
   app/og/love/hojo-masako.png  113436
   app/og/love/hojo-soun.png  127821
   app/og/love/hojo-ujiyasu.png  121411
@@ -527,13 +527,13 @@
   app/og/love/uesugi-kenshin.png  111328
   app/og/love/uesugi-yozan.png  120401
   app/og/love/van-gogh.png  117746
-  app/og/love/washington.png  118630
+  app/og/love/washington.png  123042
   app/og/love/watt.png  121350
   app/og/love/yosano-akiko.png  141850
   app/og/love/yoshida-kenko.png  112361
   app/og/love/yoshida-shoin.png  126999
   app/og/love/zhuge-liang.png  113573
-  app/og/normal/akechi-mitsuhide.png  106973
+  app/og/normal/akechi-mitsuhide.png  106606
   app/og/normal/alexander.png  115713
   app/og/normal/amundsen.png  117225
   app/og/normal/ariwara-narihira.png  106392
@@ -559,7 +559,7 @@
   app/og/normal/hijikata-toshizo.png  103427
   app/og/normal/himiko.png  103025
   app/og/normal/hino-tomiko.png  109722
-  app/og/normal/hiraga-gennai.png  107266
+  app/og/normal/hiraga-gennai.png  109055
   app/og/normal/hojo-masako.png  101336
   app/og/normal/hojo-soun.png  115385
   app/og/normal/hojo-ujiyasu.png  108062
@@ -602,8 +602,8 @@
   app/og/normal/ogata-koan.png  105306
   app/og/normal/okubo-toshimichi.png  107691
   app/og/normal/okuma-shigenobu.png  110740
-  app/og/normal/ono-no-komachi.png  112064
-  app/og/normal/ooka-tadasuke.png  114505
+  app/og/normal/ono-no-komachi.png  115728
+  app/og/normal/ooka-tadasuke.png  117522
   app/og/normal/pompadour.png  113110
   app/og/normal/richard-1.png  126024
   app/og/normal/rodin.png  113533
@@ -627,7 +627,7 @@
   app/og/normal/uesugi-kenshin.png  103741
   app/og/normal/uesugi-yozan.png  108841
   app/og/normal/van-gogh.png  111753
-  app/og/normal/washington.png  104895
+  app/og/normal/washington.png  113637
   app/og/normal/watt.png  110951
   app/og/normal/yosano-akiko.png  128075
   app/og/normal/yoshida-kenko.png  102185
@@ -660,7 +660,7 @@
   app/s/love/hijikata-toshizo.html  1094
   app/s/love/himiko.html  1049
   app/s/love/hino-tomiko.html  1079
-  app/s/love/hiraga-gennai.html  1088
+  app/s/love/hiraga-gennai.html  1067
   app/s/love/hojo-masako.html  1076
   app/s/love/hojo-soun.html  1064
   app/s/love/hojo-ujiyasu.html  1073
@@ -728,13 +728,13 @@
   app/s/love/uesugi-kenshin.html  1118
   app/s/love/uesugi-yozan.html  1094
   app/s/love/van-gogh.html  1088
-  app/s/love/washington.html  1091
+  app/s/love/washington.html  1164
   app/s/love/watt.html  1103
   app/s/love/yosano-akiko.html  1073
   app/s/love/yoshida-kenko.html  1058
   app/s/love/yoshida-shoin.html  1100
   app/s/love/zhuge-liang.html  1073
-  app/s/normal/akechi-mitsuhide.html  1072
+  app/s/normal/akechi-mitsuhide.html  1069
   app/s/normal/alexander.html  1084
   app/s/normal/amundsen.html  1048
   app/s/normal/ariwara-narihira.html  1072
@@ -760,7 +760,7 @@
   app/s/normal/hijikata-toshizo.html  1081
   app/s/normal/himiko.html  1048
   app/s/normal/hino-tomiko.html  1054
-  app/s/normal/hiraga-gennai.html  1051
+  app/s/normal/hiraga-gennai.html  1054
   app/s/normal/hojo-masako.html  1048
   app/s/normal/hojo-soun.html  1045
   app/s/normal/hojo-ujiyasu.html  1057
@@ -803,7 +803,7 @@
   app/s/normal/ogata-koan.html  1036
   app/s/normal/okubo-toshimichi.html  1081
   app/s/normal/okuma-shigenobu.html  1087
-  app/s/normal/ono-no-komachi.html  1063
+  app/s/normal/ono-no-komachi.html  1072
   app/s/normal/ooka-tadasuke.html  1069
   app/s/normal/pompadour.html  1078
   app/s/normal/richard-1.html  1069
@@ -828,23 +828,22 @@
   app/s/normal/uesugi-kenshin.html  1084
   app/s/normal/uesugi-yozan.html  1063
   app/s/normal/van-gogh.html  1057
-  app/s/normal/washington.html  1090
+  app/s/normal/washington.html  1133
   app/s/normal/watt.html  1072
   app/s/normal/yosano-akiko.html  1060
   app/s/normal/yoshida-kenko.html  1063
   app/s/normal/yoshida-shoin.html  1060
   app/s/normal/zhuge-liang.html  1078
-  app/shindan.js  7161
+  app/shindan.js  7174
   app/style.css  30042
   data/axes.json  2449
-  data/firebase.json  754
+  data/firebase.json  144
   data/plans.json  1866
   data/questions.json  5660
   data/questions_friend.json  2538
   data/questions_love.json  6452
-  data/rarity.json  4637
   data/rules.json  6121
-  data/texts.json  116900
+  data/texts.json  116918
   data/types.json  20106
   index.html  450
   robots.txt  265

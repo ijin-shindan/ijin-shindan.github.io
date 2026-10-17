@@ -3,41 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>メンテナンス中｜世界の偉人性格診断</title>
-  <meta name="description" content="ただいまメンテナンス中です。しばらくお待ちください。">
-  <meta name="robots" content="noindex">
+  <title>世界の偉人性格診断</title>
+  <meta name="description" content="12問で100人の偉人のうち誰に近いかを楽しむ、登録不要の無料診断。">
+  <meta property="og:title" content="世界の偉人性格診断">
+  <meta property="og:description" content="100人の偉人のうち、あなたは誰？ 12問・登録なし">
+  <meta property="og:type" content="website">
   <meta property="og:image" content="https://ijin-shindan.github.io/app/og/top.png">
   <meta property="og:url" content="https://ijin-shindan.github.io/app/">
   <link rel="canonical" href="https://ijin-shindan.github.io/app/">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=c098414">
-  <!--
-    メンテナンス中はアプリ本体を読みこまない（#app 等の要素がこのページに無く、読みこむとエラーになるため）。
-    scripts/build_dist.py がこの読みこみの記述を前提にしているので、コメントの中にだけ残す
-    （ブラウザはコメントの中を実行しない。ビルド時のキャッシュ対策の書き換えは素通りする）。
-    通常運用に戻す時は、このファイルを直前のコミットの内容に戻せばよい（git log で「メンテナンス」を探す）。
-    <script type="module" src="main.js?v=c098414"></script>
-  -->
-  <style>
-    body { margin: 0; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; }
-    .maint-card { max-width: 420px; }
-    .maint-seal {
-      width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 20px; display: flex;
-      align-items: center; justify-content: center; background: var(--ink, #26221d); color: var(--paper, #F6F1E7);
-      font-size: 28px; font-weight: 900;
-    }
-    .maint-card h1 { font-size: 22px; margin: 0 0 12px; line-height: 1.5; }
-    .maint-card p { font-size: 15px; line-height: 1.8; color: var(--ink-soft, #55504a); margin: 0 0 8px; }
-  </style>
-  <script src="analytics-privacy.js?v=c098414"></script>
-  <script defer src="https://cloud.umami.is/script.js" data-website-id="084caf0c-389c-4929-8a99-6e33effdbac5" data-exclude-hash="true" data-exclude-search="true" data-auto-track="false" data-do-not-track="true" data-before-send="ijinAnalyticsBeforeSend" data-domains="ijin-shindan.github.io"></script>
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css?v=a7fe851-202610171417">
+  <link rel="stylesheet" href="motion.css?v=3">
+  <link rel="stylesheet" href="guide.css?v=1">
 </head>
 <body>
-  <div class="maint-card">
-    <div class="maint-seal">偉</div>
-    <h1>ただいまメンテナンス中です</h1>
-    <p>世界の偉人性格診断は、内容を改善するため一時的にお休みしています。</p>
-    <p>しばらくしてから、もう一度お越しください。</p>
-  </div>
+  <main id="app">
+    <section class="hero">
+      <div class="seal">偉</div>
+      <div id="guide"></div>
+      <h1>100人の偉人のうち、<br>あなたは誰？</h1>
+      <p class="sub">12問・約1分半・登録なし</p>
+    </section>
+    <div class="cta">
+      <a class="btn start" href="#/q/normal">診断スタート</a>
+      <a class="btn love-sub" href="#/q/love">💘 恋愛バージョンもある</a>
+    </div>
+    <div class="teaser" aria-live="polite"></div>
+  </main>
+  <div id="overlay" hidden></div>
+  <div id="sheet" hidden></div>
+  <script type="module" src="main.js?v=a7fe851-202610171417"></script>
 </body>
 </html>
