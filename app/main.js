@@ -1,20 +1,20 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=3b8f936-202610172301";
-import { mountMotion } from "./motion.js?v=3";
-import { mountGuide } from "./guide.js?v=2";
-import { separateLegacyLinkedResults } from "./legacy_data.js";
-import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js";
-import { partialOtherCandidate } from "./other_partial.js";
-import { prependPersonCard } from "./people.js";
+import { AXES, Shindan, loadData } from "./shindan.js?v=43c2692-202610172328";
+import { mountMotion } from "./motion.js?v=43c2692-202610172328";
+import { mountGuide } from "./guide.js?v=43c2692-202610172328";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=43c2692-202610172328";
+import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=43c2692-202610172328";
+import { partialOtherCandidate } from "./other_partial.js?v=43c2692-202610172328";
+import { prependPersonCard, ensurePersonCardIds } from "./people.js?v=43c2692-202610172328";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=3b8f936-202610172301")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=43c2692-202610172328")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -135,13 +135,37 @@ const otherReplies = () => {
     return { ...x, fig: provisional?.figure.id ?? null };
   }) : [];
 };
+const usablePersonCard = (x) => x && engines[x.mode] && validCode(engines[x.mode], x.code) && SD.figures[x.fig];
 const peopleCards = () => {
   const xs = store.get("people.cards", []);
-  return Array.isArray(xs) ? xs.filter((x) => x && engines[x.mode] && validCode(engines[x.mode], x.code) && SD.figures[x.fig]) : [];
+  if (!Array.isArray(xs)) return [];
+  const valid = xs.filter(usablePersonCard);
+  try {
+    const upgraded = ensurePersonCardIds(valid, createInviteToken);
+    if (!upgraded.changed) return upgraded.cards;
+    let i = 0;
+    const preserved = xs.map((card) => usablePersonCard(card) ? upgraded.cards[i++] : card);
+    if (store.set("people.cards", preserved)) return upgraded.cards;
+  } catch { /* 保存不可の端末では既存カードを一時IDで閲覧する */ }
+  const used = new Set();
+  return valid.map((card, i) => {
+    const id = validInviteToken(card.id) && !used.has(card.id) ? card.id : `legacy-${i}`;
+    used.add(id);
+    return { ...card, id };
+  });
+};
+const rawPersonAt = (displayIndex) => {
+  peopleCards(); // 旧カードIDを可能なら永続化
+  const all = store.get("people.cards", []);
+  if (!Array.isArray(all)) return { all: [], index: -1 };
+  let shown = -1;
+  const index = all.findIndex((card) => usablePersonCard(card) && ++shown === displayIndex);
+  return { all, index };
 };
 // 同じ回答コードでも別の人であり得る。カードの識別子は回答と分ける。
 function addPersonCard(mode, code, figureId) {
-  const cards = peopleCards();
+  peopleCards(); // 旧カードのIDを補い、元データを残してから追加する。
+  const cards = store.get("people.cards", []);
   const id = createInviteToken();
   const next = prependPersonCard(cards, { id, mode, code, fig: figureId, at: Date.now() });
   if (!next) return "full";
@@ -669,14 +693,14 @@ function renderResult(mode, code) {
 }
 
 // 友達の結果（シェアされたリンクを開いた人）
-function renderFriend(sd, mode, code, r) {
+function renderFriend(sd, mode, code, r, personCard = null) {
   const f = r.figure;
   const own = store.get("seen_results", []).includes(mode + code);  // この端末で自分で診断したことがある結果
   const prevE = store.get("me.prev." + mode);
   const prevHere = prevE?.code === code;                                // 入れかえ前の結果
-  const prevLink = !own && prevHere && prevE.via === "link";            // 入れかえ前の結果が、リンクから保存したもの
-  const past = own || (prevHere && !prevLink);                         // 以前のあなた自身の結果
-  if (!past) {
+  const prevLink = !personCard && !own && prevHere && prevE.via === "link"; // 入れかえ前の結果が、リンクから保存したもの
+  const past = !personCard && (own || (prevHere && !prevLink));         // 以前のあなた自身の結果
+  if (!past && !personCard) {
     const friends = store.get("friends", []);
     if (!friends.some((x) => x.mode === mode && x.code === code))
       store.set("friends", [{ mode, code, fig: f.id, at: Date.now() }, ...friends].slice(0, 20));
@@ -693,8 +717,10 @@ function renderFriend(sd, mode, code, r) {
       <p class="rel-note">性格タイプの組み合わせで見た相性です（史実の勝ち負けではありません）。矢印の先が、押されやすい側。</p>
       <div class="rels">${duelRow(sd, mu, r.u, mine.fig, f.id, { label: "届いたリンクの結果", otherWho: "リンクの結果", otherFace: avatar(f.id) })}</div></section>`;
   }
-  if (!past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
-  const personCta = past || prevLink ? `<details class="card social-entry"><summary>友達がこの結果と同じだった場合</summary>
+  if (!personCard && !past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
+  const personCta = personCard ? `<section class="card social-entry"><h2>保存した人物カード</h2>
+    <p>${esc(personCard.label || "友達カード")}の共有結果です。あなた自身の診断結果とは別に保存しています。</p>
+    <a class="btn sub" href="#/people">人物カード一覧へ</a></section>` : past || prevLink ? `<details class="card social-entry"><summary>友達がこの結果と同じだった場合</summary>
     <p>以前の自分や保存したリンクと同じ回答でも、別の友達から届いた結果なら人物カードに追加できます。</p>
     <button class="btn sub" data-add-person>友達の人物カードに追加する</button></details>` : `<section class="card social-entry"><h2>この人を人物カードに</h2>
     <p>自己診断として共有された結果です。回答者の本人確認はできません。友達から見たあなたの結果とは別に、人物カードへ追加できます。</p>
@@ -702,20 +728,22 @@ function renderFriend(sd, mode, code, r) {
       ? '<p class="social-note">同じ回答のカードが保存されています。別の人から届いた結果なら、もう1枚追加できます。</p>'
       : ""}<button class="btn sub" data-add-person>人物カードに追加する</button></section>`;
   app.innerHTML = `
-    <div class="friend-head">${past || prevLink
+    <div class="friend-head">${personCard
+      ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>「${esc(f.name)}」タイプ</h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
+      : past || prevLink
       ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」タイプ</h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
-      : `<h1>届いたリンクの結果は<br>「${esc(f.name)}」タイプ</h1><p class="note" style="margin:6px 0 0">このリンクに記録された回答の結果です（この端末に保存された、あなたの結果とは別です）</p>`}
+      : `<h1>届いたリンクの結果は<br>「${esc(f.name)}」タイプ</h1><p class="note friend-origin-note">このリンクに記録された回答の結果です（この端末に保存された、あなたの結果とは別です）</p>`}
       <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="#/r/${mode}/${mine.code}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">この端末の記録</a></p></div>
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
+    ${personCta}
     <div style="display:grid;gap:8px;margin:16px 0">
       ${mine ? (past || prevLink ? "" : compat) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら結果リンクを最初の友達へ送り返せます。届いた結果との相性もわかります。</p>`}
     </div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
-    ${personCta}
     <div class="claim">${past
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
-      : `<p class="note">${prevLink ? "以前リンクから保存した結果です。" : "受け取ったリンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
+      : `<p class="note">${personCard ? "人物カードに保存した結果です。" : prevLink ? "以前リンクから保存した結果です。" : "受け取ったリンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
   $("[data-add-person]")?.addEventListener("click", () => {
     if (peopleCards().some((card) => card.mode === mode && card.code === code)
@@ -724,9 +752,8 @@ function renderFriend(sd, mode, code, r) {
       const status = addPersonCard(mode, code, f.id);
       if (status !== "saved") return toast(status === "full" ? "人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください" : "この端末に保存できませんでした");
     } catch { return toast("この端末ではカードを保存できません"); }
-    renderFriend(sd, mode, code, r);
-    $("[data-add-person]")?.focus({ preventScroll: true });
-    toast("人物カードが1枚増えました");
+    location.hash = "#/people";
+    toast("人物カードに保存しました");
   });
   if (past) $("[data-restore-self]").onclick = () => {
     if (!confirm(`以前の自己診断結果（${f.name}）を、現在の自分の結果に戻しますか？`)) return;
@@ -738,6 +765,20 @@ function renderFriend(sd, mode, code, r) {
   $(".stage").dataset.state = "done";
   attachMotion(f.name);
   window.scrollTo(0, 0);
+}
+
+// 人物カード固有IDから開く。回答コードが自分と同じでも、友達の表示文脈を保つ。
+function renderPersonCard(id) {
+  const cards = peopleCards();
+  const index = cards.findIndex((x) => x.id === id);
+  const card = cards[index];
+  if (!card) return renderUnavailable();
+  const displayCard = { ...card, label: card.label || `友達カード ${index + 1}` };
+  const sd = engines[card.mode];
+  const r = sd.diagnose(answersOf(sd, card.code));
+  if (r.figure.id !== card.fig) return renderUnavailable();
+  document.title = `${displayCard.label}｜${r.figure.name}タイプ`;
+  renderFriend(sd, card.mode, card.code, r, displayCard);
 }
 
 // 結果が出る瞬間の演出（約5秒。どこをタップしても最後まで飛ぶ）
@@ -1220,22 +1261,23 @@ function renderPeople() {
     ${cards.length ? `<div class="social-list">${cards.map((x, i) => `<section class="social-card">
       <img class="tile" src="${avatar(x.fig)}" alt="">
       <div><b>${esc(x.label || `友達カード ${i + 1}`)}</b><div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small></div>
-      <a href="#/r/${x.mode}/${x.code}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目の結果を見る">見る</a>
+      <a href="#/person/${encodeURIComponent(x.id)}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目の結果を見る">見る</a>
       <button type="button" data-label-person="${i}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目の呼び名を変更">呼び名</button>
       <button type="button" data-remove-person="${i}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目を削除">削除</button>
     </section>`).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
     <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
     ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">友達から見た自分を聞く機能は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = () => {
-    const i = Number(b.dataset.removePerson), all = peopleCards();
+    const i = Number(b.dataset.removePerson), { all, index } = rawPersonAt(i);
+    if (index < 0) return;
     if (!confirm(`友達カード ${i + 1}をこの端末から削除しますか？`)) return;
-    all.splice(i, 1);
+    all.splice(index, 1);
     if (!store.set("people.cards", all)) return toast("この端末からカードを削除できませんでした");
     renderPeople();
     focusPageHeading();
   });
   app.querySelectorAll("[data-label-person]").forEach((b) => b.onclick = () => {
-    const i = Number(b.dataset.labelPerson), all = peopleCards(), current = all[i];
+    const i = Number(b.dataset.labelPerson), { all, index } = rawPersonAt(i), current = all[index];
     if (!current) return;
     openSheet(`<div class="panel"><h2 id="sheet-title">カードの呼び名</h2>
       <p>自分だけに分かる短い呼び名を付けられます。本名や連絡先は入れないでください。この端末にだけ保存され、結果リンクには入りません。</p>
@@ -1245,7 +1287,7 @@ function renderPeople() {
       <button class="btn sub close" type="button">閉じる</button></div>`, b);
     $("[data-save-person-label]", sheet).onclick = () => {
       const label = $("#person-label", sheet).value.trim().replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 20);
-      all[i] = { ...current, label };
+      all[index] = { ...current, label };
       if (!store.set("people.cards", all)) return toast("呼び名を保存できませんでした");
       closeSheet(false);
       renderPeople();
@@ -1307,7 +1349,8 @@ function route() {
   if (page === "answer" && validInviteToken(mode) && !code) return renderOtherQuiz(mode);
   if (socialRoute?.kind === "reply") return renderOtherReply(socialRoute.token, socialRoute.code);
   if (page === "people" && !mode) return renderPeople();
-  if (["ask", "answer", "reply", "people"].includes(page)) return renderUnavailable();
+  if (page === "person" && mode && !code) return renderPersonCard(mode);
+  if (["ask", "answer", "reply", "people", "person"].includes(page)) return renderUnavailable();
   if (["fr", "invite"].includes(page) || (page === "q" && !engines[mode])) return renderUnavailable();
   if (page === "r" && !engines[mode]) return renderUnavailable();
   if (page === "f" && (!engines[mode] || !SD.figures[code] || !isFree(code))) return renderUnavailable();
