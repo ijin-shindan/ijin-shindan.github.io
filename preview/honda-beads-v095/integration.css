@@ -12,7 +12,7 @@ main[data-testid="research-integration-trial"] { max-width: 720px; padding-botto
 .control-row label { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; font-size: 13px; font-weight: 800; cursor: pointer; }
 .control-row input { width: 18px; height: 18px; accent-color: var(--shu); }
 .control-row input:focus-visible { outline: 2px solid var(--shu); outline-offset: 3px; }
-.phone-frame { width: min(100%, 375px); height: 812px; margin: 0 auto; padding: 10px 15px 24px; border: 2px solid var(--ink); border-radius: 30px; background: var(--paper); box-shadow: var(--shadow); overflow: auto; overscroll-behavior: contain; }
+.phone-frame { width: min(100%, 375px); min-height: 812px; height: auto; margin: 0 auto; padding: 10px 15px 24px; border: 2px solid var(--ink); border-radius: 30px; background: var(--paper); box-shadow: var(--shadow); overflow: visible; }
 .viewport-label { margin: 0 0 8px; color: var(--ink-soft); font-size: 10px; font-weight: 800; text-align: center; letter-spacing: .08em; }
 .integration-result-card { padding-top: 24px; --t-bg:#FCE0B6; --t-bg2:#F8CD92; --t-bg3:#FEEDD3; --t-accent:#DE7A12; --t-on:#26221d; }
 .integration-result-card .fig-name { --len: 4; }
