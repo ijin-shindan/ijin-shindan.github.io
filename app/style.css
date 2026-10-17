@@ -368,6 +368,7 @@ details p { font-size: 14px; margin: 8px 0; }
   box-shadow: 4px 4px 0 var(--world-shadow); }
 .about h1 { font-family: var(--serif); font-weight: 900; font-size: 24px; margin: 0 0 12px; }
 .about h2 { font-size: 16px; font-weight: 800; margin: 22px 0 6px; }
+.dev-badge { display: inline-block; padding: 2px 7px; border: 1px solid var(--world-edge); border-radius: 5px; background: var(--ai-soft); color: var(--ink); font-family: var(--sans); font-size: .72em; font-weight: 800; vertical-align: middle; white-space: nowrap; }
 .about p, .about li { font-size: 14px; }
 .about ul { padding-left: 1.2em; }
 .about-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }

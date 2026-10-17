@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=663814c-202610171700";
+import { AXES, Shindan, loadData } from "./shindan.js?v=2973096-202610171742";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 import { separateLegacyLinkedResults } from "./legacy_data.js";
@@ -11,7 +11,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=663814c-202610171700")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2973096-202610171742")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -147,7 +147,7 @@ const isDiscovered = (id) => zState(id) === "discovered";
 const zukanCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
 const knownCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => !DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
 // 図鑑の「取得元」を日本語表示用に（discoveredな経路だけ）
-const SRC_LABEL = { me: "自分の診断", friend_diag: "友達診断" };
+const SRC_LABEL = { me: "自分の診断", friend_diag: "旧版の友達診断" };
 const sourceLabels = (id) => { const e = store.get("zukan", {})[id]; return [...new Set(e?.sources ?? (e ? [e.src] : []))].map((s) => SRC_LABEL[s]).filter(Boolean); };
 // 関連表示（相性・もしも・友達）の顔：発見済みだけ通常の絵、それ以外はシルエット＋「🔒 未発見」
 const relFace = (id) => avatar(id, !isDiscovered(id));
@@ -897,6 +897,8 @@ function renderAbout() {
     <p>回答途中の記録、結果、図鑑、受け取った共有リンクの結果は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
     <p>結果の共有リンクには、12問の回答から作られたコードが含まれます。リンクを相手に送ると、受信者や共有先のサービスに結果とコードが伝わります。受信者がリンクを開くと、配信元のGitHub Pagesにもコード付きURLが届きます。画像を端末に保存するだけなら、このコードは送信されません。共有操作をしなければ、アプリから回答や結果を運営者へ送信しません。</p>
     <p>この版ではアクセス解析、広告、ログイン、クラウド保存、招待による他己診断、購入は行いません。ページの表示に必要なファイルはGitHub Pagesから読み込まれ、配信元には通常の閲覧ログが残る場合があります。Wikipediaなど外部サイトへのリンクは、押したときだけ開きます。</p>
+    <h2>これからの機能 <span class="dev-badge">※開発中</span></h2>
+    <p>友達を招いてあなたについて答えてもらう他己診断、複数人の回答をまとめた結果、人ごとのカード、組み合わせバッジは、まだ使えません。いま送れるのは、自分で答えた診断結果の共有リンクです。</p>
     <h2>記録の削除</h2>
     <p>下のボタンは、このブラウザの保存記録だけを消します。</p>
     <p><b>以前の版でログインした方へ：</b>この操作では、その認証セッションやクラウド上の既存データは削除しません。</p>
@@ -913,10 +915,12 @@ function renderAbout() {
 }
 
 function renderUnavailable() {
-  document.title = "この機能は利用できません｜世界の偉人性格診断";
+  const [, page, mode] = location.hash.split("/");
+  const planned = ["fr", "invite"].includes(page) || (["q", "r"].includes(page) && ["friend", "other"].includes(mode));
+  document.title = planned ? "招待・他己診断は開発中｜世界の偉人性格診断" : "このリンクは開けません｜世界の偉人性格診断";
   app.style.cssText = "";
-  app.innerHTML = `<section class="card"><h1>このリンクの機能は現在利用できません</h1>
-    <p>古い招待リンクは現在使えません。このリンクから相手への回答は送れません。性格版・恋愛版の自己診断は無料で遊べます。</p>
+  app.innerHTML = `<section class="card"><h1>${planned ? '招待・他己診断 <span class="dev-badge">※開発中</span>' : 'このリンクは開けませんでした'}</h1>
+    <p>${planned ? "古い招待リンクは現在使えません。このリンクから相手への回答は送れません。" : "リンクが途中で切れているか、対応していない形式です。"}性格版・恋愛版の自己診断は無料で遊べます。</p>
     <a class="btn start" href="#/q/normal">自分の診断を始める</a>
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
   window.scrollTo(0, 0);
@@ -967,6 +971,8 @@ function route() {
   app.style.cssText = "";
   const [, page, mode, code] = location.hash.split("/");
   if (["fr", "invite"].includes(page) || (page === "q" && !engines[mode])) return renderUnavailable();
+  if (page === "r" && !engines[mode]) return renderUnavailable();
+  if (page === "f" && (!engines[mode] || !SD.figures[code] || !isFree(code))) return renderUnavailable();
   if (page === "q" && (mode === "normal" || mode === "love")) return renderQuiz(mode);
   if (page === "r" && (mode === "normal" || mode === "love")) return renderResult(mode, code);
   if (page === "zukan") return renderZukan();
