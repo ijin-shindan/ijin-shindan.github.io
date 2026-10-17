@@ -1,27 +1,34 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=2973096-202610171742";
+import { AXES, Shindan, loadData } from "./shindan.js?v=3b8f936-202610172301";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 import { separateLegacyLinkedResults } from "./legacy_data.js";
+import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js";
+import { partialOtherCandidate } from "./other_partial.js";
+import { prependPersonCard } from "./people.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2973096-202610171742")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=3b8f936-202610172301")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
 }
 window.__ijinReady = true;
 const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
+// OTHER は自己診断とは別の回答・保存先を持つ。暫定calibrationを使う娯楽結果であり総合診断ではない。
+const otherEngine = new Shindan(data, "free", "friend");
 const SD = engines.normal;
 const texts = data.texts.figures;
 const axisById = Object.fromEntries(data.axes.axes.map((a) => [a.id, a]));
 const THEMES = meta.themes;
+// 他己用6軸の質問品質と補正値は未検証。公開サイトには出さず、ローカル試作だけで確認する。
+const OTHER_PILOT = otherPilotAllowed(location.hostname);
 const MAX_TIER = SD.plan.max_tier;
 const FREE = Object.values(SD.figures).filter((f) => f.tier <= MAX_TIER);
 const LOCKED = Object.values(SD.figures).filter((f) => f.tier > MAX_TIER);
@@ -31,7 +38,7 @@ const OTHER = { normal: "love", love: "normal" };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const store = {
   get(k, d = null) { try { const v = localStorage.getItem("ijin." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem("ijin." + k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem("ijin." + k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem("ijin." + k); } catch {} },
 };
 // この公開版はローカル保存のみ。計測・ログイン・招待送信・課金は行わない。
@@ -117,6 +124,30 @@ const answersOf = (sd, code) => { const d = digits(code); return Object.fromEntr
 const validCode = (sd, code) => { const d = digits(code); return !!d && d.length === ordered(sd).length; };
 const validProgress = (p) => p && Number.isFinite(p.t) && Array.isArray(p.answers) && p.answers.length <= 12
   && p.answers.every((v) => Number.isInteger(v) && v >= 1 && v <= 5);
+const friendAnswerCode = (code) => validFriendCode(code);
+const inviteToken = () => { const token = store.get("other.invite"); return validInviteToken(token) ? token : null; };
+const otherReplies = () => {
+  const xs = store.get("other.replies", []);
+  return Array.isArray(xs) ? xs.filter((x) => x && x.token === inviteToken() && friendAnswerCode(x.code)).map((x) => {
+    if (x.fig && SD.figures[x.fig]) return x;
+    const values = [...x.code.slice(2)].map(Number);
+    const provisional = values.includes(0) ? partialOtherCandidate(ordered(otherEngine), values, otherEngine.types) : null;
+    return { ...x, fig: provisional?.figure.id ?? null };
+  }) : [];
+};
+const peopleCards = () => {
+  const xs = store.get("people.cards", []);
+  return Array.isArray(xs) ? xs.filter((x) => x && engines[x.mode] && validCode(engines[x.mode], x.code) && SD.figures[x.fig]) : [];
+};
+// 同じ回答コードでも別の人であり得る。カードの識別子は回答と分ける。
+function addPersonCard(mode, code, figureId) {
+  const cards = peopleCards();
+  const id = createInviteToken();
+  const next = prependPersonCard(cards, { id, mode, code, fig: figureId, at: Date.now() });
+  if (!next) return "full";
+  store.set("people.cards", next);
+  return peopleCards().some((card) => card.id === id) ? "saved" : "error";
+}
 const savedResult = (mode) => { const e = store.get("me." + mode); return e && validCode(engines[mode], e.code) && SD.figures[e.fig] ? e : null; };
 separateLegacyLinkedResults(store, engines, validCode, (id) => !!SD.figures[id]);
 
@@ -193,25 +224,44 @@ function renderTop() {
       <a class="btn ${prog ? "sub" : "start"}" data-fresh="normal" data-src="top" href="#/q/normal">${prog ? "性格診断を最初から始める" : "診断スタート"}</a>
       <a class="btn love-sub" data-fresh="love" data-src="top" href="#/q/love">💘 恋愛バージョンもある</a>
     </div>
+    <section class="social-entry">
+      <div class="social-badge">友達と遊ぶ</div>
+      <h2>人を知るほど、偉人が増える。</h2>
+      <p>自分の結果を送る → 友達も診断する → 届いた結果を人物カードに。${OTHER_PILOT ? "友達から見た自分を聞く試作も確認できます。" : "友達から見た自分を聞く機能は準備中です。"}</p>
+      ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達に自分を診断してもらう（試作）</a>' : '<span class="dev-badge">友達から見た自分　※開発中</span>'}
+      <a class="btn sub" href="#/people">人物カードを見る</a>
+    </section>
     ${againCard}
-    <div class="teaser" aria-live="polite"></div>
+    <div class="teaser"></div>
+    <button class="btn-text teaser-toggle" type="button" data-teaser-toggle>一言を止める</button>
     <div class="type-strip" aria-hidden="true">${SD.types.map((t) => `<i style="background:${THEMES[t.id].bg2}"></i>`).join("")}</div>
     <p class="note">${LOCKED.length ? `無料で出会えるのは${FREE.length}人。ほか${LOCKED.length}人はシルエットで待機中。` : `${FREE.length}人すべてに、無料で出会えます。`}<br>逸話には伝承や諸説あるものを含みます。</p>
     <p class="note"><a href="#/how">使い方</a>　・　<a href="#/me">この端末の記録</a>　・　<a href="#/about">このサイトについて</a></p>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => (a.onclick = () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   disposeGuide = mountGuide($("#guide"));
   window.scrollTo(0, 0);
-  // 決め台詞がいちばんの宣伝文句。2.5秒ごとに切り替える
+  // 決め台詞は読み切れる間隔で切り替える。動きを抑える設定では静止。
   const teaser = $(".teaser");
+  const toggle = $("[data-teaser-toggle]");
   const pool = pick(FREE, 12);
   let k = 0;
+  let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let teaserTimer;
   const show = () => {
     const f = pool[k++ % pool.length];
     teaser.classList.remove("fade"); void teaser.offsetWidth; teaser.classList.add("fade");
     teaser.innerHTML = `<img class="tile" src="${avatar(f.id)}" alt="" style="${themeVars(f.type)}">
       <div><div class="who">${esc(f.name)}タイプの人は</div><div class="line">「${esc(texts[f.id].serif)}」</div></div>`;
-    later(2500, show);
+    if (!paused) { teaserTimer = setTimeout(show, 5000); timers.push(teaserTimer); }
   };
+  const syncToggle = () => { toggle.textContent = paused ? "一言を動かす" : "一言を止める"; toggle.setAttribute("aria-pressed", String(paused)); };
+  toggle.onclick = () => {
+    paused = !paused;
+    if (paused) clearTimeout(teaserTimer);
+    syncToggle();
+    if (!paused) show();
+  };
+  syncToggle();
   show();
 }
 
@@ -541,6 +591,9 @@ function renderResult(mode, code) {
       <button class="btn sub wide" data-share="copy">リンクをコピー</button>
     </div>
     <p class="note" style="margin:4px 0 12px">画像の保存だけでは回答コードは送信されません。結果リンクには12問の回答から作られたコードが含まれます。送る相手を選んで共有してください。</p>
+    ${freshSource === "friend" ? `<section class="card social-entry"><h2>結果を友達へ送り返そう</h2>
+      <p>最初にリンクをくれた友達へ、あなたの結果リンクをLINEで送るかコピーして返してください。結果は自動では届きません。友達が人物カードに追加できます。</p>
+      <button class="btn sub" data-share="copy">送り返すリンクをコピー</button></section>` : ""}
     ${!localSaveOk ? '<p class="note" role="alert">このブラウザには結果を保存できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
     ${(() => { const prev = store.get("me.prev." + mode); return prev && prev.code !== code && validCode(sd, prev.code) && SD.figures[prev.fig]
       ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
@@ -560,6 +613,12 @@ function renderResult(mode, code) {
       <div class="tags">${scoreTags}</div></section>
     <p class="note">★とLv.は同じ系統内の診断段階です。偉人の優劣ではありません。</p>
     ${otherHtml}
+    ${OTHER_PILOT ? `<section class="card social-entry"><h2>友達から見た自分も、聞いてみる？</h2>
+      <p>あなたが友達に12問をお願いすると、友達から見た偉人が現れます。結果の共有とは別の遊びです。</p>
+      <a class="btn sub" href="#/ask">友達に自分を診断してもらう（試作）</a></section>` : ""}
+    <details class="card social-entry"><summary>友達が自分と同じ結果だった場合</summary>
+      <p>共有された友達の回答コードが自分と同じでも、別の人のカードとして保存できます。実際に友達から届いた結果のときだけ追加してください。</p>
+      <button class="btn sub" data-add-same-person>この結果を友達の人物カードに追加</button></details>
     <section class="card"><h2>図鑑</h2>
       <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人を発見</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
       <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a>
@@ -582,6 +641,16 @@ function renderResult(mode, code) {
     if (ch === "image") { e.preventDefault(); shareImage(r, mode, b); }
   }));
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  $("[data-add-same-person]")?.addEventListener("click", () => {
+    if (peopleCards().some((card) => card.mode === mode && card.code === code)
+      && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
+    try {
+      const status = addPersonCard(mode, code, f.id);
+      if (status !== "saved") return toast(status === "full" ? "人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください" : "この端末に保存できませんでした");
+      $("[data-add-same-person]").disabled = true;
+      toast("友達の人物カードを1枚追加しました");
+    } catch { toast("この端末ではカードを保存できません"); }
+  });
   $("[data-duo]")?.addEventListener("click", () => {
     const [n, l] = $("[data-duo]").dataset.duo.split(",");
     track("share_click", { channel: "duo", figure: f.id });
@@ -625,6 +694,13 @@ function renderFriend(sd, mode, code, r) {
       <div class="rels">${duelRow(sd, mu, r.u, mine.fig, f.id, { label: "届いたリンクの結果", otherWho: "リンクの結果", otherFace: avatar(f.id) })}</div></section>`;
   }
   if (!past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
+  const personCta = past || prevLink ? `<details class="card social-entry"><summary>友達がこの結果と同じだった場合</summary>
+    <p>以前の自分や保存したリンクと同じ回答でも、別の友達から届いた結果なら人物カードに追加できます。</p>
+    <button class="btn sub" data-add-person>友達の人物カードに追加する</button></details>` : `<section class="card social-entry"><h2>この人を人物カードに</h2>
+    <p>自己診断として共有された結果です。回答者の本人確認はできません。友達から見たあなたの結果とは別に、人物カードへ追加できます。</p>
+    ${peopleCards().some((x) => x.mode === mode && x.code === code)
+      ? '<p class="social-note">同じ回答のカードが保存されています。別の人から届いた結果なら、もう1枚追加できます。</p>'
+      : ""}<button class="btn sub" data-add-person>人物カードに追加する</button></section>`;
   app.innerHTML = `
     <div class="friend-head">${past || prevLink
       ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」タイプ</h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
@@ -633,13 +709,25 @@ function renderFriend(sd, mode, code, r) {
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
     <div style="display:grid;gap:8px;margin:16px 0">
       ${mine ? (past || prevLink ? "" : compat) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
-      <p class="note" style="margin:0">届いた結果との相性もわかります</p>`}
+      <p class="note" style="margin:0">答えたら結果リンクを最初の友達へ送り返せます。届いた結果との相性もわかります。</p>`}
     </div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
+    ${personCta}
     <div class="claim">${past
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
       : `<p class="note">${prevLink ? "以前リンクから保存した結果です。" : "受け取ったリンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
+  $("[data-add-person]")?.addEventListener("click", () => {
+    if (peopleCards().some((card) => card.mode === mode && card.code === code)
+      && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
+    try {
+      const status = addPersonCard(mode, code, f.id);
+      if (status !== "saved") return toast(status === "full" ? "人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください" : "この端末に保存できませんでした");
+    } catch { return toast("この端末ではカードを保存できません"); }
+    renderFriend(sd, mode, code, r);
+    $("[data-add-person]")?.focus({ preventScroll: true });
+    toast("人物カードが1枚増えました");
+  });
   if (past) $("[data-restore-self]").onclick = () => {
     if (!confirm(`以前の自己診断結果（${f.name}）を、現在の自分の結果に戻しますか？`)) return;
     if (mine && mine.code !== code) store.set("me.prev." + mode, mine);
@@ -853,6 +941,12 @@ function renderMe() {
       ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に受け取り${store.get("me." + x.mode)?.code === x.code ? "（いまの自分の結果に保存中）" : ""}`, relFace(x.fig))).join("")}</div>
         <p class="note" style="text-align:left;margin:8px 0 0">友達などから届いたリンクの結果です。あなたの結果とは別に保存されています（最大20件）。</p>`
         : `<p class="note" style="text-align:left;margin:0">まだありません。友達から結果のリンクが届くと、ここに並びます。</p>`}</section>
+    ${OTHER_PILOT ? `<section class="card"><h2>友達から見た自分 <span class="dev-badge">試作</span></h2>
+      <p class="social-note">友達があなたについて答えた返信リンクを、自分で保存した印象です。自分の結果は置き換えません。</p>
+      <p>${otherReplies().length}件の返信をこの端末に保存中。回答した人の人数とは限りません。</p>
+      <a class="btn sub" href="#/ask">招待リンクと返信を見る</a></section>` : ""}
+    <section class="card"><h2>人物カード</h2><p>友達から届いた自己診断結果のカード：${peopleCards().length}枚</p>
+      <a class="btn sub" href="#/people">人物カードを見る</a></section>
     <section class="card"><h2>設定</h2>
       <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
       <a class="btn sub" style="margin-top:12px" href="#/about">このサイトについて・記録を消す</a>
@@ -873,13 +967,15 @@ function renderHow() {
     ["②", "似た偉人と出会う", "6つの軸をもとに、今の回答に近い偉人を1人表示します。"],
     ["③", "偉人を図鑑に集める", "相性・もしもの分岐などで名前を知り、診断で出会うと図鑑に「発見」として残ります。"],
     ["④", "結果を自分でシェアする", "共有リンクや画像は、自分で選んだときだけ送れます。受け取った結果は自分の結果と区別して表示します。"],
-    ["⑤", "いろんな角度から自分を知る", "性格版・恋愛版、図鑑や相性もあわせて楽しめます。"],
+    OTHER_PILOT ? ["⑤", "友達から見た自分も聞く", "招待リンクを自分で送り、友達が答えたら返信リンクを送ってもらいます。結果は自動では届きません。"] : ["⑤", "友達から見た自分", "招待して友達に答えてもらう機能は、質問と判定を検証中です。"],
+    ["⑥", "人物カードを増やす", "友達から自己診断の結果リンクが届いたら、結果画面でカードに追加できます。"],
   ];
   app.innerHTML = `
     <div class="zhead"><h1>このサイトの使い方</h1></div>
     <div class="how-steps">${steps.map(([n, t, d]) => `<section class="card how-step"><div class="how-n">${n}</div>
         <div><h2 style="margin:0 0 4px">${esc(t)}</h2><p class="note" style="text-align:left;margin:0">${esc(d)}</p></div></section>`).join("")}</div>
     <a class="btn start" data-fresh="normal" data-src="how" href="#/q/normal">診断スタート</a>
+    ${OTHER_PILOT ? '<a class="btn sub" style="margin-top:10px" href="#/ask">友達に聞く（試作）</a>' : ""}
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
   window.scrollTo(0, 0);
@@ -894,11 +990,13 @@ function renderAbout() {
     <p>「世界の偉人性格診断」は、12問で100人の偉人のうち誰に近いかを楽しむ無料のサイトです。性格版と恋愛版があります。登録や購入は不要です。</p>
     <p>結果は娯楽であり、心理検査や医学的診断ではありません。人物の台詞やイラストは創作を含み、史実や本人の発言そのものとは限りません。</p>
     <h2>保存と共有</h2>
-    <p>回答途中の記録、結果、図鑑、受け取った共有リンクの結果は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
+    <p>回答途中の記録、結果、図鑑、受け取った共有リンクの結果、人物カード${OTHER_PILOT ? "、試作中の招待リンクと他己回答" : ""}は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
     <p>結果の共有リンクには、12問の回答から作られたコードが含まれます。リンクを相手に送ると、受信者や共有先のサービスに結果とコードが伝わります。受信者がリンクを開くと、配信元のGitHub Pagesにもコード付きURLが届きます。画像を端末に保存するだけなら、このコードは送信されません。共有操作をしなければ、アプリから回答や結果を運営者へ送信しません。</p>
-    <p>この版ではアクセス解析、広告、ログイン、クラウド保存、招待による他己診断、購入は行いません。ページの表示に必要なファイルはGitHub Pagesから読み込まれ、配信元には通常の閲覧ログが残る場合があります。Wikipediaなど外部サイトへのリンクは、押したときだけ開きます。</p>
+    ${OTHER_PILOT ? '<p>試作中の友達への招待と返信は、利用者がリンクをコピー・共有して行います。回答は自動送信されません。返信リンクの「#」以降には回答コードが含まれるため、送った相手や共有先サービスにはその情報が伝わります。リンクを知る人は結果を開けます。名前はリンクに含めません。招待した人が別端末で返信を開いても、この端末の記録とは自動でつながりません。</p>' : ""}
+    <p>この版ではアクセス解析、広告、ログイン、クラウド保存、購入は行いません。ページの表示に必要なファイルはGitHub Pagesから読み込まれ、配信元には通常の閲覧ログが残る場合があります。Wikipediaなど外部サイトへのリンクは、押したときだけ開きます。</p>
+    <p>他己用の質問と判定は試験段階で、公開版にはまだ出していません。回答者が別人かも確認できないため、複数の返信を「何人の評価」として扱いません。</p>
     <h2>これからの機能 <span class="dev-badge">※開発中</span></h2>
-    <p>友達を招いてあなたについて答えてもらう他己診断、複数人の回答をまとめた結果、人ごとのカード、組み合わせバッジは、まだ使えません。いま送れるのは、自分で答えた診断結果の共有リンクです。</p>
+    <p>友達を招いてあなたについて答えてもらう他己診断、複数人の独立した回答を保証する総合結果、人物カード同士の組み合わせバッジは、公開版ではまだ使えません。LINEスタンプやグッズの販売導線も未公開です。</p>
     <h2>記録の削除</h2>
     <p>下のボタンは、このブラウザの保存記録だけを消します。</p>
     <p><b>以前の版でログインした方へ：</b>この操作では、その認証セッションやクラウド上の既存データは削除しません。</p>
@@ -907,6 +1005,7 @@ function renderAbout() {
   $("[data-clear]").onclick = () => {
     if (!confirm("このサイトの端末内記録（結果・図鑑・とちゅうの答えなど）を消しますか？")) return;
     try { Object.keys(localStorage).filter((k) => k.startsWith("ijin.")).forEach((k) => localStorage.removeItem(k)); } catch {}
+    try { Object.keys(sessionStorage).filter((k) => k.startsWith("ijin.")).forEach((k) => sessionStorage.removeItem(k)); } catch {}
     quiz = null;
     toast("この端末の記録を消しました");
     location.hash = "#/";
@@ -916,13 +1015,244 @@ function renderAbout() {
 
 function renderUnavailable() {
   const [, page, mode] = location.hash.split("/");
-  const planned = ["fr", "invite"].includes(page) || (["q", "r"].includes(page) && ["friend", "other"].includes(mode));
+  const planned = ["fr", "invite", "ask", "answer", "reply"].includes(page) || (["q", "r"].includes(page) && ["friend", "other"].includes(mode));
   document.title = planned ? "招待・他己診断は開発中｜世界の偉人性格診断" : "このリンクは開けません｜世界の偉人性格診断";
   app.style.cssText = "";
   app.innerHTML = `<section class="card"><h1>${planned ? '招待・他己診断 <span class="dev-badge">※開発中</span>' : 'このリンクは開けませんでした'}</h1>
-    <p>${planned ? "古い招待リンクは現在使えません。このリンクから相手への回答は送れません。" : "リンクが途中で切れているか、対応していない形式です。"}性格版・恋愛版の自己診断は無料で遊べます。</p>
+    <p>${planned ? (["fr", "invite"].includes(page) ? "古い招待リンクは現在使えません。" : "招待・他己診断は公開準備中です。") + "このリンクから相手への回答は送れません。" : "リンクが途中で切れているか、対応していない形式です。"}性格版・恋愛版の自己診断は無料で遊べます。</p>
     <a class="btn start" href="#/q/normal">自分の診断を始める</a>
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+  window.scrollTo(0, 0);
+}
+
+// ---------------- 友達から見た自分（端末内・手動で往復） ----------------
+// 旧 #/invite は別仕様のため再利用しない。新しいURLは #/ask/<token> と #/reply/<token>/<code>。
+function copyLink(url, okText = "リンクをコピーしました") {
+  navigator.clipboard?.writeText(url).then(() => toast(okText)).catch(() => prompt("このリンクをコピーしてください", url));
+  if (!navigator.clipboard?.writeText) prompt("このリンクをコピーしてください", url);
+}
+function shareLink(url, text) {
+  if (navigator.share) {
+    navigator.share({ title: "世界の偉人性格診断", text, url }).catch((e) => {
+      if (e?.name !== "AbortError") copyLink(url);
+    });
+  } else copyLink(url);
+}
+function renderAskHome() {
+  document.title = "友達に聞く｜世界の偉人性格診断";
+  app.style.cssText = "";
+  const token = inviteToken();
+  const url = token ? makeInviteUrl(location.href, token) : null;
+  const replies = otherReplies();
+  app.innerHTML = `
+    <div class="zhead"><h1>友達から見た自分</h1></div>
+    <section class="social-entry">
+      <div class="social-badge">無料・登録なし</div>
+      <h2>「自分って誰っぽい？」を友達に聞こう</h2>
+      <p>友達があなたについて12問答えると、観察できた内容から偉人の候補を見られます。分からない質問が多いと判定を保留します。自己診断とは別の、遊びとしての印象です。</p>
+    </section>
+    <div class="social-step"><b>1　招待リンクを作る</b><p>この端末専用のリンクを作ります。名前はリンクに入りません。</p>
+      ${token ? `<button class="btn start" data-share-ask>友達に招待リンクを送る</button><button class="btn sub" data-copy-ask>招待リンクをコピー</button><p class="social-code">${esc(url)}</p>`
+        : `<button class="btn start" data-create-ask>招待リンクを作る</button>`}
+    </div>
+    <div class="social-step"><b>2　友達が回答して、返信リンクを送る</b>
+      <p>回答や結果は自動では届きません。友達に、最後に表示される「返信リンク」をあなたへ送ってもらってください。</p></div>
+    <div class="social-step"><b>3　届いた返信をこの端末で開く</b>
+      <p>開いた結果を確認してから「この端末に保存」を押すと、ここに並びます。別の端末には自動で移りません。</p></div>
+    <section class="card"><h2>保存した友達からの印象</h2>
+      ${replies.length ? `<div class="social-list">${replies.map((x, i) => {
+        const id = x.fig && SD.figures[x.fig] ? x.fig : null;
+        return `<a class="me-row" href="#/reply/${x.token}/${x.code}">${id ? `<img class="tile" src="${avatar(id)}" alt="">` : '<span class="social-badge">?</span>'}<span><span class="lbl">返信 ${i + 1}（相手の人数は確認できません）</span><span class="nm">${id ? esc(fig(id).name) : "人物判定は保留"}</span></span><span class="go">›</span></a>`;
+      }).join("")}</div>` : '<p>まだ保存した返信はありません。</p>'}
+      <p class="social-note">同じ人が複数回回答したかは判別できません。「何人の評価」として集計しません。</p>
+    </section>
+    <a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
+  $("[data-create-ask]")?.addEventListener("click", () => {
+    try {
+      const next = createInviteToken();
+      store.set("other.invite", next);
+      if (inviteToken() !== next) throw new Error("storage");
+      renderAskHome();
+      toast("招待リンクを作りました");
+    } catch { toast("この端末で招待リンクを保存できません。通常ブラウザでお試しください"); }
+  });
+  $("[data-share-ask]")?.addEventListener("click", () => shareLink(url, "私について12問答えてみて！ 最後の返信リンクを送ってね。"));
+  $("[data-copy-ask]")?.addEventListener("click", () => copyLink(url));
+  window.scrollTo(0, 0);
+}
+function renderAskEntry(token) {
+  document.title = "友達について答える｜世界の偉人性格診断";
+  app.style.cssText = "";
+  app.innerHTML = `
+    <div class="zhead"><h1>友達からのお願い</h1></div>
+    <section class="social-entry"><div class="social-badge">あなたから見た、リンクを送った人</div>
+      <h2>その人を偉人にたとえるなら？</h2>
+      <p>あなた自身ではなく、このリンクを送った人の普段の様子について12問答えてください。分からないことは「見ていない」を選べます。観察が足りない場合は人物判定を保留します。</p>
+      <a class="btn start" href="#/answer/${token}">友達について答える</a>
+    </section>
+    <p class="social-note">結果は娯楽用の印象です。回答は自動送信されません。最後に返信リンクをあなたが送った場合のみ、相手に伝わります。</p>
+    <a class="btn sub" href="#/">自分を診断したい人はこちら</a>`;
+  window.scrollTo(0, 0);
+}
+let otherQuiz = null;
+const otherProgressKey = (token) => "ijin.other.progress." + token;
+function readOtherProgress(token) {
+  try {
+    const xs = JSON.parse(sessionStorage.getItem(otherProgressKey(token)) || "null");
+    return Array.isArray(xs) && xs.length <= 12 && xs.every((v) => Number.isInteger(v) && v >= 0 && v <= 5) ? xs : [];
+  } catch { return []; }
+}
+function writeOtherProgress(token, answers) {
+  try { sessionStorage.setItem(otherProgressKey(token), JSON.stringify(answers)); } catch {}
+}
+function renderOtherQuiz(token) {
+  if (!otherQuiz || otherQuiz.token !== token) {
+    const saved = readOtherProgress(token);
+    otherQuiz = { token, qs: ordered(otherEngine), answers: saved, i: Math.min(saved.length, 11), busy: false };
+  }
+  const { qs, answers, i } = otherQuiz;
+  const q = qs[i];
+  document.title = `友達について ${i + 1} / ${qs.length}｜世界の偉人性格診断`;
+  app.style.cssText = "";
+  app.innerHTML = `
+    <div class="qhead"><button class="back" data-other-back>${i ? "← 前の質問" : "← 説明に戻る"}</button>
+      <span class="count"><b>${i + 1}</b> / ${qs.length}</span><span class="social-badge">相手について</span></div>
+    <div class="segs">${qs.map((_, k) => `<i class="${k < i ? "done" : k === i ? "now" : ""}"></i>`).join("")}</div>
+    <div class="qbox"><div class="intro">このリンクを送った人の、見聞きした行動について答えてください。</div>
+      <h1 class="qtext" id="other-question" tabindex="-1">${esc(q.text)}</h1>
+      <p class="qhint">いちばん近いものを選んでね。押すと次へ進みます。</p>
+      <div class="scale5" role="group" aria-labelledby="other-question">${[1, 2, 3, 4, 5].map((v) =>
+        `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-other-v="${v}" aria-label="${esc(data.questions_friend.scale[v - 1])}"><i aria-hidden="true"></i><span>${esc(data.questions_friend.scale[v - 1])}</span></button>`).join("")}</div>
+      <button class="btn sub" style="margin-top:16px" data-other-v="0">見ていない・分からない</button>
+      <p class="social-note">「どちらとも言えない」は見た上で両方ありそうな場合。「見ていない」は人物判定に使いません。</p>
+    </div>`;
+  window.scrollTo(0, 0);
+  $(".qtext").focus({ preventScroll: true });
+  $("[data-other-back]").onclick = () => { if (i) { otherQuiz.i--; renderOtherQuiz(token); } else location.hash = `#/ask/${token}`; };
+  app.querySelectorAll("[data-other-v]").forEach((b) => b.onclick = () => {
+    if (otherQuiz.busy) return;
+    otherQuiz.busy = true;
+    answers[i] = Number(b.dataset.otherV);
+    answers.length = i + 1;
+    if (i + 1 === qs.length) {
+      const code = makeCode(answers);
+      try { sessionStorage.removeItem(otherProgressKey(token)); } catch {}
+      otherQuiz = null;
+      location.hash = `#/reply/${token}/${code}`;
+    } else {
+      writeOtherProgress(token, answers);
+      otherQuiz.i++;
+      otherQuiz.busy = false;
+      renderOtherQuiz(token);
+    }
+  });
+}
+function renderOtherReply(token, code) {
+  document.title = "友達から見た結果｜世界の偉人性格診断";
+  app.style.cssText = "";
+  const values = [...code.slice(2)].map(Number);
+  const unknown = values.filter((v) => v === 0).length;
+  const complete = unknown === 0;
+  const result = complete ? otherEngine.diagnose(Object.fromEntries(ordered(otherEngine).map((q, i) => [q.id, values[i]]))) : null;
+  const partial = complete ? null : partialOtherCandidate(ordered(otherEngine), values, otherEngine.types);
+  const candidate = result || partial;
+  const f = candidate?.figure;
+  const owner = inviteToken() === token;
+  const saved = otherReplies().some((x) => x.token === token && x.code === code);
+  const url = makeReplyUrl(location.href, token, code);
+  app.innerHTML = `
+    <div class="zhead"><h1>${owner ? "友達から見たあなた" : "あなたから見た相手"}</h1></div>
+    ${candidate ? `<section class="social-figure" style="${themeVars(candidate.type.id)}">
+       <img src="${avatar(f.id)}" alt="${esc(f.name)}のイラスト">
+       <div><div class="social-badge">${complete ? "12問の印象から" : `参考候補・観察できた${partial.observedQuestions}問から`}</div>
+         <h2>${esc(f.name)}</h2><p>${esc(typeLabel(candidate.type, "normal").name)}</p><strong>「${esc(mainLine(f.id, "normal"))}」</strong></div>
+       </section>`
+      : `<section class="social-entry"><div class="social-badge">判定保留</div><h2>まだ人物は決められません</h2>
+        <p>${unknown}問を「見ていない」と回答しました。観察した回答が8問・4軸以上必要です。不明を中間回答として扱わず、偉人を無理に決めません。</p></section>`}
+    <p class="social-note">${partial ? "この人物は、観察できた軸だけを比べた系統の参考人物です。段階・Lvは判定していません。" : ""}
+      これは相手を決めつける診断ではなく、一つの印象です。他己用の質問と判定は試験段階で、人数による総合結果ではありません。</p>
+    ${owner ? `<section class="card"><h2>この端末に残す</h2><p>保存すると、この端末の「友達から見た自分」に追加されます。あなた自身の診断結果は置き換わりません。</p>
+      ${saved ? '<p class="social-note">保存済みです。</p>' : '<button class="btn start" data-save-other>この印象を保存する</button>'}
+      ${saved ? '<button class="btn sub" data-delete-other>この印象だけ削除する</button>' : ""}
+      </section><a class="btn sub" href="#/ask">保存した印象を見る</a>`
+      : `<section class="card"><h2>この結果を相手に返す</h2><p>まだ送っていません。返信リンクを、招待してくれた相手へ送ってください。</p>
+        <button class="btn start" data-share-reply>返信リンクを送る</button><button class="btn sub" data-copy-reply>返信リンクをコピー</button>
+        <button class="btn sub" data-revise-other>回答を見直す</button>
+        <p class="social-note">返信リンクには12問の回答コードが含まれます。送る相手と共有先を確認してください。</p></section>`}
+    <a class="btn sub" href="#/">トップへ</a>`;
+  $("[data-save-other]")?.addEventListener("click", () => {
+    const prev = otherReplies();
+    const entry = { token, code, fig: f?.id ?? null, at: Date.now() };
+    store.set("other.replies", [entry, ...prev].slice(0, 50));
+    if (!otherReplies().some((x) => x.code === code)) return toast("この端末に保存できませんでした");
+    renderOtherReply(token, code);
+    toast("友達からの印象を保存しました");
+  });
+  $("[data-share-reply]")?.addEventListener("click", () => shareLink(url, "あなたについて答えました。返信リンクを開いて、結果を見てね。"));
+  $("[data-copy-reply]")?.addEventListener("click", () => copyLink(url));
+  $("[data-revise-other]")?.addEventListener("click", () => {
+    otherQuiz = { token, qs: ordered(otherEngine), answers: values.slice(), i: Math.max(0, values.indexOf(0)), busy: false };
+    writeOtherProgress(token, values);
+    location.hash = `#/answer/${token}`;
+  });
+  $("[data-delete-other]")?.addEventListener("click", () => {
+    if (!confirm("この返信だけを端末内の記録から削除しますか？")) return;
+    store.set("other.replies", otherReplies().filter((x) => !(x.token === token && x.code === code)));
+    renderOtherReply(token, code);
+    toast("この返信を削除しました");
+  });
+  window.scrollTo(0, 0);
+}
+
+// 人物カードは、他人が自分自身について答えた共有結果から本人が明示的に追加する。
+// 既存の friends 履歴や「友達から見た自分」とは別の端末内コレクション。
+function renderPeople() {
+  document.title = "人物カード｜世界の偉人性格診断";
+  app.style.cssText = "";
+  const cards = peopleCards();
+  const ownNormal = savedResult("normal"), ownLove = savedResult("love");
+  const ownShare = ownNormal && ownNormal.via !== "link" ? { mode: "normal", code: ownNormal.code }
+    : ownLove && ownLove.via !== "link" ? { mode: "love", code: ownLove.code } : null;
+  app.innerHTML = `<div class="zhead"><h1>人物カード</h1><span class="cnt">${cards.length}枚</span></div>
+    <section class="social-entry"><div class="social-badge">人が増えるコレクション</div>
+      <h2>友達の偉人を集めよう</h2><p>自分の結果を友達へ送る。友達も診断したら、結果リンクを送り返してもらう。届いた結果のページからカードに追加できます。</p>
+      <a class="btn sub" href="${ownShare ? `#/r/${ownShare.mode}/${ownShare.code}` : "#/q/normal"}">${ownShare ? "自分の結果を開いて友達に送る" : "まず自分を診断する"}</a></section>
+    ${cards.length ? `<div class="social-list">${cards.map((x, i) => `<section class="social-card">
+      <img class="tile" src="${avatar(x.fig)}" alt="">
+      <div><b>${esc(x.label || `友達カード ${i + 1}`)}</b><div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small></div>
+      <a href="#/r/${x.mode}/${x.code}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目の結果を見る">見る</a>
+      <button type="button" data-label-person="${i}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目の呼び名を変更">呼び名</button>
+      <button type="button" data-remove-person="${i}" aria-label="${esc(x.label || fig(x.fig).name)}・${i + 1}枚目を削除">削除</button>
+    </section>`).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
+    <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
+    ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">友達から見た自分を聞く機能は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
+  app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = () => {
+    const i = Number(b.dataset.removePerson), all = peopleCards();
+    if (!confirm(`友達カード ${i + 1}をこの端末から削除しますか？`)) return;
+    all.splice(i, 1);
+    if (!store.set("people.cards", all)) return toast("この端末からカードを削除できませんでした");
+    renderPeople();
+    focusPageHeading();
+  });
+  app.querySelectorAll("[data-label-person]").forEach((b) => b.onclick = () => {
+    const i = Number(b.dataset.labelPerson), all = peopleCards(), current = all[i];
+    if (!current) return;
+    openSheet(`<div class="panel"><h2 id="sheet-title">カードの呼び名</h2>
+      <p>自分だけに分かる短い呼び名を付けられます。本名や連絡先は入れないでください。この端末にだけ保存され、結果リンクには入りません。</p>
+      <label for="person-label">呼び名（20文字以内）</label>
+      <input class="social-input" id="person-label" type="text" maxlength="20" value="${esc(current.label || "")}" placeholder="例：友達A">
+      <button class="btn start" data-save-person-label>保存する</button>
+      <button class="btn sub close" type="button">閉じる</button></div>`, b);
+    $("[data-save-person-label]", sheet).onclick = () => {
+      const label = $("#person-label", sheet).value.trim().replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 20);
+      all[i] = { ...current, label };
+      if (!store.set("people.cards", all)) return toast("呼び名を保存できませんでした");
+      closeSheet(false);
+      renderPeople();
+      app.querySelector(`[data-label-person="${i}"]`)?.focus();
+      toast("呼び名を保存しました");
+    };
+  });
   window.scrollTo(0, 0);
 }
 
@@ -970,6 +1300,14 @@ function route() {
   overlay.hidden = true; app.inert = false; closeSheet(false);
   app.style.cssText = "";
   const [, page, mode, code] = location.hash.split("/");
+  if (!OTHER_PILOT && ["ask", "answer", "reply"].includes(page)) return renderUnavailable();
+  const socialRoute = parseSocialHash(location.hash);
+  if (page === "ask" && !mode) return renderAskHome();
+  if (socialRoute?.kind === "invite") return renderAskEntry(socialRoute.token);
+  if (page === "answer" && validInviteToken(mode) && !code) return renderOtherQuiz(mode);
+  if (socialRoute?.kind === "reply") return renderOtherReply(socialRoute.token, socialRoute.code);
+  if (page === "people" && !mode) return renderPeople();
+  if (["ask", "answer", "reply", "people"].includes(page)) return renderUnavailable();
   if (["fr", "invite"].includes(page) || (page === "q" && !engines[mode])) return renderUnavailable();
   if (page === "r" && !engines[mode]) return renderUnavailable();
   if (page === "f" && (!engines[mode] || !SD.figures[code] || !isFree(code))) return renderUnavailable();

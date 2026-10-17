@@ -1,16 +1,16 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 2973096-202610171742
+版番号: 3b8f936-202610172301
 公開先: https://ijin-shindan.github.io/app/
-ファイル数: 834（この一覧を含む）
-合計サイズ: 29.10 MB
+ファイル数: 837（この一覧を含む）
+合計サイズ: 29.14 MB
 
 主なフォルダ（ファイル数・サイズ）:
   app/og/                    201 件    23.45 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
   app/s/                     200 件     0.22 MB
+  app/                        14 件     0.18 MB
   data/                        9 件     0.16 MB
-  app/                        11 件     0.15 MB
   app/decor/                   4 件     0.07 MB
   app/icons/                   3 件     0.01 MB
   （一番上）                        4 件     0.00 MB
@@ -432,9 +432,9 @@
   app/icons/apple-touch-icon.png  3502
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
-  app/index.html  1876
+  app/index.html  1857
   app/legacy_data.js  1928
-  app/main.js  71296
+  app/main.js  98953
   app/meta.json  7834
   app/motion.css  2141
   app/motion.js  10614
@@ -639,6 +639,8 @@
   app/og/normal/yoshida-shoin.png  117802
   app/og/normal/zhuge-liang.png  99380
   app/og/top.png  142799
+  app/other_partial.js  1970
+  app/people.js  266
   app/s/love/akechi-mitsuhide.html  1097
   app/s/love/alexander.html  1118
   app/s/love/amundsen.html  1073
@@ -840,12 +842,13 @@
   app/s/normal/yoshida-shoin.html  1060
   app/s/normal/zhuge-liang.html  1078
   app/shindan.js  7174
-  app/style.css  37521
+  app/social.js  2372
+  app/style.css  43373
   data/axes.json  2449
   data/firebase.json  144
   data/plans.json  2033
   data/questions.json  5660
-  data/questions_friend.json  2538
+  data/questions_friend.json  2997
   data/questions_love.json  6452
   data/rules.json  6121
   data/texts.json  116918
