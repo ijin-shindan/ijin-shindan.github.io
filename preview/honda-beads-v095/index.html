@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>本多忠勝・大数珠 スマホ確認用</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="stylesheet" href="app/style.css">
+  <link rel="stylesheet" href="app/motion.css">
+  <link rel="stylesheet" href="integration.css">
+  <script type="module" src="integration.js"></script>
+</head>
+<body>
+  <main data-testid="research-integration-trial">
+    <header class="research-head">
+      <p class="research-kicker">研究用プレビュー / 診断本番とは別画面</p>
+      <h1>本番相当コンテナ統合試験</h1>
+      <p>375px幅の結果カード、正方形の小カード、図鑑相当サイズで、大数珠候補の見え方と共通モーションを確認します。</p>
+    </header>
+
+    <fieldset class="trial-controls" data-testid="trial-controls">
+      <legend>表示条件</legend>
+      <div class="control-row" aria-label="画像種別">
+        <label><input data-testid="mode-color" type="radio" name="image-mode" value="color" checked> カラー＋動き</label>
+        <label><input data-testid="mode-silhouette" type="radio" name="image-mode" value="silhouette"> シルエット静止</label>
+      </div>
+      <div class="control-row" aria-label="背景テーマ">
+        <label><input data-testid="theme-light" type="radio" name="theme" value="light" checked> ライト</label>
+        <label><input data-testid="theme-dark" type="radio" name="theme" value="dark"> ダーク</label>
+      </div>
+    </fieldset>
+
+    <section class="phone-frame" data-testid="phone-frame" aria-label="375×812ピクセル相当の結果画面">
+      <p class="viewport-label">375 × 812 相当 / 結果カード</p>
+      <section class="rcard integration-result-card" data-testid="result-card">
+        <p class="anata">あなた自身の回答から見えるあなた</p>
+        <div class="stage" data-testid="result-stage" data-state="done">
+          <img class="avatar sil" src="candidate-silhouette.svg" alt="" width="320" height="440">
+          <img class="avatar color" src="candidate-color.svg" alt="本多忠勝の研究候補イラスト" width="320" height="440">
+          <div class="burst" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <h2 class="fig-name">本多忠勝</h2>
+        <div class="type-line"><span class="emblem">猛</span><span class="type-name">猛将系</span></div>
+        <p class="type-catch">考えるより先に体が前に出る</p>
+        <p class="serif-quote">全力でぶつかる。なぜか敵にもモテる。</p>
+        <div class="meta-row"><span class="stars" aria-label="濃さ 5"><span class="on">★</span><span class="on">★</span><span class="on">★</span><span class="on">★</span><span class="on">★</span></span><span class="lv">Lv.<b>99</b></span><span class="rare">研究用表示</span></div>
+        <div class="brand"><i>偉</i>世界の偉人性格診断　スマホ研究表示</div>
+      </section>
+    </section>
+
+    <section class="compact-panel" data-testid="compact-panel" aria-labelledby="compact-title">
+      <h2 id="compact-title">正方形 contain 表示</h2>
+      <div class="compact-grid">
+        <figure><div class="compact-card size-60" data-testid="card-60"><img data-compact-image src="candidate-color.svg" alt="60pxカード"></div><figcaption>60px</figcaption></figure>
+        <figure><div class="compact-card size-64" data-testid="card-64"><img data-compact-image src="candidate-color.svg" alt="64pxカード"></div><figcaption>64px</figcaption></figure>
+        <figure><div class="compact-card size-84" data-testid="card-84"><img data-compact-image src="candidate-color.svg" alt="84pxカード"></div><figcaption>84px</figcaption></figure>
+        <figure><div class="compact-card size-62" data-testid="zukan-62"><img data-compact-image src="candidate-color.svg" alt="図鑑相当62pxカード"></div><figcaption>図鑑相当 62px</figcaption></figure>
+      </div>
+    </section>
+
+    <aside class="review-list" data-testid="review-list">
+      <h2>確認すること</h2>
+      <ul>
+        <li>280×385pxの結果ステージで数珠が胴体に追従する</li>
+        <li>キメる・怒る・泣く・考える・停止・動きを抑えるが使える</li>
+        <li>60 / 64 / 84 / 62pxの正方形で切れず、数珠の丸い輪郭が残る</li>
+        <li>ライトとダークの両方で、黒い鎧と金色の数珠を判別できる</li>
+      </ul>
+    </aside>
+
+    <p class="research-scope" data-testid="scope-note">研究用のスマホ確認画面です。診断の回答や個人情報は含みません。外部DB、ログイン、課金、アクセス解析はありません。「動きを抑える」だけはこの画面の端末内設定を利用します。</p>
+  </main>
+</body>
+</html>
