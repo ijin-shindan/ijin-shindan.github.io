@@ -118,6 +118,7 @@ img { display: block; }
 .qbox.out { animation: slideout .18s ease-in both; }
 .intro { background: var(--ai-soft); color: var(--ai); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 18px; }
 .qtext { font-family: var(--sans); font-weight: 800; font-size: clamp(19px, 5vw, 22px); line-height: 1.5; margin: 0 0 14px; text-align: left; }
+.qtext:focus { outline: 2px solid #426d91; outline-offset: 3px; border-radius: 4px; }
 .qhint { margin: 0 0 12px; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
 .scale5 { display: grid; gap: 8px; }
 .dotbtn { --c: var(--ink-soft); display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 14px;
