@@ -1,20 +1,21 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=43c2692-202610172328";
-import { mountMotion } from "./motion.js?v=43c2692-202610172328";
-import { mountGuide } from "./guide.js?v=43c2692-202610172328";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=43c2692-202610172328";
-import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=43c2692-202610172328";
-import { partialOtherCandidate } from "./other_partial.js?v=43c2692-202610172328";
-import { prependPersonCard, ensurePersonCardIds } from "./people.js?v=43c2692-202610172328";
+import { AXES, Shindan, loadData } from "./shindan.js?v=c733c90-202610172355";
+import { mountMotion } from "./motion.js?v=c733c90-202610172355";
+import { mountGuide } from "./guide.js?v=c733c90-202610172355";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=c733c90-202610172355";
+import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=c733c90-202610172355";
+import { partialOtherCandidate } from "./other_partial.js?v=c733c90-202610172355";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=c733c90-202610172355";
+import { prependPersonCard, ensurePersonCardIds } from "./people.js?v=c733c90-202610172355";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=43c2692-202610172328")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=c733c90-202610172355")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -128,7 +129,7 @@ const friendAnswerCode = (code) => validFriendCode(code);
 const inviteToken = () => { const token = store.get("other.invite"); return validInviteToken(token) ? token : null; };
 const otherReplies = () => {
   const xs = store.get("other.replies", []);
-  return Array.isArray(xs) ? xs.filter((x) => x && x.token === inviteToken() && friendAnswerCode(x.code)).map((x) => {
+  return Array.isArray(xs) ? xs.filter((x) => x && validInviteToken(x.token) && friendAnswerCode(x.code)).map((x) => {
     if (x.fig && SD.figures[x.fig]) return x;
     const values = [...x.code.slice(2)].map(Number);
     const provisional = values.includes(0) ? partialOtherCandidate(ordered(otherEngine), values, otherEngine.types) : null;
@@ -710,6 +711,7 @@ function renderFriend(sd, mode, code, r, personCard = null) {
   const tx = texts[f.id];
   app.style.cssText = themeVars(r.type.id);
   const mine = savedResult(mode);
+  const ownReply = mine && mine.via !== "link" && validCode(sd, mine.code);
   let compat = "";
   if (!past && mine) {
     const mu = sd.score(answersOf(sd, mine.code));
@@ -736,6 +738,9 @@ function renderFriend(sd, mode, code, r, personCard = null) {
       <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="#/r/${mode}/${mine.code}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">この端末の記録</a></p></div>
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
     ${personCta}
+    ${!personCard && !past && !prevLink && ownReply ? `<section class="card social-entry"><h2>自分の結果を友達に返す</h2>
+      <p>すでに自分の診断をしているなら、その結果リンクを最初に送ってくれた友達へ返せます。自動では届きません。</p>
+      <button class="btn start" data-return-self>自分の結果を送る</button></section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
       ${mine ? (past || prevLink ? "" : compat) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら結果リンクを最初の友達へ送り返せます。届いた結果との相性もわかります。</p>`}
@@ -745,6 +750,7 @@ function renderFriend(sd, mode, code, r, personCard = null) {
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
       : `<p class="note">${personCard ? "人物カードに保存した結果です。" : prevLink ? "以前リンクから保存した結果です。" : "受け取ったリンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
+  $("[data-return-self]")?.addEventListener("click", () => shareLink(shareUrl(mode, mine.fig, mine.code), "あなたから届いた結果を見たよ。私の結果も送るね。"));
   $("[data-add-person]")?.addEventListener("click", () => {
     if (peopleCards().some((card) => card.mode === mode && card.code === code)
       && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
@@ -1075,9 +1081,9 @@ function copyLink(url, okText = "リンクをコピーしました") {
 function shareLink(url, text) {
   if (navigator.share) {
     navigator.share({ title: "世界の偉人性格診断", text, url }).catch((e) => {
-      if (e?.name !== "AbortError") copyLink(url);
+      if (e?.name !== "AbortError") copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました");
     });
-  } else copyLink(url);
+  } else copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました");
 }
 function renderAskHome() {
   document.title = "友達に聞く｜世界の偉人性格診断";
@@ -1102,8 +1108,7 @@ function renderAskHome() {
       <p>開いた結果を確認してから「この端末に保存」を押すと、ここに並びます。別の端末には自動で移りません。</p></div>
     <section class="card"><h2>保存した友達からの印象</h2>
       ${replies.length ? `<div class="social-list">${replies.map((x, i) => {
-        const id = x.fig && SD.figures[x.fig] ? x.fig : null;
-        return `<a class="me-row" href="#/reply/${x.token}/${x.code}">${id ? `<img class="tile" src="${avatar(id)}" alt="">` : '<span class="social-badge">?</span>'}<span><span class="lbl">返信 ${i + 1}（相手の人数は確認できません）</span><span class="nm">${id ? esc(fig(id).name) : "人物判定は保留"}</span></span><span class="go">›</span></a>`;
+        return `<a class="me-row" href="#/reply/${x.token}/${x.code}"><span class="social-badge">${i + 1}</span><span><span class="lbl">返信 ${i + 1}${x.token === token ? "" : "・以前の招待"}（相手の人数は確認できません）</span><span class="nm">回答を確認する</span></span><span class="go">›</span></a>`;
       }).join("")}</div>` : '<p>まだ保存した返信はありません。</p>'}
       <p class="social-note">同じ人が複数回回答したかは判別できません。「何人の評価」として集計しません。</p>
     </section>
@@ -1126,30 +1131,59 @@ function renderAskEntry(token) {
   app.style.cssText = "";
   app.innerHTML = `
     <div class="zhead"><h1>友達からのお願い</h1></div>
-    <section class="social-entry"><div class="social-badge">あなたから見た、リンクを送った人</div>
-      <h2>その人を偉人にたとえるなら？</h2>
-      <p>あなた自身ではなく、このリンクを送った人の普段の様子について12問答えてください。分からないことは「見ていない」を選べます。観察が足りない場合は人物判定を保留します。</p>
-      <a class="btn start" href="#/answer/${token}">友達について答える</a>
+    <section class="social-entry"><div class="social-badge">あなたから見た、招待を作った人</div>
+      <h2>その人の印象を答えてみよう</h2>
+      <p>あなた自身ではなく、この招待を作った人の普段の様子について12問答えてください。転送されたリンクでは、送ってきた人と質問の対象が違う場合があります。</p>
+      <p>誰について答えるか分からなければ、招待した本人に確認してください。分からない質問は「見ていない」を選べます。</p>
+      <label class="social-note"><input type="checkbox" data-subject-known> 招待を作った人が誰か分かっている</label>
+      <button class="btn start" data-start-other disabled>その人について答える</button>
     </section>
     <p class="social-note">結果は娯楽用の印象です。回答は自動送信されません。最後に返信リンクをあなたが送った場合のみ、相手に伝わります。</p>
     <a class="btn sub" href="#/">自分を診断したい人はこちら</a>`;
+  const confirmSubject = $("[data-subject-known]");
+  const start = $("[data-start-other]");
+  confirmSubject.onchange = () => { start.disabled = !confirmSubject.checked; };
+  start.onclick = () => {
+    confirmedOtherToken = token;
+    try { sessionStorage.setItem(`ijin.other.subject.${token}`, "yes"); } catch {}
+    const answerHash = `#/answer/${token}`;
+    if (location.hash === answerHash) { renderOtherQuiz(token); focusPageHeading(); }
+    else location.hash = answerHash;
+  };
   window.scrollTo(0, 0);
 }
 let otherQuiz = null;
+let confirmedOtherToken = null;
+const subjectConfirmed = (token) => {
+  if (confirmedOtherToken === token) return true;
+  try { return sessionStorage.getItem(`ijin.other.subject.${token}`) === "yes"; } catch { return false; }
+};
 const otherProgressKey = (token) => "ijin.other.progress." + token;
+const otherProgressIndexKey = (token) => "ijin.other.progress_index." + token;
 function readOtherProgress(token) {
   try {
     const xs = JSON.parse(sessionStorage.getItem(otherProgressKey(token)) || "null");
     return Array.isArray(xs) && xs.length <= 12 && xs.every((v) => Number.isInteger(v) && v >= 0 && v <= 5) ? xs : [];
   } catch { return []; }
 }
-function writeOtherProgress(token, answers) {
-  try { sessionStorage.setItem(otherProgressKey(token), JSON.stringify(answers)); } catch {}
+function readOtherProgressIndex(token, fallback) {
+  try {
+    const raw = sessionStorage.getItem(otherProgressIndexKey(token));
+    if (raw === null) return fallback;
+    const index = Number(raw);
+    return Number.isInteger(index) && index >= 0 && index < 12 ? index : fallback;
+  } catch { return fallback; }
+}
+function writeOtherProgress(token, answers, index) {
+  try {
+    sessionStorage.setItem(otherProgressKey(token), JSON.stringify(answers));
+    sessionStorage.setItem(otherProgressIndexKey(token), String(index));
+  } catch {}
 }
 function renderOtherQuiz(token) {
   if (!otherQuiz || otherQuiz.token !== token) {
     const saved = readOtherProgress(token);
-    otherQuiz = { token, qs: ordered(otherEngine), answers: saved, i: Math.min(saved.length, 11), busy: false };
+    otherQuiz = { token, qs: ordered(otherEngine), answers: saved, i: readOtherProgressIndex(token, Math.min(saved.length, 11)), busy: false };
   }
   const { qs, answers, i } = otherQuiz;
   const q = qs[i];
@@ -1159,7 +1193,7 @@ function renderOtherQuiz(token) {
     <div class="qhead"><button class="back" data-other-back>${i ? "← 前の質問" : "← 説明に戻る"}</button>
       <span class="count"><b>${i + 1}</b> / ${qs.length}</span><span class="social-badge">相手について</span></div>
     <div class="segs">${qs.map((_, k) => `<i class="${k < i ? "done" : k === i ? "now" : ""}"></i>`).join("")}</div>
-    <div class="qbox"><div class="intro">このリンクを送った人の、見聞きした行動について答えてください。</div>
+    <div class="qbox"><div class="intro">この招待を作った人の、見聞きした行動について答えてください。</div>
       <h1 class="qtext" id="other-question" tabindex="-1">${esc(q.text)}</h1>
       <p class="qhint">いちばん近いものを選んでね。押すと次へ進みます。</p>
       <div class="scale5" role="group" aria-labelledby="other-question">${[1, 2, 3, 4, 5].map((v) =>
@@ -1169,20 +1203,24 @@ function renderOtherQuiz(token) {
     </div>`;
   window.scrollTo(0, 0);
   $(".qtext").focus({ preventScroll: true });
-  $("[data-other-back]").onclick = () => { if (i) { otherQuiz.i--; renderOtherQuiz(token); } else location.hash = `#/ask/${token}`; };
+  $("[data-other-back]").onclick = () => { if (i) { otherQuiz.i--; writeOtherProgress(token, answers, otherQuiz.i); renderOtherQuiz(token); } else location.hash = `#/ask/${token}`; };
   app.querySelectorAll("[data-other-v]").forEach((b) => b.onclick = () => {
     if (otherQuiz.busy) return;
     otherQuiz.busy = true;
     answers[i] = Number(b.dataset.otherV);
-    answers.length = i + 1;
+    // 前の回答を直しても、その後に答えた内容は勝手に消さない。
+    answers.length = Math.max(answers.length, i + 1);
     if (i + 1 === qs.length) {
       const code = makeCode(answers);
       try { sessionStorage.removeItem(otherProgressKey(token)); } catch {}
+      try { sessionStorage.removeItem(otherProgressIndexKey(token)); } catch {}
+      try { sessionStorage.removeItem(`ijin.other.subject.${token}`); } catch {}
+      confirmedOtherToken = null;
       otherQuiz = null;
       location.hash = `#/reply/${token}/${code}`;
     } else {
-      writeOtherProgress(token, answers);
       otherQuiz.i++;
+      writeOtherProgress(token, answers, otherQuiz.i);
       otherQuiz.busy = false;
       renderOtherQuiz(token);
     }
@@ -1198,16 +1236,18 @@ function renderOtherReply(token, code) {
   const partial = complete ? null : partialOtherCandidate(ordered(otherEngine), values, otherEngine.types);
   const candidate = result || partial;
   const f = candidate?.figure;
-  const owner = inviteToken() === token;
   const saved = otherReplies().some((x) => x.token === token && x.code === code);
+  const owner = inviteToken() === token || saved;
   const url = makeReplyUrl(location.href, token, code);
   app.innerHTML = `
-    <div class="zhead"><h1>${owner ? "友達から見たあなた" : "あなたから見た相手"}</h1></div>
-    ${candidate ? `<section class="social-figure" style="${themeVars(candidate.type.id)}">
+    <div class="zhead"><h1>友達についての回答 <span class="dev-badge">試作</span></h1></div>
+    <section class="social-entry"><h2>${owner ? "あなたについて届いた回答" : "回答を返す準備ができました"}</h2>
+      <p>人物への当てはめはまだ検証中です。回答した人の本人確認もできません。これを性格の確定や「みんなの評価」とは扱いません。</p></section>
+    ${candidate ? `<details class="card"><summary>未検証の参考人物を見る</summary><section class="social-figure" style="${themeVars(candidate.type.id)}">
        <img src="${avatar(f.id)}" alt="${esc(f.name)}のイラスト">
-       <div><div class="social-badge">${complete ? "12問の印象から" : `参考候補・観察できた${partial.observedQuestions}問から`}</div>
-         <h2>${esc(f.name)}</h2><p>${esc(typeLabel(candidate.type, "normal").name)}</p><strong>「${esc(mainLine(f.id, "normal"))}」</strong></div>
-       </section>`
+       <div><div class="social-badge">${complete ? "12問の回答から・補正未検証" : `観察できた${partial.observedQuestions}問から・閾値未検証`}</div>
+         <h2>${esc(f.name)}</h2><p>${esc(typeLabel(candidate.type, "normal").name)}</p></div>
+       </section><p class="social-note">この候補は試算です。相手の性格や偉人との一致を確かめたものではありません。</p></details>`
       : `<section class="social-entry"><div class="social-badge">判定保留</div><h2>まだ人物は決められません</h2>
         <p>${unknown}問を「見ていない」と回答しました。観察した回答が8問・4軸以上必要です。不明を中間回答として扱わず、偉人を無理に決めません。</p></section>`}
     <p class="social-note">${partial ? "この人物は、観察できた軸だけを比べた系統の参考人物です。段階・Lvは判定していません。" : ""}
@@ -1216,15 +1256,18 @@ function renderOtherReply(token, code) {
       ${saved ? '<p class="social-note">保存済みです。</p>' : '<button class="btn start" data-save-other>この印象を保存する</button>'}
       ${saved ? '<button class="btn sub" data-delete-other>この印象だけ削除する</button>' : ""}
       </section><a class="btn sub" href="#/ask">保存した印象を見る</a>`
-      : `<section class="card"><h2>この結果を相手に返す</h2><p>まだ送っていません。返信リンクを、招待してくれた相手へ送ってください。</p>
+      : `<section class="card"><h2>この回答を相手に返す</h2><p>まだ送っていません。返信リンクを、招待を作った本人へ送ってください。</p>
+        <p class="social-note">この端末では招待を作った記録を確認できません。あなたが招待者で別の端末から開いている場合は、招待を作った端末でこの返信リンクを開き直してください。</p>
         <button class="btn start" data-share-reply>返信リンクを送る</button><button class="btn sub" data-copy-reply>返信リンクをコピー</button>
         <button class="btn sub" data-revise-other>回答を見直す</button>
-        <p class="social-note">返信リンクには12問の回答コードが含まれます。送る相手と共有先を確認してください。</p></section>`}
+        <p class="social-note">返信リンクを知る人は12問の選択を読み取れます。送る相手と共有先を確認してください。</p></section>`}
     <a class="btn sub" href="#/">トップへ</a>`;
   $("[data-save-other]")?.addEventListener("click", () => {
-    const prev = otherReplies();
+    const prev = store.get("other.replies", []);
     const entry = { token, code, fig: f?.id ?? null, at: Date.now() };
-    store.set("other.replies", [entry, ...prev].slice(0, 50));
+    const update = appendOtherReply(prev, entry);
+    if (update.status !== "saved") return toast(update.status === "full" ? "返信は50件まで。追加するには不要な返信を削除してください" : update.status === "duplicate" ? "この返信は保存済みです" : "返信を保存できませんでした");
+    if (!store.set("other.replies", update.records)) return toast("この端末に保存できませんでした");
     if (!otherReplies().some((x) => x.code === code)) return toast("この端末に保存できませんでした");
     renderOtherReply(token, code);
     toast("友達からの印象を保存しました");
@@ -1233,12 +1276,16 @@ function renderOtherReply(token, code) {
   $("[data-copy-reply]")?.addEventListener("click", () => copyLink(url));
   $("[data-revise-other]")?.addEventListener("click", () => {
     otherQuiz = { token, qs: ordered(otherEngine), answers: values.slice(), i: Math.max(0, values.indexOf(0)), busy: false };
-    writeOtherProgress(token, values);
+    // 返信URLは転送され得る。見直す人も回答対象を再確認する。
+    confirmedOtherToken = null;
+    try { sessionStorage.removeItem(`ijin.other.subject.${token}`); } catch {}
+    writeOtherProgress(token, values, otherQuiz.i);
     location.hash = `#/answer/${token}`;
   });
   $("[data-delete-other]")?.addEventListener("click", () => {
     if (!confirm("この返信だけを端末内の記録から削除しますか？")) return;
-    store.set("other.replies", otherReplies().filter((x) => !(x.token === token && x.code === code)));
+    const remaining = removeOtherReply(store.get("other.replies", []), token, code);
+    if (!remaining || !store.set("other.replies", remaining)) return toast("この端末から返信を削除できませんでした");
     renderOtherReply(token, code);
     toast("この返信を削除しました");
   });
@@ -1257,7 +1304,9 @@ function renderPeople() {
   app.innerHTML = `<div class="zhead"><h1>人物カード</h1><span class="cnt">${cards.length}枚</span></div>
     <section class="social-entry"><div class="social-badge">人が増えるコレクション</div>
       <h2>友達の偉人を集めよう</h2><p>自分の結果を友達へ送る。友達も診断したら、結果リンクを送り返してもらう。届いた結果のページからカードに追加できます。</p>
-      <a class="btn sub" href="${ownShare ? `#/r/${ownShare.mode}/${ownShare.code}` : "#/q/normal"}">${ownShare ? "自分の結果を開いて友達に送る" : "まず自分を診断する"}</a></section>
+      ${ownShare ? `<p class="social-note">送るのは、あなたの結果と12問の回答コードが入ったリンクです。友達はそこから自分自身を診断できます。あなたについて答えてもらう他己診断は ※開発中。</p>
+        <button class="btn start" data-invite-self>自分の結果を友達に送る</button><button class="btn sub" data-copy-self>結果リンクをコピー</button>`
+        : '<a class="btn start" href="#/q/normal">まず自分を診断する</a>'}</section>
     ${cards.length ? `<div class="social-list">${cards.map((x, i) => `<section class="social-card">
       <img class="tile" src="${avatar(x.fig)}" alt="">
       <div><b>${esc(x.label || `友達カード ${i + 1}`)}</b><div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small></div>
@@ -1267,6 +1316,12 @@ function renderPeople() {
     </section>`).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
     <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
     ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">友達から見た自分を聞く機能は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
+  if (ownShare) {
+    const result = engines[ownShare.mode].diagnose(answersOf(engines[ownShare.mode], ownShare.code));
+    const url = shareUrl(ownShare.mode, result.figure.id, ownShare.code);
+    $("[data-invite-self]")?.addEventListener("click", () => shareLink(url, `私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`));
+    $("[data-copy-self]")?.addEventListener("click", () => copyLink(url, "友達に送るリンクをコピーしました"));
+  }
   app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = () => {
     const i = Number(b.dataset.removePerson), { all, index } = rawPersonAt(i);
     if (index < 0) return;
@@ -1346,7 +1401,7 @@ function route() {
   const socialRoute = parseSocialHash(location.hash);
   if (page === "ask" && !mode) return renderAskHome();
   if (socialRoute?.kind === "invite") return renderAskEntry(socialRoute.token);
-  if (page === "answer" && validInviteToken(mode) && !code) return renderOtherQuiz(mode);
+  if (page === "answer" && validInviteToken(mode) && !code) return subjectConfirmed(mode) ? renderOtherQuiz(mode) : renderAskEntry(mode);
   if (socialRoute?.kind === "reply") return renderOtherReply(socialRoute.token, socialRoute.code);
   if (page === "people" && !mode) return renderPeople();
   if (page === "person" && mode && !code) return renderPersonCard(mode);
