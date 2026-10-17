@@ -1,7 +1,7 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=a7fe851-202610171417";
+import { AXES, Shindan, loadData } from "./shindan.js?v=33199ff-202610171452";
 import { mountMotion } from "./motion.js?v=3";
 import { mountGuide } from "./guide.js?v=2";
 import { separateLegacyLinkedResults } from "./legacy_data.js";
@@ -11,7 +11,7 @@ const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=a7fe851-202610171417")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=33199ff-202610171452")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -227,19 +227,26 @@ function renderQuiz(mode, anim = false) {
     <div class="segs">${qs.map((_, k) => `<i class="${k < i ? "done" : k === i ? "now" : ""} ${[3, 7, 11].includes(k) ? "chest" : ""}"></i>`).join("")}</div>
     <div class="qbox ${anim ? "in" : ""}">
       ${intro}
-      <p class="qtext">${esc(q.text)}</p>
-      <div class="scale5" role="radiogroup" aria-label="あてはまる度合い">
-        ${[1, 2, 3, 4, 5].map((v) => `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-v="${v}" role="radio" aria-checked="${answers[i] === v}" aria-label="${esc(sd.data.questions.scale[v - 1])}"><i></i></button>`).join("")}
+      <h1 class="qtext" id="current-question" tabindex="-1">${esc(q.text)}</h1>
+      <p class="qhint">いちばん近いものを1つ選んでね。押すと次へ進みます。</p>
+      <div class="scale5" role="group" aria-labelledby="current-question">
+        ${[1, 2, 3, 4, 5].map((v) => `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-v="${v}" aria-pressed="${answers[i] === v}"><i aria-hidden="true"></i><span>${esc(sd.data.questions.scale[v - 1])}</span></button>`).join("")}
       </div>
-      <div class="scale-lbl"><span class="no">当てはまらない</span><span class="yes">当てはまる</span></div>
     </div>`;
+  window.scrollTo(0, 0);
+  $(".qtext").focus({ preventScroll: true });
   $(".back").onclick = () => { quiz.i--; renderQuiz(mode, true); };
   app.querySelectorAll(".dotbtn").forEach((b) => (b.onclick = () => {
     if (quiz.busy) return;
     quiz.busy = true;
     quiz.answers[i] = Number(b.dataset.v);
     quiz.answers.length = Math.max(quiz.answers.length, i + 1);
+    app.querySelectorAll(".dotbtn").forEach((choice) => {
+      choice.classList.remove("sel");
+      choice.setAttribute("aria-pressed", "false");
+    });
     b.classList.add("sel");
+    b.setAttribute("aria-pressed", "true");
     navigator.vibrate?.(8);
     store.set("progress." + mode, { answers: quiz.answers.slice(0, i + 1).concat(quiz.answers.slice(i + 1)), t: Date.now(), source: quiz.source });
     setTimeout(() => $(".qbox")?.classList.add("out"), 120);
@@ -271,10 +278,11 @@ function renderCheckpoint(mode, n) {
       <div class="sils">${three.map((t) => `<div><img class="tile" src="${avatar(t.figures[0].id, true)}" alt="" style="${themeVars(t.id)}">
         <div class="note" style="margin-top:4px">${esc(typeLabel(t, mode).name)}</div></div>`).join("")}</div>`;
   }
-  app.innerHTML = `<div class="checkpoint">${body}<p class="tap">タップで次へ（あと${quiz.qs.length - n}問）</p></div>`;
-  const go = () => { clearTimers(); if (n === 8) store.set("seen_checkpoint", true); renderQuiz(mode, true); };
-  app.firstElementChild.onclick = go;
-  later(2600, go);
+  app.innerHTML = `<div class="checkpoint">${body}<button class="btn start" type="button">続ける（あと${quiz.qs.length - n}問）</button></div>`;
+  window.scrollTo(0, 0);
+  $(".checkpoint h2").tabIndex = -1;
+  $(".checkpoint h2").focus({ preventScroll: true });
+  $(".checkpoint button").onclick = () => { if (n === 8) store.set("seen_checkpoint", true); renderQuiz(mode, true); };
 }
 
 function finishQuiz(mode) {
