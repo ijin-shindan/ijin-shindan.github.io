@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=5fb424b-202610190013";
-import { mountMotion } from "./motion.js?v=5fb424b-202610190013";
-import { mountGuide } from "./guide.js?v=5fb424b-202610190013";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=5fb424b-202610190013";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5fb424b-202610190013";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5fb424b-202610190013";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5fb424b-202610190013";
-import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=5fb424b-202610190013";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5fb424b-202610190013";
-import { storedResultMatches, storedList } from "./stored_result.js?v=5fb424b-202610190013";
-import { clearPrefixedStorage } from "./storage_clear.js?v=5fb424b-202610190013";
+import { AXES, Shindan, loadData } from "./shindan.js?v=08cf29b-202610190033";
+import { mountMotion } from "./motion.js?v=08cf29b-202610190033";
+import { mountGuide } from "./guide.js?v=08cf29b-202610190033";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=08cf29b-202610190033";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=08cf29b-202610190033";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=08cf29b-202610190033";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=08cf29b-202610190033";
+import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=08cf29b-202610190033";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=08cf29b-202610190033";
+import { storedResultMatches, storedList } from "./stored_result.js?v=08cf29b-202610190033";
+import { clearPrefixedStorage } from "./storage_clear.js?v=08cf29b-202610190033";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5fb424b-202610190013")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=08cf29b-202610190033")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -623,7 +623,7 @@ function renderResult(mode, code) {
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
     ${freshSource === "friend" ? returnSharedHtml : ""}
-    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "送る相手を選んでください。"}結果リンクには12問の回答コードが含まれます。</p>
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "送る相手を選んでください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="friend">${freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る"}</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
@@ -1060,7 +1060,7 @@ function renderAbout() {
     <p>結果は娯楽であり、心理検査や医学的診断ではありません。人物の台詞やイラストは創作を含み、史実や本人の発言そのものとは限りません。</p>
     <h2>保存と共有</h2>
     <p>回答途中の記録、結果、図鑑、受け取った共有リンクの結果、人物カード${OTHER_PILOT ? "、試作中の招待リンクと他己回答" : ""}は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
-    <p>結果の共有リンクには、12問の回答から作られたコードが含まれます。リンクを相手に送ると、受信者や共有先のサービスに結果とコードが伝わります。受信者がリンクを開くと、配信元のGitHub Pagesにもコード付きURLが届きます。画像を端末に保存するだけなら、このコードは送信されません。共有操作をしなければ、アプリから回答や結果を運営者へ送信しません。</p>
+    <p>結果の共有リンクには、12問の回答から作られたコードが含まれ、リンクを知る人は答えを読み取れます。リンクを相手に送ると、受信者や共有先のサービスに結果とコードが伝わります。受信者がリンクを開くと、配信元のGitHub Pagesにもコード付きURLが届きます。画像を端末に保存するだけなら、このコードは送信されません。共有操作をしなければ、アプリから回答や結果を運営者へ送信しません。</p>
     ${OTHER_PILOT ? '<p>試作中の友達への招待と返信は、利用者がリンクをコピー・共有して行います。回答は自動送信されません。返信リンクの「#」以降には回答コードが含まれるため、送った相手や共有先サービスにはその情報が伝わります。リンクを知る人は12問の答えを開けます。名前はリンクに含めません。招待した人が別ブラウザーや別のサイトアドレスで返信を開いても、招待の記録とは自動でつながりません。</p>' : ""}
     <p>この版ではアクセス解析、広告、ログイン、クラウド保存、購入は行いません。ページの表示に必要なファイルはGitHub Pagesから読み込まれ、配信元には通常の閲覧ログが残る場合があります。Wikipediaなど外部サイトへのリンクは、押したときだけ開きます。</p>
     <p>他己用の質問と判定は試験段階で、公開版にはまだ出していません。回答者が別人かも確認できないため、複数の返信を「何人の評価」として扱いません。</p>
@@ -1366,13 +1366,17 @@ function renderPeople() {
       : '<div class="variety-slot empty" role="img" aria-label="空いている枠"><span aria-hidden="true">？</span></div>';
   }).join("");
   const ownNormal = savedResult("normal"), ownLove = savedResult("love");
-  const ownShare = ownNormal && ownNormal.via !== "link" ? { mode: "normal", code: ownNormal.code }
-    : ownLove && ownLove.via !== "link" ? { mode: "love", code: ownLove.code } : null;
+  const ownShares = [["normal", ownNormal], ["love", ownLove]]
+    .filter(([, result]) => result && result.via !== "link")
+    .map(([mode, result]) => ({ mode, code: result.code }));
   app.innerHTML = `<div class="zhead"><h1>人物カード</h1><span class="cnt">${cards.length}枚</span></div>
     <section class="social-entry"><div class="social-badge">人が増えるコレクション</div>
       <h2>友達の偉人を集めよう</h2><p>① あなたの結果を送る。<br>② 友達が自分自身を診断し、結果リンクを返す。<br>③ 届いたリンクで「人物カードに追加する」を押す。</p>
-      ${ownShare ? `<p class="social-note">送るのは、あなたの結果と12問の回答コードが入ったリンクです。友達はそこから自分自身を診断できます。あなたについて答えてもらう他己診断は ※開発中。</p>
-        <button class="btn start" data-invite-self>自分の結果を友達に送る</button><button class="btn sub" data-copy-self>結果リンクをコピー</button>`
+      <p class="social-note">届いた結果は人物カードに増えます。図鑑の「発見」とは別です。</p>
+      ${ownShares.length ? `<p class="social-note">送るリンクを知る人は、あなたの12問の答えを読み取れます。友達はそのリンクから自分自身を診断できます。あなたについて答えてもらう他己診断は ※開発中。</p>
+        ${ownShares.map(({ mode }, i) => { const label = mode === "love" ? "恋愛版" : "性格版"; return `
+          <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${label}の結果を友達に送る</button>
+          <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}`
         : '<a class="btn start" href="#/q/normal">まず自分を診断する</a>'}</section>
     <section class="social-entry variety-entry" aria-labelledby="variety-title"><div class="social-badge">${varietyCount < 3 ? `${varietyCount}/3種類` : `${varietyCount}種類`}</div>
       <h2 id="variety-title">キャラの顔ぶれ</h2><p>${varietyMessage}</p>
@@ -1396,12 +1400,13 @@ function renderPeople() {
     </section>`; }).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
     <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
     ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">友達から見た自分を聞く機能は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
-  if (ownShare) {
-    const result = engines[ownShare.mode].diagnose(answersOf(engines[ownShare.mode], ownShare.code));
-    const url = shareUrl(ownShare.mode, result.figure.id, ownShare.code);
-    $("[data-invite-self]")?.addEventListener("click", () => shareLink(url, `私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`));
-    $("[data-copy-self]")?.addEventListener("click", () => copyLink(url, "友達に送るリンクをコピーしました"));
-  }
+  ownShares.forEach(({ mode, code }) => {
+    const result = engines[mode].diagnose(answersOf(engines[mode], code));
+    const url = shareUrl(mode, result.figure.id, code);
+    const label = mode === "love" ? "恋愛版" : "性格版";
+    $(`[data-invite-self="${mode}"]`)?.addEventListener("click", () => shareLink(url, `${label}では私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`));
+    $(`[data-copy-self="${mode}"]`)?.addEventListener("click", () => copyLink(url, `${label}の結果リンクをコピーしました`));
+  });
   app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = () => {
     const i = Number(b.dataset.removePerson), { all, index } = rawPersonAt(i);
     if (index < 0) return;
