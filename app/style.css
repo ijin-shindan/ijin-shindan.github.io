@@ -484,6 +484,9 @@ details p { font-size: 14px; margin: 8px 0; }
 .social-note { margin: 8px 0 12px; padding: 10px 12px; border-left: 4px solid var(--ai);
   border-radius: 0 var(--r-sm) var(--r-sm) 0; background: var(--ai-soft); color: var(--ink);
   font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.recent-shared-return { display: grid; gap: 8px; margin: 12px 0 20px; }
+.recent-shared-return .social-note { margin: 0; }
+.recent-shared-return a:focus-visible { outline: 3px solid var(--shu); outline-offset: 3px; }
 .social-list { display: grid; gap: 10px; margin: 12px 0; padding: 0; list-style: none; }
 .social-list > * { min-width: 0; }
 .social-list a, .social-list button { min-height: 44px; }

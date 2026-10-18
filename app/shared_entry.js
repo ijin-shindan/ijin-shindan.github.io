@@ -2,6 +2,10 @@
 // shared=1 は「共有ページを経由した」目印であり、別人や本人の証明ではない。
 export const SHARED_RESULT_PARAM = "shared";
 
+export function sharedResultViewPath(mode, code) {
+  return `index.html?shared=1#/r/${mode}/${encodeURIComponent(code)}`;
+}
+
 export function isSharedResultEntry(url, mode, code) {
   try {
     const current = new URL(url);

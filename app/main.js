@@ -1,22 +1,22 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=3d64d05-202610180813";
-import { mountMotion } from "./motion.js?v=3d64d05-202610180813";
-import { mountGuide } from "./guide.js?v=3d64d05-202610180813";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=3d64d05-202610180813";
-import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=3d64d05-202610180813";
-import { partialOtherCandidate } from "./other_partial.js?v=3d64d05-202610180813";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=3d64d05-202610180813";
-import { prependPersonCard, ensurePersonCardIds } from "./people.js?v=3d64d05-202610180813";
-import { isSharedResultEntry, withoutSharedResultParam } from "./shared_entry.js?v=3d64d05-202610180813";
+import { AXES, Shindan, loadData } from "./shindan.js?v=51b152d-202610180912";
+import { mountMotion } from "./motion.js?v=51b152d-202610180912";
+import { mountGuide } from "./guide.js?v=51b152d-202610180912";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=51b152d-202610180912";
+import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=51b152d-202610180912";
+import { partialOtherCandidate } from "./other_partial.js?v=51b152d-202610180912";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=51b152d-202610180912";
+import { prependPersonCard, ensurePersonCardIds } from "./people.js?v=51b152d-202610180912";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=51b152d-202610180912";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=3d64d05-202610180813")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=51b152d-202610180912")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -46,6 +46,8 @@ const store = {
 // この公開版はローカル保存のみ。計測・ログイン・招待送信・課金は行わない。
 const RETURNING = !!store.get("visited");
 let currentMode = "none", nextSrc = null;
+// 端末保存が使えない場合も、このタブ内の共有→診断の往復だけは続けられる。
+const lastSharedInMemory = { normal: null, love: null };
 function track() {} // この公開版ではアクセス・診断結果を計測しない。
 let disposeGuide = () => {};
 let disposeMotion = () => {};
@@ -557,7 +559,10 @@ function renderResult(mode, code) {
   const weakId = ms.weak.find((id) => id !== fate?.other && id !== strongId);
   [strongId, weakId, fate?.other].forEach((id) => meet(id, "match"));
   if (r.levelup && !r.levelup.locked) meet(r.levelup.to, "next");
-  const friend = store.get("lastFriend." + mode);
+  const friend = lastSharedInMemory[mode] || store.get("lastFriend." + mode);
+  const validFriend = friend && typeof friend.code === "string" && typeof friend.fig === "string"
+    && SD.figures[friend.fig] && validCode(sd, friend.code)
+    && sd.diagnose(answersOf(sd, friend.code)).figure.id === friend.fig;
   const other = savedResult(OTHER[mode]);
 
   const tx = texts[f.id];
@@ -572,9 +577,9 @@ function renderResult(mode, code) {
       <div><div class="lbl">⚔️ 史実の因縁 ― ${esc(fate.label)}（史実ネタ。性格の相性とは別）</div>
         <div class="nm">${esc(fig(fate.other).name)}${undiscTag(fate.other)}</div><div class="tx">${esc(fate.text)}</div></div></div>` : "";
   let friendHtml = "";
-  if (friend && SD.figures[friend.fig] && friend.code !== code && validCode(sd, friend.code)) {
+  if (validFriend && friend.code !== code) {
     const fu = sd.score(answersOf(sd, friend.code));
-    friendHtml = duelRow(sd, r.u, fu, f.id, friend.fig, { label: "最近開いた共有リンク", otherWho: "リンクの結果" });
+    friendHtml = duelRow(sd, r.u, fu, f.id, friend.fig, { label: "開いた共有リンク", otherWho: "リンクの結果" });
   }
   const h = r.levelup;
   let levelHtml;
@@ -598,6 +603,9 @@ function renderResult(mode, code) {
   const scoreTags = sc[hi] - sc[lo] < 5
     ? '<span class="tag good">6つの軸に大きな差はありません</span>'
     : `<span class="tag good">高め：${esc(pole(hi, 1))}</span><span class="tag weak">低め：${esc(axisById[lo].name)}</span>`;
+  const returnSharedHtml = validFriend ? `<div class="recent-shared-return ${reveal ? "reveal-hide" : ""}">
+      <a class="btn sub" href="${esc(sharedResultViewPath(mode, friend.code))}">共有リンクの結果を見る：${esc(fig(friend.fig).name)}</a>
+      <p class="social-note">このブラウザーで開いた共有結果です。自分のリンクも含み、送り主は確認できません。友達のカードはリンク先で手動で追加できます。</p></div>` : "";
   const otherHtml = other && validCode(engines[OTHER[mode]], other.code) ? (() => {
     const [n, l] = mode === "normal" ? [f.id, other.fig] : [other.fig, f.id];
     return `<section class="card"><h2>${n === l ? "ふだんも恋も同じ偉人" : "表の顔 × 恋の顔"}</h2>
@@ -611,17 +619,19 @@ function renderResult(mode, code) {
   app.style.cssText = themeVars(r.type.id);
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
+    ${freshSource === "friend" ? returnSharedHtml : ""}
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="image">画像を保存</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
       <a class="btn sub" data-share="x" target="_blank" rel="noopener">Xでポスト</a>
-      <button class="btn sub wide" data-share="copy">リンクをコピー</button>
+      ${freshSource === "friend" ? "" : '<button class="btn sub wide" data-share="copy">リンクをコピー</button>'}
     </div>
     <p class="note" style="margin:4px 0 12px">画像の保存だけでは回答コードは送信されません。結果リンクには12問の回答から作られたコードが含まれます。送る相手を選んで共有してください。</p>
     ${freshSource === "friend" ? `<section class="card social-entry"><h2>結果を友達へ送り返そう</h2>
       <p>最初にリンクをくれた友達へ、あなたの結果リンクをLINEで送るかコピーして返してください。結果は自動では届きません。友達が人物カードに追加できます。</p>
       <button class="btn sub" data-share="copy">送り返すリンクをコピー</button></section>` : ""}
     ${!localSaveOk ? '<p class="note" role="alert">このブラウザには結果を保存できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
+    ${freshSource !== "friend" ? returnSharedHtml : ""}
     ${(() => { const prev = store.get("me.prev." + mode); return prev && prev.code !== code && validCode(sd, prev.code) && SD.figures[prev.fig]
       ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
     <section class="card"><h2>偉人に重ねたあなたの物語</h2>
@@ -708,7 +718,8 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     const friends = store.get("friends", []);
     if (!friends.some((x) => x.mode === mode && x.code === code))
       store.set("friends", [{ mode, code, fig: f.id, at: Date.now() }, ...friends].slice(0, 20));
-    store.set("lastFriend." + mode, { code, fig: f.id });
+    lastSharedInMemory[mode] = { code, fig: f.id };
+    store.set("lastFriend." + mode, lastSharedInMemory[mode]);
     meet(f.id, "friend");
   }
   const tx = texts[f.id];
@@ -730,7 +741,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     <a class="btn sub" href="#/people">人物カード一覧へ</a></section>` : past || prevLink ? `<details class="card social-entry"><summary>友達がこの結果と同じだった場合</summary>
     <p>以前の自分や保存したリンクと同じ回答でも、別の友達から届いた結果なら人物カードに追加できます。</p>
     <button class="btn sub" data-add-person>友達の人物カードに追加する</button></details>` : `<section class="card social-entry"><h2>共有リンクを人物カードへ</h2>
-    <p>自己診断として共有された結果です。回答者の本人確認はできません。実際に別の人から届いたときだけ、あなた自身の結果とは別の人物カードへ追加してください。</p>
+    <p>友達から届いた結果だけカードに追加してください。リンクの送り主は確認できません。あなたの結果とは別に保存されます。</p>
     ${peopleCards().some((x) => x.mode === mode && x.code === code)
       ? '<p class="social-note">同じ回答のカードが保存されています。別の人から届いた結果なら、もう1枚追加できます。</p>'
       : ""}<button class="btn sub" data-add-person>人物カードに追加する</button></section>`;
@@ -990,7 +1001,7 @@ function renderMe() {
     ${zukanSummaryCard()}
     <section class="card"><h2>自分の診断結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
     <section class="card"><h2>開いた共有リンクの結果</h2>
-      ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に開いた結果${store.get("me." + x.mode)?.code === x.code ? "（自分と同じ回答）" : ""}`, relFace(x.fig), `index.html?shared=1#/r/${x.mode}/${x.code}`)).join("")}</div>
+      ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に開いた結果${store.get("me." + x.mode)?.code === x.code ? "（自分と同じ回答）" : ""}`, relFace(x.fig), sharedResultViewPath(x.mode, x.code))).join("")}</div>
         <p class="note" style="text-align:left;margin:8px 0 0">開いた共有リンクの記録です。自分のリンクも含まれ、同じ回答コードは1件にまとまります。人の数ではありません（最大20件）。</p>`
         : `<p class="note" style="text-align:left;margin:0">まだありません。共有リンクを開くと、ここに結果が並びます。</p>`}</section>
     ${OTHER_PILOT ? `<section class="card"><h2>友達から見た自分 <span class="dev-badge">試作</span></h2>
