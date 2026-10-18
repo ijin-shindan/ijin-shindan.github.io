@@ -249,7 +249,9 @@ main > .note { padding: 5px 8px; background: var(--card); border: 1px solid var(
 
 /* ---------------- 結果の下のカード ---------------- */
 .share-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.share-row .btn { padding-inline: 7px; }
 .share-row .wide { grid-column: 1 / -1; }
+@media (max-width: 360px) { .share-row .btn.sub { font-size: 14px; } }
 .card { background: var(--card); border: 2px solid var(--world-edge); border-radius: 9px; padding: 18px; margin: 14px 0;
   box-shadow: 4px 4px 0 var(--world-shadow); }
 .card h2 { font-size: 16px; font-weight: 800; color: var(--ink); margin: 0 0 12px; letter-spacing: .03em; }

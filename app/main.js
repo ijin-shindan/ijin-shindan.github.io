@@ -1,22 +1,22 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=b32a377-202610181300";
-import { mountMotion } from "./motion.js?v=b32a377-202610181300";
-import { mountGuide } from "./guide.js?v=b32a377-202610181300";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=b32a377-202610181300";
-import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=b32a377-202610181300";
-import { partialOtherCandidate } from "./other_partial.js?v=b32a377-202610181300";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=b32a377-202610181300";
-import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=b32a377-202610181300";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=b32a377-202610181300";
+import { AXES, Shindan, loadData } from "./shindan.js?v=b754da4-202610181325";
+import { mountMotion } from "./motion.js?v=b754da4-202610181325";
+import { mountGuide } from "./guide.js?v=b754da4-202610181325";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=b754da4-202610181325";
+import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=b754da4-202610181325";
+import { partialOtherCandidate } from "./other_partial.js?v=b754da4-202610181325";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=b754da4-202610181325";
+import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=b754da4-202610181325";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=b754da4-202610181325";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=b32a377-202610181300")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=b754da4-202610181325")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -623,16 +623,15 @@ function renderResult(mode, code) {
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
     ${freshSource === "friend" ? returnSharedHtml : ""}
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">結果リンクには12問の回答コードが含まれます。送る相手を選んでください。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
-      <button class="btn primary wide" data-share="image">画像を保存</button>
+      <button class="btn primary wide" data-share="friend">${freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る"}</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
       <a class="btn sub" data-share="x" target="_blank" rel="noopener">Xでポスト</a>
-      ${freshSource === "friend" ? "" : '<button class="btn sub wide" data-share="copy">リンクをコピー</button>'}
+      <button class="btn sub" data-share="image">画像を保存</button>
+      <button class="btn sub" data-share="copy">リンクをコピー</button>
     </div>
-    <p class="note" style="margin:4px 0 12px">画像の保存だけでは回答コードは送信されません。結果リンクには12問の回答から作られたコードが含まれます。送る相手を選んで共有してください。</p>
-    ${freshSource === "friend" ? `<section class="card social-entry"><h2>結果を友達へ送り返そう</h2>
-      <p>最初にリンクをくれた友達へ、あなたの結果リンクをLINEで送るかコピーして返してください。結果は自動では届きません。友達が人物カードに追加できます。</p>
-      <button class="btn sub" data-share="copy">送り返すリンクをコピー</button></section>` : ""}
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${freshSource === "friend" ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}</p>
     ${!localSaveOk ? '<p class="note" role="alert">このブラウザには結果を保存できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
     ${freshSource !== "friend" ? returnSharedHtml : ""}
     ${(() => { const prev = store.get("me.prev." + mode); return prev && prev.code !== code && validCode(sd, prev.code) && SD.figures[prev.fig]
@@ -669,7 +668,7 @@ function renderResult(mode, code) {
       <a class="btn sub" href="#/me">この端末の記録</a>
       <a class="btn sub" href="#/">トップへ</a></div>
     <p class="note" style="margin-top:16px"><a href="#/about">このサイトについて</a></p>
-    <button class="fab" data-share="image" hidden>シェア</button>`;
+    <button class="fab" data-share="friend" hidden>結果リンクを送る</button>`;
 
   // シェア
   const url = shareUrl(mode, f.id, code), text = shareText(r, mode, fate);
@@ -678,6 +677,7 @@ function renderResult(mode, code) {
   app.querySelectorAll("[data-share]").forEach((b) => b.addEventListener("click", async (e) => {
     const ch = b.dataset.share;
     track("share_click", { channel: ch, mode, figure: f.id });
+    if (ch === "friend") { e.preventDefault(); shareLink(url, `私は「${f.name}」タイプだった！あなたも診断して、結果リンクを返してね。`); }
     if (ch === "copy") { e.preventDefault(); try { await navigator.clipboard.writeText(url); toast("リンクをコピーしました"); } catch { prompt("このリンクをコピーしてください", url); } }
     if (ch === "image") { e.preventDefault(); shareImage(r, mode, b); }
   }));
