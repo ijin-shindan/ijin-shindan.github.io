@@ -193,6 +193,8 @@ main > .note { padding: 5px 8px; background: var(--card); border: 1px solid var(
 .friend-head { text-align: center; margin: 4px 0 12px; padding: 8px 10px; background: var(--card);
   border: 2px solid var(--world-edge); border-radius: 6px; box-shadow: 3px 3px 0 var(--world-shadow); }
 .friend-head h1 { font-family: var(--serif); font-weight: 900; font-size: 22px; margin: 0; }
+.friend-result-kind { white-space: nowrap; }
+@media (max-width: 400px) { .friend-result-kind { display: block; } }
 .friend-head .friend-origin-note { font-size: 14px; line-height: 1.55; margin: 8px 0 0; }
 .rcard { text-align: center; padding: 18px 16px 14px; border: 3px solid var(--world-edge); border-radius: 8px;
   background: var(--t-bg3); box-shadow: 5px 5px 0 var(--world-shadow); position: relative; overflow: hidden; }

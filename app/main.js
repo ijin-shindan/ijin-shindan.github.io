@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=7419eb5-202610182206";
-import { mountMotion } from "./motion.js?v=7419eb5-202610182206";
-import { mountGuide } from "./guide.js?v=7419eb5-202610182206";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=7419eb5-202610182206";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7419eb5-202610182206";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7419eb5-202610182206";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7419eb5-202610182206";
-import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=7419eb5-202610182206";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7419eb5-202610182206";
-import { storedResultMatches, storedList } from "./stored_result.js?v=7419eb5-202610182206";
-import { clearPrefixedStorage } from "./storage_clear.js?v=7419eb5-202610182206";
+import { AXES, Shindan, loadData } from "./shindan.js?v=14e78fb-202610182243";
+import { mountMotion } from "./motion.js?v=14e78fb-202610182243";
+import { mountGuide } from "./guide.js?v=14e78fb-202610182243";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=14e78fb-202610182243";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=14e78fb-202610182243";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=14e78fb-202610182243";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=14e78fb-202610182243";
+import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=14e78fb-202610182243";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=14e78fb-202610182243";
+import { storedResultMatches, storedList } from "./stored_result.js?v=14e78fb-202610182243";
+import { clearPrefixedStorage } from "./storage_clear.js?v=14e78fb-202610182243";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7419eb5-202610182206")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=14e78fb-202610182243")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -256,7 +256,7 @@ function renderTop() {
     <section class="social-entry">
       <div class="social-badge">友達と遊ぶ</div>
       <h2>人を知るほど、偉人が増える。</h2>
-      <p>自分の結果を送る → 友達も診断する → 届いた結果を人物カードに。${OTHER_PILOT ? "友達から見た自分を聞く試作も確認できます。" : "友達から見た自分を聞く機能は準備中です。"}</p>
+      <p>自分の結果を送る → 友達も診断して結果リンクを返す → 届いた結果を人物カードに。${OTHER_PILOT ? "友達から見た自分を聞く試作も確認できます。" : "友達から見た自分を聞く機能は準備中です。"}</p>
       ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達に12問答えてもらう（試作）</a>' : '<span class="dev-badge">友達から見た自分　※開発中</span>'}
       <a class="btn sub" href="#/people">人物カードを見る</a>
     </section>
@@ -621,7 +621,7 @@ function renderResult(mode, code) {
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
     ${freshSource === "friend" ? returnSharedHtml : ""}
-    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">結果リンクには12問の回答コードが含まれます。送る相手を選んでください。</p>
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "送る相手を選んでください。"}結果リンクには12問の回答コードが含まれます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="friend">${freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る"}</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
@@ -748,18 +748,18 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       : ""}<button class="btn sub" data-add-person>人物カードに追加する</button></section>`;
   app.innerHTML = `
     <div class="friend-head">${personCard
-      ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>「${esc(f.name)}」タイプ</h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
+      ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
       : past || prevLink
-      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」タイプ</h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
-      : `<h1>共有リンクの結果は<br>「${esc(f.name)}」タイプ</h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。あなた自身の結果と同じになることもあります。</p>`}
+      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
+      : `<h1>共有リンクの結果は<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。あなた自身の結果と同じになることもあります。</p>`}
       <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="${esc(fromSharedPage && mine.code === code ? withoutSharedResultParam(location.href) : `#/r/${mode}/${mine.code}`)}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">この端末の記録</a></p></div>
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
     ${personCta}
     ${!personCard && !past && !prevLink && ownReply ? `<section class="card social-entry"><h2>自分の結果を友達に返す</h2>
-      <p>このリンクを友達から受け取ったなら、自分の結果リンクを返せます。自分で開いたリンクなら操作は不要です。結果は自動では届きません。</p>
-      <button class="btn start" data-return-self>自分の結果を送る</button></section>` : ""}
+      <p>友達から届いたリンクなら、最初にリンクを送った友達を選んで、自分の結果リンクを返してください。結果は自動では届きません。自分で開いたリンクなら操作は不要です。</p>
+      <button class="btn start" data-return-self>自分の結果リンクを送る</button></section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
-      ${mine ? (past || prevLink ? "" : compat) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
+      ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら自分の結果リンクを共有できます。友達から届いたなら、その友達へ返せます。</p>`}
     </div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
