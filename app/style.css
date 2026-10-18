@@ -442,10 +442,15 @@ details p { font-size: 14px; margin: 8px 0; }
 .social-card { display: grid; grid-template-columns: 112px repeat(2, minmax(0, 1fr)); gap: 10px; align-items: center; margin: 0; }
 .social-card > img { grid-column: 1; grid-row: 1; justify-self: center; width: min(100%, 112px); height: auto;
   aspect-ratio: 1; object-fit: contain; }
-.social-card > div { grid-column: 2 / -1; grid-row: 1; min-width: 0; overflow-wrap: anywhere; }
-.social-card > div b { display: block; font-size: 14px; line-height: 1.4; }
-.social-card > div .nm { font-family: var(--serif); font-size: 18px; font-weight: 900; line-height: 1.35; }
-.social-card > div small { display: block; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
+.social-card > .person-card-info { grid-column: 2 / -1; grid-row: 1; min-width: 0; overflow-wrap: anywhere; }
+.social-card > .person-card-info b { display: block; font-size: 14px; line-height: 1.4; }
+.social-card > .person-card-info .nm { font-family: var(--serif); font-size: 18px; font-weight: 900; line-height: 1.35; }
+.social-card > .person-card-info small { display: block; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
+.social-card > .person-broken-icon { grid-column: 1; grid-row: 1; display: grid; place-items: center;
+  width: min(100%, 112px); aspect-ratio: 1; border: 2px dashed var(--world-edge);
+  border-radius: var(--r-tile); background: var(--paper); color: var(--ink-soft); font-size: 42px; }
+.social-card > .person-unavailable { display: grid; place-items: center; min-height: 44px;
+  color: var(--ink-soft); font-size: 12px; font-weight: 800; text-align: center; }
 .social-card > :is(a, button) { display: grid; place-items: center; min-width: 0; min-height: 44px;
   padding: 6px 4px; border: 2px solid var(--world-edge); border-radius: var(--r-sm);
   background: var(--paper); color: var(--ink); box-shadow: 0 2px 0 var(--world-shadow);
@@ -501,6 +506,15 @@ details p { font-size: 14px; margin: 8px 0; }
 .variety-slot.empty span { color: var(--ink-soft); font-size: 32px; }
 .variety-entry .variety-extra { color: var(--ink-soft); font-size: 13px; }
 .variety-entry .variety-note { color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+.theme-set { display: grid; gap: 6px; padding: 10px 12px; border: 2px solid var(--line);
+  border-radius: var(--r-tile); background: var(--paper); }
+.theme-set strong { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.theme-set strong span { color: var(--ai); }
+.theme-set p { font-size: 13px; }
+.theme-set-names { display: flex; flex-wrap: wrap; gap: 5px; }
+.theme-set-names span { padding: 2px 7px; border: 1px solid var(--line); border-radius: 4px;
+  color: var(--ink-soft); font-size: 12px; }
+.theme-set-names span.found { border-color: var(--world-edge); background: var(--hero-mint); color: var(--ink); font-weight: 800; }
 .social-code { display: block; min-width: 0; padding: 10px 12px; border: 2px solid var(--line);
   border-radius: var(--r-sm); background: var(--paper); color: var(--ink); font: 700 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-wrap: anywhere; word-break: break-word; user-select: all; }

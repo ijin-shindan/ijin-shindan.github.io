@@ -1,8 +1,8 @@
 // 回答コードは人物の識別子ではない。同じ回答の別人もカード化できる。
-import { validInviteToken } from "./social.js?v=f140e1a-202610181025";
+import { validInviteToken } from "./social.js?v=b32a377-202610181300";
 
-export function prependPersonCard(cards, card, maxCards = 50) {
-  if (!Array.isArray(cards) || cards.length >= maxCards) return null;
+export function prependPersonCard(cards, card, maxCards = 50, isUsable = () => true) {
+  if (!Array.isArray(cards) || cards.filter(isUsable).length >= maxCards) return null;
   return [card, ...cards];
 }
 
@@ -20,6 +20,14 @@ export function distinctCardFigures(cards, isVerified) {
     figures.push(card.fig);
   }
   return figures;
+}
+
+export function figureSetProgress(figureIds, targetIds) {
+  const have = new Set(figureIds);
+  return {
+    found: targetIds.filter((id) => have.has(id)),
+    missing: targetIds.filter((id) => !have.has(id)),
+  };
 }
 
 // 旧版のカードには固有IDがない。順序・呼び名を保ち、欠損や重複したIDだけ補う。
