@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=14e78fb-202610182243";
-import { mountMotion } from "./motion.js?v=14e78fb-202610182243";
-import { mountGuide } from "./guide.js?v=14e78fb-202610182243";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=14e78fb-202610182243";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=14e78fb-202610182243";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=14e78fb-202610182243";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=14e78fb-202610182243";
-import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=14e78fb-202610182243";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=14e78fb-202610182243";
-import { storedResultMatches, storedList } from "./stored_result.js?v=14e78fb-202610182243";
-import { clearPrefixedStorage } from "./storage_clear.js?v=14e78fb-202610182243";
+import { AXES, Shindan, loadData } from "./shindan.js?v=5fb424b-202610190013";
+import { mountMotion } from "./motion.js?v=5fb424b-202610190013";
+import { mountGuide } from "./guide.js?v=5fb424b-202610190013";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=5fb424b-202610190013";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5fb424b-202610190013";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5fb424b-202610190013";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5fb424b-202610190013";
+import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=5fb424b-202610190013";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5fb424b-202610190013";
+import { storedResultMatches, storedList } from "./stored_result.js?v=5fb424b-202610190013";
+import { clearPrefixedStorage } from "./storage_clear.js?v=5fb424b-202610190013";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=14e78fb-202610182243")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5fb424b-202610190013")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -416,7 +416,9 @@ function radar(scores, { grow = false } = {}) {
     return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle">${esc(axisById[a].name)}</text>
             ${grow ? "" : `<text class="val" x="${x}" y="${y + 14}" text-anchor="middle" dominant-baseline="middle">${scores[a]}</text>`}`;
   }).join("");
-  return `<svg class="radar" viewBox="0 0 300 290" role="img" aria-label="6つの軸のスコア">
+  // 演出中の未完成グラフは読ませず、結果画面では6軸の確定値をまとめて伝える。
+  const accessibility = grow ? 'aria-hidden="true"' : `role="img" aria-label="${esc(`6つの軸の値。0から100の目盛りで、50が中間。${AXES.map((a) => `${axisById[a].name}は${scores[a]}`).join("、")}`)}"`;
+  return `<svg class="radar" viewBox="0 0 300 290" ${accessibility}>
     ${[1, 0.66, 0.33].map((f) => `<polygon points="${ring(f)}" fill="none" stroke="currentColor" stroke-opacity=".25"/>`).join("")}
     <polygon class="shape" points="${poly}" fill="var(--t-accent)" fill-opacity=".3" stroke="var(--t-accent)" stroke-width="2"/>
     ${labels}</svg>`;
