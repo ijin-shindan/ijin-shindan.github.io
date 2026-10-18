@@ -3,9 +3,11 @@
 const TOKEN_PATTERN = /^[0-9a-f]{32}$/;
 // 0 は「見ていない／分からない」。3 は中立回答であり、両者を混同しない。
 const FRIEND_CODE_PATTERN = /^1\.[0-5]{12}$/;
+const FRIEND_CODE_VERSION = '1';
 
 export function otherPilotAllowed(hostname) {
-  return /^(?:localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)$/.test(hostname);
+  // 個別回答を含む試作リンクは公開前にLANへ配らない。
+  return /^(?:localhost|127\.0\.0\.1)$/.test(hostname);
 }
 
 export function validInviteToken(token) {
@@ -14,6 +16,19 @@ export function validInviteToken(token) {
 
 export function validFriendCode(code) {
   return typeof code === "string" && FRIEND_CODE_PATTERN.test(code);
+}
+
+export function makeFriendCode(answers) {
+  if (!Array.isArray(answers) || answers.length !== 12 ||
+      !Array.from({ length: 12 }, (_, index) => answers[index])
+        .every((answer) => Number.isInteger(answer) && answer >= 0 && answer <= 5)) {
+    throw new TypeError('OTHER v1 の回答は0〜5を12個選んでください');
+  }
+  return `${FRIEND_CODE_VERSION}.${answers.join('')}`;
+}
+
+export function friendAnswersFromCode(code) {
+  return validFriendCode(code) ? [...code.slice(2)].map(Number) : null;
 }
 
 export function createInviteToken(cryptoProvider = globalThis.crypto) {

@@ -16,7 +16,7 @@ export function separateLegacyLinkedResults(store, engines, validCode, hasFigure
       // 容量不足などで保存に失敗したら、元の記録を消さない。
       if (JSON.stringify(store.get(backupKey)) !== JSON.stringify(result)) continue;
       if (validCode(engines[mode], result.code) && hasFigure(result.fig) &&
-          !friends.some((f) => f.mode === mode && f.code === result.code)) {
+          !friends.some((f) => f && f.mode === mode && f.code === result.code)) {
         const next = [{ mode, code: result.code, fig: result.fig, at: result.at || Date.now() }, ...friends];
         store.set("friends", next);
         if (JSON.stringify(store.get("friends")) !== JSON.stringify(next)) continue;

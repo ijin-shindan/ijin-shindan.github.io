@@ -1,15 +1,15 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: b754da4-202610181325
+版番号: 7419eb5-202610182206
 公開先: https://ijin-shindan.github.io/app/
-ファイル数: 839（この一覧を含む）
-合計サイズ: 29.16 MB
+ファイル数: 842（この一覧を含む）
+合計サイズ: 29.17 MB
 
 主なフォルダ（ファイル数・サイズ）:
   app/og/                    201 件    23.45 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
   app/s/                     200 件     0.22 MB
-  app/                        16 件     0.20 MB
+  app/                        19 件     0.21 MB
   data/                        9 件     0.16 MB
   app/decor/                   4 件     0.07 MB
   app/icons/                   3 件     0.01 MB
@@ -433,8 +433,8 @@
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
   app/index.html  1857
-  app/legacy_data.js  1928
-  app/main.js  112410
+  app/legacy_data.js  1933
+  app/main.js  113747
   app/meta.json  7834
   app/motion.css  2141
   app/motion.js  10614
@@ -641,6 +641,7 @@
   app/og/top.png  142799
   app/other_partial.js  1970
   app/other_replies.js  836
+  app/other_v1.js  1266
   app/people.js  2037
   app/s/love/akechi-mitsuhide.html  1132
   app/s/love/alexander.html  1153
@@ -844,8 +845,10 @@
   app/s/normal/zhuge-liang.html  1113
   app/shared_entry.js  776
   app/shindan.js  7174
-  app/social.js  2372
-  app/style.css  46060
+  app/social.js  2963
+  app/storage_clear.js  878
+  app/stored_result.js  717
+  app/style.css  47718
   data/axes.json  2449
   data/firebase.json  144
   data/plans.json  2033
