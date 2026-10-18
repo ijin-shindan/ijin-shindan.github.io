@@ -1,22 +1,22 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=51b152d-202610180912";
-import { mountMotion } from "./motion.js?v=51b152d-202610180912";
-import { mountGuide } from "./guide.js?v=51b152d-202610180912";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=51b152d-202610180912";
-import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=51b152d-202610180912";
-import { partialOtherCandidate } from "./other_partial.js?v=51b152d-202610180912";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=51b152d-202610180912";
-import { prependPersonCard, ensurePersonCardIds } from "./people.js?v=51b152d-202610180912";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=51b152d-202610180912";
+import { AXES, Shindan, loadData } from "./shindan.js?v=f140e1a-202610181025";
+import { mountMotion } from "./motion.js?v=f140e1a-202610181025";
+import { mountGuide } from "./guide.js?v=f140e1a-202610181025";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=f140e1a-202610181025";
+import { createInviteToken, validInviteToken, validFriendCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f140e1a-202610181025";
+import { partialOtherCandidate } from "./other_partial.js?v=f140e1a-202610181025";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f140e1a-202610181025";
+import { prependPersonCard, ensurePersonCardIds, distinctCardFigures } from "./people.js?v=f140e1a-202610181025";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f140e1a-202610181025";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=51b152d-202610180912")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f140e1a-202610181025")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -139,7 +139,9 @@ const otherReplies = () => {
     return { ...x, fig: provisional?.figure.id ?? null };
   }) : [];
 };
-const usablePersonCard = (x) => x && engines[x.mode] && validCode(engines[x.mode], x.code) && SD.figures[x.fig];
+const usablePersonCard = (x) => x && (x.mode === "normal" || x.mode === "love")
+  && typeof x.code === "string" && validCode(engines[x.mode], x.code) && typeof x.fig === "string"
+  && Object.prototype.hasOwnProperty.call(SD.figures, x.fig);
 const peopleCards = () => {
   const xs = store.get("people.cards", []);
   if (!Array.isArray(xs)) return [];
@@ -1314,15 +1316,40 @@ function renderPeople() {
   document.title = "人物カード｜世界の偉人性格診断";
   app.style.cssText = "";
   const cards = peopleCards();
+  const isVerifiedCard = (card) => {
+    try {
+      const engine = engines[card.mode];
+      return engine && validCode(engine, card.code)
+        && engine.diagnose(answersOf(engine, card.code)).figure.id === card.fig;
+    } catch { return false; }
+  };
+  const verifiedCards = cards.filter(isVerifiedCard);
+  const figureIds = distinctCardFigures(verifiedCards, () => true);
+  const varietyCount = figureIds.length;
+  const varietyMessage = varietyCount === 0
+    ? "届いた結果をカードに追加すると、キャラがここに並びます。"
+    : varietyCount === 1 ? "次はどんなキャラが来る？"
+      : varietyCount === 2 ? "あと1種類で3キャラ集合！" : "3種類のキャラが並びました。もっと増やしてみよう。";
+  const varietySlots = Array.from({ length: 3 }, (_, i) => {
+    const id = figureIds[i];
+    return id ? `<div class="variety-slot"><img src="${avatar(id)}" alt=""><span>${esc(fig(id).name)}</span></div>`
+      : '<div class="variety-slot empty" role="img" aria-label="空いている枠"><span aria-hidden="true">？</span></div>';
+  }).join("");
   const ownNormal = savedResult("normal"), ownLove = savedResult("love");
   const ownShare = ownNormal && ownNormal.via !== "link" ? { mode: "normal", code: ownNormal.code }
     : ownLove && ownLove.via !== "link" ? { mode: "love", code: ownLove.code } : null;
   app.innerHTML = `<div class="zhead"><h1>人物カード</h1><span class="cnt">${cards.length}枚</span></div>
     <section class="social-entry"><div class="social-badge">人が増えるコレクション</div>
-      <h2>友達の偉人を集めよう</h2><p>自分の結果を友達へ送る。友達も診断したら、結果リンクを送り返してもらう。届いた結果のページからカードに追加できます。</p>
+      <h2>友達の偉人を集めよう</h2><p>① あなたの結果を送る。<br>② 友達が自分自身を診断し、結果リンクを返す。<br>③ 届いたリンクで「人物カードに追加する」を押す。</p>
       ${ownShare ? `<p class="social-note">送るのは、あなたの結果と12問の回答コードが入ったリンクです。友達はそこから自分自身を診断できます。あなたについて答えてもらう他己診断は ※開発中。</p>
         <button class="btn start" data-invite-self>自分の結果を友達に送る</button><button class="btn sub" data-copy-self>結果リンクをコピー</button>`
         : '<a class="btn start" href="#/q/normal">まず自分を診断する</a>'}</section>
+    <section class="social-entry variety-entry" aria-labelledby="variety-title"><div class="social-badge">${varietyCount < 3 ? `${varietyCount}/3種類` : `${varietyCount}種類`}</div>
+      <h2 id="variety-title">キャラの顔ぶれ</h2><p>${varietyMessage}</p>
+      <div class="variety-slots">${varietySlots}</div>
+      ${varietyCount > 3 ? `<p class="variety-extra">ほか${varietyCount - 3}種類のキャラも下のカード一覧にいます。</p>` : ""}
+      ${verifiedCards.length < cards.length ? '<p class="variety-extra">結果を確認できないカードは、キャラの種類に数えていません。</p>' : ""}
+      <p class="variety-note">この端末に保存した結果のキャラの種類です。人の数や本人確認を示すものではありません。</p></section>
     ${cards.length ? `<div class="social-list">${cards.map((x, i) => `<section class="social-card">
       <img class="tile" src="${avatar(x.fig)}" alt="">
       <div><b>${esc(x.label || `友達カード ${i + 1}`)}</b><div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small></div>

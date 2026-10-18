@@ -1,9 +1,25 @@
 // 回答コードは人物の識別子ではない。同じ回答の別人もカード化できる。
-import { validInviteToken } from "./social.js?v=51b152d-202610180912";
+import { validInviteToken } from "./social.js?v=f140e1a-202610181025";
 
 export function prependPersonCard(cards, card, maxCards = 50) {
   if (!Array.isArray(cards) || cards.length >= maxCards) return null;
   return [card, ...cards];
+}
+
+// 人物カードに保存された偉人の「種類」だけを取り出す。
+// 回答コードやカードIDは人の本人確認にならないため、呼び出し側で
+// 回答から偉人IDまで再計算したカードだけを isVerified で通す。
+export function distinctCardFigures(cards, isVerified) {
+  if (!Array.isArray(cards) || typeof isVerified !== "function") return [];
+  const seen = new Set();
+  const figures = [];
+  for (const card of cards) {
+    if (!card || typeof card !== "object" || typeof card.fig !== "string" || !card.fig) continue;
+    if (!isVerified(card) || seen.has(card.fig)) continue;
+    seen.add(card.fig);
+    figures.push(card.fig);
+  }
+  return figures;
 }
 
 // 旧版のカードには固有IDがない。順序・呼び名を保ち、欠損や重複したIDだけ補う。
