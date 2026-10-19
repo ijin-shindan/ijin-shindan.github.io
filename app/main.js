@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=bc7e9b7-202610191458";
-import { mountMotion } from "./motion.js?v=bc7e9b7-202610191458";
-import { mountGuide } from "./guide.js?v=bc7e9b7-202610191458";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=bc7e9b7-202610191458";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=bc7e9b7-202610191458";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=bc7e9b7-202610191458";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=bc7e9b7-202610191458";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=bc7e9b7-202610191458";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=bc7e9b7-202610191458";
-import { storedResultMatches, storedList } from "./stored_result.js?v=bc7e9b7-202610191458";
-import { clearPrefixedStorage } from "./storage_clear.js?v=bc7e9b7-202610191458";
+import { AXES, Shindan, loadData } from "./shindan.js?v=72b2305-202610192054";
+import { mountMotion } from "./motion.js?v=72b2305-202610192054";
+import { mountGuide } from "./guide.js?v=72b2305-202610192054";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=72b2305-202610192054";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=72b2305-202610192054";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=72b2305-202610192054";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=72b2305-202610192054";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=72b2305-202610192054";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=72b2305-202610192054";
+import { storedResultMatches, storedList } from "./stored_result.js?v=72b2305-202610192054";
+import { clearPrefixedStorage } from "./storage_clear.js?v=72b2305-202610192054";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=bc7e9b7-202610191458")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=72b2305-202610192054")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -186,12 +186,38 @@ const personDeleteConfirmMessage = (card, displayIndex, verifiedFigureName = "")
   return `「${name}」（${displayIndex + 1}枚目・${result}・${mode}）をこの端末から削除しますか？`;
 };
 // 同じ回答コードでも別の人であり得る。カードの識別子は回答と分ける。
+function readPersonCardStorage() {
+  // store.get は壊れた JSON を [] として返すため、追加や一覧では生値を区別する。
+  let raw;
+  try { raw = localStorage.getItem("ijin.people.cards"); }
+  catch { return { status: "unavailable" }; }
+  if (raw === null) return { status: "ok", raw, cards: [] };
+  let cards;
+  try { cards = JSON.parse(raw); }
+  catch { return { status: "damaged" }; }
+  return Array.isArray(cards) ? { status: "ok", raw, cards } : { status: "damaged" };
+}
+function showPersonCardAddFailure(button, status) {
+  if (status === "full") return toast("人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください");
+  if (status !== "damaged") return toast("この端末に保存できませんでした");
+  let warning = button.parentElement.querySelector("[data-person-save-error]");
+  if (!warning) {
+    warning = document.createElement("p");
+    warning.className = "note";
+    warning.setAttribute("role", "alert");
+    warning.dataset.personSaveError = "";
+    button.insertAdjacentElement("afterend", warning);
+  }
+  warning.textContent = "保存済みの人物カードを読み込めないため、追加を止めました。この端末の記録を消さずに保管し、人物カード画面の案内をご確認ください。";
+}
 function addPersonCard(mode, code, figureId) {
-  const cards = store.get("people.cards", []);
+  const snapshot = readPersonCardStorage();
+  if (snapshot.status !== "ok") return snapshot.status === "damaged" ? "damaged" : "error";
+  const { raw, cards } = snapshot;
   const id = createInviteToken();
   const next = prependPersonCard(cards, { id, mode, code, fig: figureId, at: Date.now() }, 50, usablePersonCard);
   if (!next) return "full";
-  if (JSON.stringify(store.get("people.cards", [])) !== JSON.stringify(cards)) return "error";
+  try { if (localStorage.getItem("ijin.people.cards") !== raw) return "error"; } catch { return "error"; }
   if (!store.set("people.cards", next)) return "error";
   return peopleCards().some((card) => card.id === id) ? "saved" : "error";
 }
@@ -718,7 +744,7 @@ function renderResult(mode, code) {
       && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
     try {
       const status = addPersonCard(mode, code, f.id);
-      if (status !== "saved") return toast(status === "full" ? "人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください" : "この端末に保存できませんでした");
+      if (status !== "saved") return showPersonCardAddFailure($('[data-add-same-person]'), status);
       $("[data-add-same-person]").disabled = true;
       toast("友達の人物カードを1枚追加しました");
     } catch { toast("この端末ではカードを保存できません"); }
@@ -806,7 +832,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
     try {
       const status = addPersonCard(mode, code, f.id);
-      if (status !== "saved") return toast(status === "full" ? "人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください" : "この端末に保存できませんでした");
+      if (status !== "saved") return showPersonCardAddFailure($('[data-add-person]'), status);
     } catch { return toast("この端末ではカードを保存できません"); }
     location.hash = "#/people";
     toast("人物カードに保存しました");
@@ -1067,6 +1093,10 @@ function renderMe() {
       + hist.map((h) => row(m, h, `以前の${name}の結果`)).join("");
   }).join("");
   const friends = storedList(store.get("friends", [])).filter((x) => x && ok(x.mode, x));
+  const personCardSnapshot = readPersonCardStorage();
+  const personCardCount = personCardSnapshot.status === "ok"
+    ? `${personCardsFromRaw(personCardSnapshot.cards).cards.length}枚`
+    : "確認できません";
   app.innerHTML = `
     <div class="zhead"><h1>この端末の記録</h1></div>
     ${accountCard()}
@@ -1080,7 +1110,7 @@ function renderMe() {
       <p class="social-note">あなたについての返信リンクを、自分で保存した記録です。回答者の本人確認はできず、自分の結果も置き換えません。</p>
       <p>${otherReplies().length}件の返信をこの端末に保存中。回答した人の人数とは限りません。</p>
       <a class="btn sub" href="#/ask">招待リンクと返信を見る</a></section>` : ""}
-    <section class="card"><h2>人物カード</h2><p>友達から届いた自己診断結果のカード：${peopleCards().length}枚</p>
+    <section class="card"><h2>人物カード</h2><p>友達から届いた自己診断結果のカード：${personCardCount}</p>
       <a class="btn sub" href="#/people">人物カードを見る</a></section>
     <section class="card"><h2>設定</h2>
       <p class="note" style="text-align:left;margin:0">この記録は、この端末のこのブラウザの中だけに保存されています。機種変更、別のブラウザ、プライベートモード、ブラウザのデータ削除では消えることがあります。</p>
@@ -1411,7 +1441,16 @@ function renderOtherReply(token, code) {
 function renderPeople() {
   document.title = "人物カード｜世界の偉人性格診断";
   app.style.cssText = "";
-  const cards = peopleCards();
+  const snapshot = readPersonCardStorage();
+  if (snapshot.status !== "ok") {
+    const message = snapshot.status === "damaged"
+      ? "この端末の人物カード記録を読み込めません。元の記録を守るため、追加や編集を止めています。サイトデータを消さずに保管してください。"
+      : "この端末の保存領域を読み込めません。人物カードの追加や編集はできません。";
+    app.innerHTML = `<section class="card"><h1>人物カードを確認できません</h1><p role="alert">${message}</p><a class="btn sub" href="#/">トップへ戻る</a></section>`;
+    window.scrollTo(0, 0);
+    return;
+  }
+  const cards = personCardsFromRaw(snapshot.cards).cards;
   const isVerifiedCard = (card) => {
     try {
       const engine = engines[card.mode];
