@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=2160f99-202610191236";
-import { mountMotion } from "./motion.js?v=2160f99-202610191236";
-import { mountGuide } from "./guide.js?v=2160f99-202610191236";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=2160f99-202610191236";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=2160f99-202610191236";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=2160f99-202610191236";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=2160f99-202610191236";
-import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=2160f99-202610191236";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=2160f99-202610191236";
-import { storedResultMatches, storedList } from "./stored_result.js?v=2160f99-202610191236";
-import { clearPrefixedStorage } from "./storage_clear.js?v=2160f99-202610191236";
+import { AXES, Shindan, loadData } from "./shindan.js?v=bc7e9b7-202610191458";
+import { mountMotion } from "./motion.js?v=bc7e9b7-202610191458";
+import { mountGuide } from "./guide.js?v=bc7e9b7-202610191458";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=bc7e9b7-202610191458";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=bc7e9b7-202610191458";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=bc7e9b7-202610191458";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=bc7e9b7-202610191458";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=bc7e9b7-202610191458";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=bc7e9b7-202610191458";
+import { storedResultMatches, storedList } from "./stored_result.js?v=bc7e9b7-202610191458";
+import { clearPrefixedStorage } from "./storage_clear.js?v=bc7e9b7-202610191458";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2160f99-202610191236")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=bc7e9b7-202610191458")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -140,31 +140,40 @@ const otherReplies = () => {
 const usablePersonCard = (x) => x && (x.mode === "normal" || x.mode === "love")
   && typeof x.code === "string" && validCode(engines[x.mode], x.code) && typeof x.fig === "string"
   && Object.prototype.hasOwnProperty.call(SD.figures, x.fig);
-const peopleCards = () => {
-  const xs = store.get("people.cards", []);
-  if (!Array.isArray(xs)) return [];
-  const valid = xs.filter(usablePersonCard);
-  try {
-    const upgraded = ensurePersonCardIds(valid, createInviteToken);
-    if (!upgraded.changed) return upgraded.cards;
-    let i = 0;
-    const preserved = xs.map((card) => usablePersonCard(card) ? upgraded.cards[i++] : card);
-    if (store.set("people.cards", preserved)) return upgraded.cards;
-  } catch { /* 保存不可の端末では既存カードを一時IDで閲覧する */ }
-  const used = new Set();
-  return valid.map((card, i) => {
-    const id = validInviteToken(card.id) && !used.has(card.id) ? card.id : `legacy-${i}`;
-    used.add(id);
-    return { ...card, id };
+// 旧カードの識別子はタブ内だけに置く。表示やルート解決で保存を書き換えない。
+// raw配列の内容・順序が変われば全旧handleを失効し、別カードへの誤接続を防ぐ。
+let personSnapshot = null;
+const legacyHandles = new Map(); // raw index -> opaque, tab-local ID
+const personCardsFromRaw = (xs) => {
+  if (!Array.isArray(xs)) return { cards: [], indexes: [] };
+  const snapshot = JSON.stringify(xs);
+  if (snapshot !== personSnapshot) {
+    personSnapshot = snapshot;
+    legacyHandles.clear();
+  }
+  const counts = new Map();
+  xs.forEach((card) => {
+    if (usablePersonCard(card) && validInviteToken(card.id)) counts.set(card.id, (counts.get(card.id) || 0) + 1);
   });
+  const cards = [], indexes = [];
+  xs.forEach((card, rawIndex) => {
+    if (!usablePersonCard(card)) return;
+    let id = card.id;
+    if (!validInviteToken(id) || counts.get(id) !== 1) {
+      if (!legacyHandles.has(rawIndex)) legacyHandles.set(rawIndex, `legacy-${createInviteToken()}`);
+      id = legacyHandles.get(rawIndex);
+    }
+    cards.push({ ...card, id });
+    indexes.push(rawIndex);
+  });
+  return { cards, indexes };
 };
+const peopleCards = () => personCardsFromRaw(store.get("people.cards", [])).cards;
 const rawPersonAt = (displayIndex) => {
-  peopleCards(); // 旧カードIDを可能なら永続化
   const all = store.get("people.cards", []);
   if (!Array.isArray(all)) return { all: [], index: -1 };
-  let shown = -1;
-  const index = all.findIndex((card) => usablePersonCard(card) && ++shown === displayIndex);
-  return { all, index };
+  const { cards, indexes } = personCardsFromRaw(all);
+  return { all, index: indexes[displayIndex] ?? -1, displayedId: cards[displayIndex]?.id };
 };
 const personDeleteConfirmMessage = (card, displayIndex, verifiedFigureName = "") => {
   // 旧版や手動編集された保存データも、確認ダイアログでは短い一行に収める。
@@ -178,12 +187,12 @@ const personDeleteConfirmMessage = (card, displayIndex, verifiedFigureName = "")
 };
 // 同じ回答コードでも別の人であり得る。カードの識別子は回答と分ける。
 function addPersonCard(mode, code, figureId) {
-  peopleCards(); // 旧カードのIDを補い、元データを残してから追加する。
   const cards = store.get("people.cards", []);
   const id = createInviteToken();
   const next = prependPersonCard(cards, { id, mode, code, fig: figureId, at: Date.now() }, 50, usablePersonCard);
   if (!next) return "full";
-  store.set("people.cards", next);
+  if (JSON.stringify(store.get("people.cards", [])) !== JSON.stringify(cards)) return "error";
+  if (!store.set("people.cards", next)) return "error";
   return peopleCards().some((card) => card.id === id) ? "saved" : "error";
 }
 const verifiedResult = (mode, entry) => storedResultMatches(mode, entry, engines, SD.figures, validCode, answersOf);
@@ -260,7 +269,7 @@ function renderTop() {
       ${["normal", "love"].filter((m) => me[m]).map((m) => `
         <a class="row" href="#/r/${m}/${me[m].code}" style="text-decoration:none;color:inherit">
           <img class="tile" src="${avatar(me[m].fig)}" alt="" style="${themeVars(fig(me[m].fig).type)}">
-          <div><div class="lbl">前回の${m === "love" ? "恋の" : ""}あなた${me[m].via === "link" ? "（リンクから保存）" : ""}</div><div class="nm">${esc(fig(me[m].fig).name)}</div></div>
+          <div><div class="lbl">いまの${m === "love" ? "恋愛診断" : "性格診断"}の結果${me[m].via === "link" ? "（リンクから保存）" : ""}</div><div class="nm">${esc(fig(me[m].fig).name)}</div></div>
         </a>`).join("")}
       <a class="btn sub" href="#/zukan">図鑑を見る（${zukanCount()} / ${FREE.length}）</a>
       <a class="btn sub" href="#/me">この端末の記録（自分・受け取った結果）</a>
@@ -278,8 +287,8 @@ function renderTop() {
     <section class="social-entry">
       <div class="social-badge">友達と遊ぶ</div>
       <h2>人を知るほど、偉人が増える。</h2>
-      <p>自分の結果を送る → 友達も診断して結果リンクを返す → 届いた結果を人物カードに。${OTHER_PILOT ? "友達から見た自分を聞く試作も確認できます。" : "友達から見た自分を聞く機能は準備中です。"}</p>
-      ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達に12問答えてもらう（試作）</a>' : '<span class="dev-badge">友達から見た自分　※開発中</span>'}
+      <p>人物カードには、友達から届いた自己診断結果を集めます。${OTHER_PILOT ? "友達があなたについて答える他己分析は、試作として確認できます。" : "友達があなたについて答える他己分析は、まだ使えません。"}</p>
+      ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達に12問答えてもらう（試作）</a>' : '<span class="dev-badge">他己分析　※開発中</span>'}
       <a class="btn sub" href="#/people">人物カードを見る</a>
     </section>
     ${againCard}
@@ -1093,8 +1102,8 @@ function renderHow() {
     ["②", "似た偉人と出会う", "6つの軸をもとに、今の回答に近い偉人を1人表示します。"],
     ["③", "偉人を図鑑に集める", "相性・もしもの分岐などで名前を知り、診断で出会うと図鑑に「発見」として残ります。"],
     ["④", "結果を自分でシェアする", "共有リンクや画像は、自分で選んだときだけ送れます。受け取った結果は自分の結果と区別して表示します。"],
-    OTHER_PILOT ? ["⑤", "友達から見た自分も聞く", "招待リンクを自分で送り、友達が答えたら返信リンクを送ってもらいます。回答は自動では届きません。"] : ["⑤", "友達から見た自分", "招待して友達に答えてもらう機能は、質問と判定を検証中です。"],
-    ["⑥", "人物カードを増やす", "友達から自己診断の結果リンクが届いたら、結果画面でカードに追加できます。"],
+    ["⑤", "人物カードを増やす", "友達から自己診断結果リンクが届いたら、結果画面でカードに追加できます。"],
+    OTHER_PILOT ? ["⑥", "友達から見た自分も聞く（試作）", "招待リンクを自分で送り、友達が答えたら返信リンクを送ってもらいます。回答は自動では届きません。"] : ["予定", "他己分析 ※開発中", "友達があなたについて答える機能です。今は公開していません。"],
   ];
   app.innerHTML = `
     <div class="zhead"><h1>このサイトの使い方</h1></div>
@@ -1178,7 +1187,8 @@ function renderUnavailable() {
   document.title = planned ? "招待・他己診断は開発中｜世界の偉人性格診断" : "このリンクは開けません｜世界の偉人性格診断";
   app.style.cssText = "";
   app.innerHTML = `<section class="card"><h1>${planned ? '招待・他己診断 <span class="dev-badge">※開発中</span>' : 'このリンクは開けませんでした'}</h1>
-    <p>${planned ? (["fr", "invite"].includes(page) ? "古い招待リンクは現在使えません。" : "招待・他己診断は公開準備中です。") + "このリンクから相手への回答は送れません。" : "リンクが途中で切れているか、対応していない形式です。"}性格版・恋愛版の自己診断は無料で遊べます。</p>
+    <p>${planned ? (["fr", "invite"].includes(page) ? "古い招待リンクは現在使えません。" : "招待・他己診断は公開準備中です。") + "このリンクから相手への回答は送れません。" : page === "person" ? "カードの記録が変わったか、古いカードのリンクです。人物カード一覧から選び直してください。" : "リンクが途中で切れているか、対応していない形式です。"}性格版・恋愛版の自己診断は無料で遊べます。</p>
+    ${page === "person" ? '<a class="btn sub" href="#/people">人物カード一覧へ</a>' : ""}
     <a class="btn start" href="#/q/normal">自分の診断を始める</a>
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
   window.scrollTo(0, 0);
@@ -1429,8 +1439,8 @@ function renderPeople() {
   app.innerHTML = `<div class="zhead"><h1>人物カード</h1><span class="cnt">${cards.length}枚</span></div>
     <section class="social-entry"><div class="social-badge">人が増えるコレクション</div>
       <h2>友達の偉人を集めよう</h2><p>① あなたの結果を送る。<br>② 友達が自分自身を診断し、結果リンクを返す。<br>③ 届いたリンクで「人物カードに追加する」を押す。</p>
-      <p class="social-note">届いた結果は人物カードに増えます。図鑑の「発見」とは別です。</p>
-      ${ownShares.length ? `<p class="social-note">送るリンクを知る人は、あなたの12問の答えを読み取れます。友達はそのリンクから自分自身を診断できます。あなたについて答えてもらう他己診断は ※開発中。</p>
+      <p class="social-note">ここで集めるのは、友達から届いた自己診断結果です。リンクの持ち主は確認できません。友達があなたについて答える「他己分析」とは別です。図鑑の「発見」とも別です。</p>
+      ${ownShares.length ? `<p class="social-note">送るリンクを知る人は、あなたの12問の答えを読み取れます。友達はそのリンクから自分自身を診断できます。他己分析は ※開発中。</p>
         ${ownShares.map(({ mode }, i) => { const label = mode === "love" ? "恋愛版" : "性格版"; return `
           <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${label}の結果を友達に送る</button>
           <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}`
@@ -1456,7 +1466,7 @@ function renderPeople() {
       <button type="button" data-remove-person="${i}" data-person-id="${esc(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目を削除">削除</button>
     </section>`; }).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
     <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
-    ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">友達から見た自分を聞く機能は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
+    ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">他己分析（友達があなたについて答える機能）は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
   ownShares.forEach(({ mode, code }) => {
     const result = engines[mode].diagnose(answersOf(engines[mode], code));
     const url = shareUrl(mode, result.figure.id, code);
@@ -1469,11 +1479,9 @@ function renderPeople() {
       renderPeople();
       toast("別タブでカードが変わりました。更新して選び直してください");
     };
-    const i = Number(b.dataset.removePerson), { all, index } = rawPersonAt(i);
+    const i = Number(b.dataset.removePerson), { all, index, displayedId: currentId } = rawPersonAt(i);
     const current = all[index], displayedId = b.dataset.personId;
-    if (!validInviteToken(displayedId) || !validInviteToken(current?.id)
-      || displayedId !== current.id
-      || all.filter((card) => card && card.id === displayedId).length !== 1) {
+    if (!usablePersonCard(current) || displayedId !== currentId) {
       return refreshChanged();
     }
     const beforeConfirm = JSON.stringify(all);
@@ -1492,11 +1500,9 @@ function renderPeople() {
       focusPageHeading();
       toast("別タブでカードが変わりました。更新して選び直してください");
     };
-    const i = Number(b.dataset.labelPerson), { all, index } = rawPersonAt(i);
+    const i = Number(b.dataset.labelPerson), { all, index, displayedId: currentId } = rawPersonAt(i);
     const current = all[index], displayedId = b.dataset.personId;
-    if (!validInviteToken(displayedId) || !validInviteToken(current?.id)
-      || displayedId !== current.id
-      || all.filter((card) => card && card.id === displayedId).length !== 1) {
+    if (!usablePersonCard(current) || displayedId !== currentId) {
       return refreshChanged();
     }
     const beforeEdit = JSON.stringify(all);
