@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=72b2305-202610192054";
-import { mountMotion } from "./motion.js?v=72b2305-202610192054";
-import { mountGuide } from "./guide.js?v=72b2305-202610192054";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=72b2305-202610192054";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=72b2305-202610192054";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=72b2305-202610192054";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=72b2305-202610192054";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=72b2305-202610192054";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=72b2305-202610192054";
-import { storedResultMatches, storedList } from "./stored_result.js?v=72b2305-202610192054";
-import { clearPrefixedStorage } from "./storage_clear.js?v=72b2305-202610192054";
+import { AXES, Shindan, loadData } from "./shindan.js?v=cfe4061-202610192231";
+import { mountMotion } from "./motion.js?v=cfe4061-202610192231";
+import { mountGuide } from "./guide.js?v=cfe4061-202610192231";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=cfe4061-202610192231";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=cfe4061-202610192231";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=cfe4061-202610192231";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=cfe4061-202610192231";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=cfe4061-202610192231";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=cfe4061-202610192231";
+import { storedResultMatches, storedList } from "./stored_result.js?v=cfe4061-202610192231";
+import { clearPrefixedStorage } from "./storage_clear.js?v=cfe4061-202610192231";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=72b2305-202610192054")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=cfe4061-202610192231")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -194,8 +194,21 @@ function readPersonCardStorage() {
   if (raw === null) return { status: "ok", raw, cards: [] };
   let cards;
   try { cards = JSON.parse(raw); }
-  catch { return { status: "damaged" }; }
-  return Array.isArray(cards) ? { status: "ok", raw, cards } : { status: "damaged" };
+  catch { return { status: "damaged", raw }; }
+  return Array.isArray(cards) ? { status: "ok", raw, cards } : { status: "damaged", raw };
+}
+function exportDamagedPersonCardRaw(raw) {
+  const url = URL.createObjectURL(new Blob([raw], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  try {
+    link.href = url;
+    link.download = "ijin-people-cards-original.txt";
+    document.body.append(link);
+    link.click();
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
 }
 function showPersonCardAddFailure(button, status) {
   if (status === "full") return toast("人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください");
@@ -388,13 +401,13 @@ function renderQuiz(mode, anim = false) {
   app.innerHTML = `
     <div class="qhead">
       ${i === 0 ? '<a class="back" href="#/">← トップへ</a>' : '<button class="back">← 戻る</button>'}
-      <span class="count"><b>${i + 1}</b> / ${qs.length}</span>
+      <span class="count" aria-hidden="true"><b>${i + 1}</b> / ${qs.length}</span>
       <span class="mystery" style="--p:${(i / qs.length) * 100}%" aria-hidden="true">?</span>
     </div>
     <div class="segs">${qs.map((_, k) => `<i class="${k < i ? "done" : k === i ? "now" : ""} ${[3, 7, 11].includes(k) ? "chest" : ""}"></i>`).join("")}</div>
     <div class="qbox ${anim ? "in" : ""}">
       ${intro}
-      <h1 class="qtext" id="current-question" tabindex="-1">${esc(q.text)}</h1>
+      <h1 class="qtext" id="current-question" tabindex="-1" aria-label="${i + 1}問目、全${qs.length}問。${esc(q.text)}">${esc(q.text)}</h1>
       <p class="qhint">いちばん近いものを1つ選んでね。押すと次へ進みます。</p>
       <div class="scale5" role="group" aria-labelledby="current-question">
         ${[1, 2, 3, 4, 5].map((v) => `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-v="${v}" aria-label="${esc(sd.data.questions.scale[v - 1])}${answers[i] === v ? "（前の回答）" : ""}"><i aria-hidden="true"></i><span>${esc(sd.data.questions.scale[v - 1])}</span></button>`).join("")}
@@ -439,7 +452,7 @@ function renderCheckpoint(mode, n) {
   if (n === 4) {
     const hot = new Set(ranked.slice(0, 5).map((t) => t.id));
     body = `<h2>いまの回答から、候補が見えてきました</h2>
-      <div class="emblems">${sd.types.filter((t) => t.unit).map((t) =>
+      <div class="emblems" aria-hidden="true">${sd.types.filter((t) => t.unit).map((t) =>
         `<span class="emb ${hot.has(t.id) ? "hot" : ""}" style="background:${THEMES[t.id].accent}">${esc(t.name[0])}</span>`).join("")}</div>`;
   } else {
     const three = ranked.slice(0, 3);
@@ -672,6 +685,7 @@ function renderResult(mode, code) {
       <div class="duo"><div><img class="tile" src="${avatar(n)}" alt="" style="${themeVars(fig(n).type)}"><div class="lbl">ふだんは</div><div class="nm">${esc(fig(n).name)}</div></div>
         <div class="x">${n === l ? "＝" : "×"}</div>
         <div><img class="tile" src="${avatar(l)}" alt="" style="${themeVars(fig(l).type)}"><div class="lbl">恋をすると</div><div class="nm">${esc(fig(l).name)}</div></div></div>
+      <p class="social-note">投稿する結果リンクには、12問の答えが入っています。リンクを知る人は答えを読み取れます。</p>
       <button class="btn sub" style="margin-top:12px" data-duo="${n},${l}">${n === l ? "同じ偉人だったとXに投稿" : "偉人の組み合わせをXに投稿"}</button></section>`;
   })() : `<section class="card"><h2>${mode === "normal" ? "恋愛バージョン" : "性格バージョン"}</h2>
       <p style="margin:0 0 12px">${mode === "normal" ? "恋をしたら、あなたは別の偉人かも？" : "ふだんのあなたは、どの偉人？"}（約1分半）</p>
@@ -680,7 +694,7 @@ function renderResult(mode, code) {
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
     ${freshSource === "friend" ? returnSharedHtml : ""}
-    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
+    <p class="note share-warning ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="friend">${freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る"}</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
@@ -727,6 +741,12 @@ function renderResult(mode, code) {
     <p class="note" style="margin-top:16px"><a href="#/about">このサイトについて</a></p>
     <button class="fab" data-share="friend" hidden>結果リンクを送る</button>`;
 
+  // ボタンだけを拾う読み上げ操作でも、回答コードを含むリンクの注意が伝わるようにする。
+  app.querySelectorAll('[data-share="friend"], [data-share="line"], [data-share="x"], [data-share="copy"]').forEach((b) => {
+    b.setAttribute("aria-label", `${b.textContent.trim()}。結果リンクを知る人は12問の答えを読み取れます`);
+  });
+  const duoShareButton = $("[data-duo]");
+  duoShareButton?.setAttribute("aria-label", `${duoShareButton.textContent.trim()}。投稿する結果リンクを知る人は12問の答えを読み取れます`);
   // シェア
   const url = shareUrl(mode, f.id, code), text = shareText(r, mode, fate);
   $('[data-share="x"]').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
@@ -816,6 +836,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     ${personCta}
     ${!personCard && !past && !prevLink && ownReply ? `<section class="card social-entry"><h2>自分の結果を友達に返す</h2>
       <p>友達から届いたリンクなら、最初にリンクを送った友達を選んで、自分の結果リンクを返してください。結果は自動では届きません。自分で開いたリンクなら操作は不要です。</p>
+      <p class="social-note">送る結果リンクを知る人は、あなたの12問の答えを読み取れます。</p>
       <button class="btn start" data-return-self>自分の結果リンクを送る</button></section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
       ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
@@ -826,6 +847,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
       : `<p class="note">${personCard ? "人物カードに保存した結果です。" : prevLink ? "以前リンクから保存した結果です。" : "開いた共有リンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
   app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
+  $("[data-return-self]")?.setAttribute("aria-label", "自分の結果リンクを送る。リンクを知る人は12問の答えを読み取れます");
   $("[data-return-self]")?.addEventListener("click", () => shareLink(shareUrl(mode, mine.fig, mine.code), "あなたから届いた結果を見たよ。私の結果も送るね。"));
   $("[data-add-person]")?.addEventListener("click", () => {
     if (peopleCards().some((card) => card.mode === mode && card.code === code)
@@ -1446,7 +1468,18 @@ function renderPeople() {
     const message = snapshot.status === "damaged"
       ? "この端末の人物カード記録を読み込めません。元の記録を守るため、追加や編集を止めています。サイトデータを消さずに保管してください。"
       : "この端末の保存領域を読み込めません。人物カードの追加や編集はできません。";
-    app.innerHTML = `<section class="card"><h1>人物カードを確認できません</h1><p role="alert">${message}</p><a class="btn sub" href="#/">トップへ戻る</a></section>`;
+    app.innerHTML = `<section class="card"><h1>人物カードを確認できません</h1><p role="alert">${message}</p>${snapshot.status === "damaged" && typeof snapshot.raw === "string"
+      ? '<p>元の記録のファイル保存を試せます。回答が含まれる場合があるため、人に送らず保管してください。保存してもサイト内の記録は変わりません。押した後、ファイルが保存されたか確認してください。</p><button class="btn sub" data-export-damaged>元の記録をファイルに保存</button>'
+      : ""}<a class="btn sub" href="#/">トップへ戻る</a></section>`;
+    $("[data-export-damaged]")?.addEventListener("click", () => {
+      const latest = readPersonCardStorage();
+      if (latest.status !== "damaged" || latest.raw !== snapshot.raw) {
+        renderPeople();
+        return toast("別のタブで記録が変わりました。表示を更新してから選び直してください");
+      }
+      try { exportDamagedPersonCardRaw(snapshot.raw); }
+      catch { toast("ファイルを保存できませんでした。サイトデータは消さずに保管してください"); }
+    });
     window.scrollTo(0, 0);
     return;
   }
@@ -1510,6 +1543,8 @@ function renderPeople() {
     const result = engines[mode].diagnose(answersOf(engines[mode], code));
     const url = shareUrl(mode, result.figure.id, code);
     const label = mode === "love" ? "恋愛版" : "性格版";
+    $(`[data-invite-self="${mode}"]`)?.setAttribute("aria-label", `${label}の結果を友達に送る。リンクを知る人は12問の答えを読み取れます`);
+    $(`[data-copy-self="${mode}"]`)?.setAttribute("aria-label", `${label}の結果リンクをコピー。リンクを知る人は12問の答えを読み取れます`);
     $(`[data-invite-self="${mode}"]`)?.addEventListener("click", () => shareLink(url, `${label}では私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`));
     $(`[data-copy-self="${mode}"]`)?.addEventListener("click", () => copyLink(url, `${label}の結果リンクをコピーしました`));
   });

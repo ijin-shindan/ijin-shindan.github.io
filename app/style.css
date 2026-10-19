@@ -110,6 +110,7 @@ img { display: block; }
 .type-strip { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; height: 10px; margin: 26px 0 6px; border-radius: 5px; overflow: hidden; }
 .note { font-size: 12px; color: var(--ink-soft); text-align: center; margin: 6px 0 0; }
 main > .note { padding: 5px 8px; background: var(--card); border: 1px solid var(--world-edge); border-radius: 5px; }
+main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; line-height: 1.5; text-align: left; }
 
 /* ---------------- 質問 ---------------- */
 .qhead { display: flex; align-items: center; gap: 12px; color: var(--ink-soft); font-size: 14px;
