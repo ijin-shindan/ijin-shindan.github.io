@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=cfe4061-202610192231";
-import { mountMotion } from "./motion.js?v=cfe4061-202610192231";
-import { mountGuide } from "./guide.js?v=cfe4061-202610192231";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=cfe4061-202610192231";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=cfe4061-202610192231";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=cfe4061-202610192231";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=cfe4061-202610192231";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=cfe4061-202610192231";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=cfe4061-202610192231";
-import { storedResultMatches, storedList } from "./stored_result.js?v=cfe4061-202610192231";
-import { clearPrefixedStorage } from "./storage_clear.js?v=cfe4061-202610192231";
+import { AXES, Shindan, loadData } from "./shindan.js?v=f8024e7-202610192302";
+import { mountMotion } from "./motion.js?v=f8024e7-202610192302";
+import { mountGuide } from "./guide.js?v=f8024e7-202610192302";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=f8024e7-202610192302";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f8024e7-202610192302";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f8024e7-202610192302";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f8024e7-202610192302";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f8024e7-202610192302";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f8024e7-202610192302";
+import { storedResultMatches, storedList } from "./stored_result.js?v=f8024e7-202610192302";
+import { clearPrefixedStorage } from "./storage_clear.js?v=f8024e7-202610192302";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=cfe4061-202610192231")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f8024e7-202610192302")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -131,6 +131,21 @@ const answersOf = (sd, code) => { const d = digits(code); return Object.fromEntr
 const validCode = (sd, code) => { const d = digits(code); return !!d && d.length === ordered(sd).length; };
 const validProgress = (p) => p && Number.isFinite(p.t) && Array.isArray(p.answers) && p.answers.length <= 12
   && p.answers.every((v) => Number.isInteger(v) && v >= 1 && v <= 5);
+// 見直し位置はタブ内だけに保存し、別タブの回答記録を上書きしない。
+const quizCursorKey = (mode) => `ijin.quiz.cursor.${mode}`;
+function rememberQuizCursor(mode, progress, index) {
+  if (!validProgress(progress)) return;
+  try { sessionStorage.setItem(quizCursorKey(mode), JSON.stringify({ t: progress.t, length: progress.answers.length, index })); } catch {}
+}
+function resumeQuizIndex(mode, progress, questionCount) {
+  const fallback = Math.min(progress.answers.length, questionCount - 1);
+  try {
+    const cursor = JSON.parse(sessionStorage.getItem(quizCursorKey(mode)));
+    if (cursor?.t === progress.t && cursor.length === progress.answers.length
+      && Number.isInteger(cursor.index) && cursor.index >= 0 && cursor.index <= fallback) return cursor.index;
+  } catch {}
+  return fallback;
+}
 const friendAnswerCode = (code) => validFriendCode(code);
 const inviteToken = () => { const token = store.get("other.invite"); return validInviteToken(token) ? token : null; };
 const otherReplies = () => {
@@ -387,8 +402,8 @@ function renderQuiz(mode, anim = false) {
     const saved = store.get("progress." + mode);
     const qs = ordered(sd);
     quiz = { mode, qs, answers: [], i: 0 };
-    if (validProgress(saved) && Date.now() - saved.t < 864e5) { quiz.answers = saved.answers; quiz.i = Math.min(saved.answers.length, qs.length - 1); }
-    const resumed = validProgress(saved) && saved.answers.length && quiz.i > 0;
+    if (validProgress(saved) && Date.now() - saved.t < 864e5) { quiz.answers = saved.answers; quiz.i = resumeQuizIndex(mode, saved, qs.length); }
+    const resumed = validProgress(saved) && saved.answers.length > 0 && Date.now() - saved.t < 864e5;
     quiz.source = resumed ? saved.source ?? "resume" : nextSrc ?? "top";
     nextSrc = null;
     if (!resumed) track("quiz_start", { mode, source: quiz.source });
@@ -415,7 +430,13 @@ function renderQuiz(mode, anim = false) {
     </div>`;
   window.scrollTo(0, 0);
   $(".qtext").focus({ preventScroll: true });
-  if (i > 0) $(".back").onclick = () => { clearTimers(); quiz.busy = false; quiz.i--; renderQuiz(mode, true); };
+  if (i > 0) $(".back").onclick = () => {
+    clearTimers(); quiz.busy = false; quiz.i--;
+    const saved = store.get("progress." + mode);
+    if (validProgress(saved) && saved.answers.length === quiz.answers.length
+      && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
+    renderQuiz(mode, true);
+  };
   app.querySelectorAll(".dotbtn").forEach((b) => (b.onclick = () => {
     if (quiz.busy) return;
     quiz.busy = true;
@@ -429,7 +450,8 @@ function renderQuiz(mode, anim = false) {
     b.classList.add("sel");
     b.setAttribute("aria-label", `${b.querySelector("span").textContent}（選択中）`);
     navigator.vibrate?.(8);
-    store.set("progress." + mode, { answers: quiz.answers.slice(0, i + 1).concat(quiz.answers.slice(i + 1)), t: Date.now(), source: quiz.source });
+    const progress = { answers: quiz.answers.slice(), t: Date.now(), source: quiz.source };
+    if (store.set("progress." + mode, progress)) rememberQuizCursor(mode, progress, Math.min(i + 1, qs.length - 1));
     later(120, () => { if (quiz === activeQuiz && quiz.i === i && location.hash === `#/q/${mode}`) $(".qbox")?.classList.add("out"); });
     later(300, () => {
       if (quiz !== activeQuiz || quiz.i !== i || location.hash !== `#/q/${mode}`) return;
@@ -470,6 +492,7 @@ function renderCheckpoint(mode, n) {
 function finishQuiz(mode) {
   const code = makeCode(quiz.answers);
   store.del("progress." + mode);
+  try { sessionStorage.removeItem(quizCursorKey(mode)); } catch {}
   justFinished = { mode, code, source: quiz.source };
   quiz = null;
   location.hash = `#/r/${mode}/${code}`;
@@ -533,8 +556,8 @@ function duelRow(sd, mu, ou, meId, otherId, { label, otherWho, otherFace }) {
 }
 
 function stars(tier) {
-  return `<span class="stars" aria-label="濃さ ${tier + 1}">${[0, 1, 2, 3, 4].map((k) =>
-    k <= tier ? '<span class="on">★</span>' : k <= MAX_TIER ? '<span class="off">★</span>' : '<span class="lock">🔒</span>').join("")}</span>`;
+  return `<span class="stars" role="img" aria-label="濃さ ${tier + 1}">${[0, 1, 2, 3, 4].map((k) =>
+    k <= tier ? '<span class="on" aria-hidden="true">★</span>' : k <= MAX_TIER ? '<span class="off" aria-hidden="true">★</span>' : '<span class="lock" aria-hidden="true">🔒</span>').join("")}</span>`;
 }
 
 function resultCard(r, mode, who, reveal) {
