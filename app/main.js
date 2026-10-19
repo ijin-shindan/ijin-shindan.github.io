@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=08cf29b-202610190033";
-import { mountMotion } from "./motion.js?v=08cf29b-202610190033";
-import { mountGuide } from "./guide.js?v=08cf29b-202610190033";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=08cf29b-202610190033";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=08cf29b-202610190033";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=08cf29b-202610190033";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=08cf29b-202610190033";
-import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=08cf29b-202610190033";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=08cf29b-202610190033";
-import { storedResultMatches, storedList } from "./stored_result.js?v=08cf29b-202610190033";
-import { clearPrefixedStorage } from "./storage_clear.js?v=08cf29b-202610190033";
+import { AXES, Shindan, loadData } from "./shindan.js?v=2160f99-202610191236";
+import { mountMotion } from "./motion.js?v=2160f99-202610191236";
+import { mountGuide } from "./guide.js?v=2160f99-202610191236";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=2160f99-202610191236";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=2160f99-202610191236";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=2160f99-202610191236";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=2160f99-202610191236";
+import { prependPersonCard, ensurePersonCardIds, distinctCardFigures, figureSetProgress } from "./people.js?v=2160f99-202610191236";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=2160f99-202610191236";
+import { storedResultMatches, storedList } from "./stored_result.js?v=2160f99-202610191236";
+import { clearPrefixedStorage } from "./storage_clear.js?v=2160f99-202610191236";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=08cf29b-202610190033")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2160f99-202610191236")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -166,6 +166,16 @@ const rawPersonAt = (displayIndex) => {
   const index = all.findIndex((card) => usablePersonCard(card) && ++shown === displayIndex);
   return { all, index };
 };
+const personDeleteConfirmMessage = (card, displayIndex, verifiedFigureName = "") => {
+  // 旧版や手動編集された保存データも、確認ダイアログでは短い一行に収める。
+  const label = typeof card.label === "string"
+    ? [...card.label.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, " ").trim()].slice(0, 20).join("")
+    : "";
+  const name = label || `友達カード ${displayIndex + 1}`;
+  const mode = card.mode === "love" ? "恋愛版" : "性格版";
+  const result = verifiedFigureName || "結果を確認できないカード";
+  return `「${name}」（${displayIndex + 1}枚目・${result}・${mode}）をこの端末から削除しますか？`;
+};
 // 同じ回答コードでも別の人であり得る。カードの識別子は回答と分ける。
 function addPersonCard(mode, code, figureId) {
   peopleCards(); // 旧カードのIDを補い、元データを残してから追加する。
@@ -215,13 +225,27 @@ const undiscTag = (id) => (isDiscovered(id) ? "" : `<span class="undisc">🔒 �
 
 // ---------------- トップ ----------------
 let firstTop = true;
+function topQuizCtas() {
+  const progress = Object.fromEntries(["normal", "love"].map((mode) => {
+    const saved = store.get("progress." + mode);
+    return [mode, validProgress(saved) && Date.now() - saved.t < 864e5 && saved.answers.length > 0 ? saved : null];
+  }));
+  const resumable = ["normal", "love"].filter((mode) => progress[mode]);
+  const primary = resumable[0] ?? "normal";
+  const resumeLinks = resumable.map((mode) => `<a class="btn ${mode === primary ? "start" : "sub"}" data-src="resume" href="#/q/${mode}">${mode === "love" ? "恋愛診断" : "性格診断"}の続きから（${progress[mode].answers.length} / 12）</a>`).join("");
+  const freshLinks = ["normal", "love"].map((mode) => {
+    const label = mode === "love" ? "恋愛診断" : "性格診断";
+    const text = `${mode === "love" && !progress[mode] ? "💘 " : ""}${label}を${progress[mode] ? "最初から" : ""}始める`;
+    const cls = mode === primary && !progress[mode] ? "start" : mode === "love" ? "love-sub" : "sub";
+    return `<a class="btn ${cls}" data-fresh="${mode}" data-src="top" href="#/q/${mode}">${text}</a>`;
+  }).join("");
+  return resumeLinks + freshLinks;
+}
 function renderTop() {
   document.title = "世界の偉人性格診断";
   const staticParade = firstTop ? $(".parade")?.innerHTML : null;
   firstTop = false;
   const me = { normal: savedResult("normal"), love: savedResult("love") };
-  const prog = ["normal", "love"].map((m) => [m, store.get("progress." + m)])
-    .find(([, p]) => validProgress(p) && Date.now() - p.t < 864e5 && p.answers.length > 0);
   const types = pick(SD.types.filter((t) => t.unit), 4);
   const parade = types.map((t) => pick(t.figures.slice(0, MAX_TIER + 1), 1)[0].id);
   parade.splice(2, 0, pick(FREE, 1)[0].id);
@@ -249,9 +273,7 @@ function renderTop() {
       <p class="sub">12問・約1分半・登録なし</p>
     </section>
     <div class="cta">
-      ${prog ? `<a class="btn start" data-src="resume" href="#/q/${prog[0]}">${prog[0] === "love" ? "恋愛診断の" : "性格診断の"}続きから（${prog[1].answers.length} / 12）</a>` : ""}
-      <a class="btn ${prog ? "sub" : "start"}" data-fresh="normal" data-src="top" href="#/q/normal">${prog ? "性格診断を最初から始める" : "診断スタート"}</a>
-      <a class="btn love-sub" data-fresh="love" data-src="top" href="#/q/love">💘 恋愛バージョンもある</a>
+      ${topQuizCtas()}
     </div>
     <section class="social-entry">
       <div class="social-badge">友達と遊ぶ</div>
@@ -582,7 +604,7 @@ function renderResult(mode, code) {
   let friendHtml = "";
   if (validFriend && friend.code !== code) {
     const fu = sd.score(answersOf(sd, friend.code));
-    friendHtml = duelRow(sd, r.u, fu, f.id, friend.fig, { label: "開いた共有リンク", otherWho: "リンクの結果" });
+    friendHtml = duelRow(sd, r.u, fu, f.id, friend.fig, { label: "以前に開いた共有リンク", otherWho: "リンクの結果" });
   }
   const h = r.levelup;
   let levelHtml;
@@ -608,7 +630,7 @@ function renderResult(mode, code) {
     : `<span class="tag good">高め：${esc(pole(hi, 1))}</span><span class="tag weak">低め：${esc(axisById[lo].name)}</span>`;
   const returnSharedHtml = validFriend ? `<div class="recent-shared-return ${reveal ? "reveal-hide" : ""}">
       <a class="btn sub" href="${esc(sharedResultViewPath(mode, friend.code))}">共有リンクの結果を見る：${esc(fig(friend.fig).name)}</a>
-      <p class="social-note">このブラウザーで開いた共有結果です。自分のリンクも含み、送り主は確認できません。友達のカードはリンク先で手動で追加できます。</p></div>` : "";
+      <p class="social-note">以前にこのブラウザーで開いた共有結果です。自分のリンクも含み、送り主は確認できません。友達のカードはリンク先で手動で追加できます。</p></div>` : "";
   const otherHtml = other && validCode(engines[OTHER[mode]], other.code) ? (() => {
     const [n, l] = mode === "normal" ? [f.id, other.fig] : [other.fig, f.id];
     return `<section class="card"><h2>${n === l ? "ふだんも恋も同じ偉人" : "表の顔 × 恋の顔"}</h2>
@@ -623,7 +645,7 @@ function renderResult(mode, code) {
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
     ${freshSource === "friend" ? returnSharedHtml : ""}
-    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "送る相手を選んでください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="friend">${freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る"}</button>
       <a class="btn sub" data-share="line" target="_blank" rel="noopener">LINEで送る</a>
@@ -780,13 +802,48 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     location.hash = "#/people";
     toast("人物カードに保存しました");
   });
-  if (past) $("[data-restore-self]").onclick = () => {
-    if (!confirm(`以前の自己診断結果（${f.name}）を、現在の自分の結果に戻しますか？`)) return;
-    if (mine && mine.code !== code) store.set("me.prev." + mode, mine);
-    store.set("me." + mode, { code, fig: f.id, at: Date.now() });
-    route();
-    focusPageHeading();
-  };
+  if (past) {
+    const currentKey = "me." + mode, previousKey = "me.prev." + mode;
+    const currentAtDisplay = store.get(currentKey), previousAtDisplay = store.get(previousKey);
+    const unchanged = () => JSON.stringify(store.get(currentKey)) === JSON.stringify(currentAtDisplay)
+      && JSON.stringify(store.get(previousKey)) === JSON.stringify(previousAtDisplay)
+      && JSON.stringify(savedResult(mode)) === JSON.stringify(mine)
+      && JSON.stringify(previousAtDisplay) === JSON.stringify(prevE);
+    const refreshChanged = () => {
+      route();
+      focusPageHeading();
+      toast("別タブで自己診断結果が変わりました。更新して選び直してください");
+    };
+    const restoreButton = $("[data-restore-self]");
+    restoreButton.onclick = () => {
+      if (!unchanged()) return refreshChanged();
+      if (!confirm(`以前の自己診断結果（${f.name}）を、現在の自分の結果に戻しますか？`)) return;
+      if (!unchanged()) return refreshChanged();
+      const replacePrevious = mine && mine.code !== code;
+      if (replacePrevious && !store.set(previousKey, mine)) return toast("前の結果を保存できず、戻せませんでした");
+      if (!store.set(currentKey, { code, fig: f.id, at: Date.now() })) {
+        let previousRestored = true;
+        if (replacePrevious) {
+          if (previousAtDisplay === null) store.del(previousKey);
+          else store.set(previousKey, previousAtDisplay);
+          previousRestored = JSON.stringify(store.get(previousKey)) === JSON.stringify(previousAtDisplay);
+        }
+        if (!previousRestored) {
+          const warning = document.createElement("p");
+          warning.className = "clear-status";
+          warning.setAttribute("role", "alert");
+          warning.tabIndex = -1;
+          warning.textContent = "現在の結果を保存できず、前の結果の記録も元に戻せませんでした。ページを閉じる前に、このページ（以前の結果）のURLを控え、この端末の記録を確認してください。";
+          restoreButton.insertAdjacentElement("afterend", warning);
+          warning.focus();
+          return;
+        }
+        return toast("現在の結果を保存できませんでした。端末の記録を確認してください");
+      }
+      route();
+      focusPageHeading();
+    };
+  }
   $(".stage").dataset.state = "done";
   attachMotion(f.name);
   window.scrollTo(0, 0);
@@ -1395,8 +1452,8 @@ function renderPeople() {
         ? `<div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small>`
         : '<small>保存データの回答とキャラが一致しません。このカードの結果は開けません。</small>'}</div>
       ${verified ? `<a href="#/person/${encodeURIComponent(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目の結果を見る">見る</a>` : '<span class="person-unavailable">確認不可</span>'}
-      <button type="button" data-label-person="${i}" aria-label="${esc(actionName)}・${i + 1}枚目の呼び名を変更">呼び名</button>
-      <button type="button" data-remove-person="${i}" aria-label="${esc(actionName)}・${i + 1}枚目を削除">削除</button>
+      <button type="button" data-label-person="${i}" data-person-id="${esc(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目の呼び名を変更">呼び名</button>
+      <button type="button" data-remove-person="${i}" data-person-id="${esc(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目を削除">削除</button>
     </section>`; }).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
     <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
     ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">友達から見た自分を聞く機能は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
@@ -1408,17 +1465,41 @@ function renderPeople() {
     $(`[data-copy-self="${mode}"]`)?.addEventListener("click", () => copyLink(url, `${label}の結果リンクをコピーしました`));
   });
   app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = () => {
+    const refreshChanged = () => {
+      renderPeople();
+      toast("別タブでカードが変わりました。更新して選び直してください");
+    };
     const i = Number(b.dataset.removePerson), { all, index } = rawPersonAt(i);
-    if (index < 0) return;
-    if (!confirm(`友達カード ${i + 1}をこの端末から削除しますか？`)) return;
-    all.splice(index, 1);
-    if (!store.set("people.cards", all)) return toast("この端末からカードを削除できませんでした");
+    const current = all[index], displayedId = b.dataset.personId;
+    if (!validInviteToken(displayedId) || !validInviteToken(current?.id)
+      || displayedId !== current.id
+      || all.filter((card) => card && card.id === displayedId).length !== 1) {
+      return refreshChanged();
+    }
+    const beforeConfirm = JSON.stringify(all);
+    if (!confirm(personDeleteConfirmMessage(current, i, isVerifiedCard(current) ? fig(current.fig).name : ""))) return;
+    const latest = store.get("people.cards", []);
+    if (!Array.isArray(latest) || JSON.stringify(latest) !== beforeConfirm) return refreshChanged();
+    latest.splice(index, 1);
+    if (!store.set("people.cards", latest)) return toast("この端末からカードを削除できませんでした");
     renderPeople();
     focusPageHeading();
   });
   app.querySelectorAll("[data-label-person]").forEach((b) => b.onclick = () => {
-    const i = Number(b.dataset.labelPerson), { all, index } = rawPersonAt(i), current = all[index];
-    if (!current) return;
+    const refreshChanged = () => {
+      closeSheet(false);
+      renderPeople();
+      focusPageHeading();
+      toast("別タブでカードが変わりました。更新して選び直してください");
+    };
+    const i = Number(b.dataset.labelPerson), { all, index } = rawPersonAt(i);
+    const current = all[index], displayedId = b.dataset.personId;
+    if (!validInviteToken(displayedId) || !validInviteToken(current?.id)
+      || displayedId !== current.id
+      || all.filter((card) => card && card.id === displayedId).length !== 1) {
+      return refreshChanged();
+    }
+    const beforeEdit = JSON.stringify(all);
     openSheet(`<div class="panel"><h2 id="sheet-title">カードの呼び名</h2>
       <p>自分だけに分かる短い呼び名を付けられます。本名や連絡先は入れないでください。この端末にだけ保存され、結果リンクには入りません。</p>
       <label for="person-label">呼び名（20文字以内）</label>
@@ -1427,8 +1508,10 @@ function renderPeople() {
       <button class="btn sub close" type="button">閉じる</button></div>`, b);
     $("[data-save-person-label]", sheet).onclick = () => {
       const label = $("#person-label", sheet).value.trim().replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 20);
-      all[index] = { ...current, label };
-      if (!store.set("people.cards", all)) return toast("呼び名を保存できませんでした");
+      const latest = store.get("people.cards", []);
+      if (!Array.isArray(latest) || JSON.stringify(latest) !== beforeEdit) return refreshChanged();
+      latest[index] = { ...latest[index], label };
+      if (!store.set("people.cards", latest)) return toast("呼び名を保存できませんでした");
       closeSheet(false);
       renderPeople();
       app.querySelector(`[data-label-person="${i}"]`)?.focus();
