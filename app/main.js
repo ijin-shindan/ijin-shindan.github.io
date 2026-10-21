@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=d225a48-202610212211";
-import { mountMotion } from "./motion.js?v=d225a48-202610212211";
-import { mountGuide } from "./guide.js?v=d225a48-202610212211";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=d225a48-202610212211";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d225a48-202610212211";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=d225a48-202610212211";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=d225a48-202610212211";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=d225a48-202610212211";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d225a48-202610212211";
-import { storedResultMatches, storedList } from "./stored_result.js?v=d225a48-202610212211";
-import { clearPrefixedStorage } from "./storage_clear.js?v=d225a48-202610212211";
+import { AXES, Shindan, loadData } from "./shindan.js?v=f5a15fb-202610212222";
+import { mountMotion } from "./motion.js?v=f5a15fb-202610212222";
+import { mountGuide } from "./guide.js?v=f5a15fb-202610212222";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=f5a15fb-202610212222";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f5a15fb-202610212222";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f5a15fb-202610212222";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f5a15fb-202610212222";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f5a15fb-202610212222";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f5a15fb-202610212222";
+import { storedResultMatches, storedList } from "./stored_result.js?v=f5a15fb-202610212222";
+import { clearPrefixedStorage } from "./storage_clear.js?v=f5a15fb-202610212222";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=d225a48-202610212211")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f5a15fb-202610212222")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -609,12 +609,12 @@ function renderCheckpoint(mode, n) {
     body = `<h2>まだ候補を絞れません</h2><p class="note">ここまでの回答では系統に差がついていません。残りの質問も、いちばん近い答えを選んでね。</p>`;
   } else if (n === 4) {
     const hot = new Set(ranked.slice(0, 5).map((t) => t.id));
-    body = `<h2>いまの回答から、候補が見えてきました</h2>
+    body = `<h2>4問答えた！いまの答えに近い系統</h2><p class="note">光る印は途中のヒント。12問ぜんぶ答えたら、偉人が決まります。</p>
       <div class="emblems" aria-hidden="true">${sd.types.filter((t) => t.unit).map((t) =>
         `<span class="emb ${hot.has(t.id) ? "hot" : ""}" style="background:${THEMES[t.id].accent}">${esc(t.name[0])}</span>`).join("")}</div>`;
   } else {
     const three = ranked.slice(0, 3);
-    body = `<h2>いま有力な3つの系統</h2><p class="note">残りの回答で候補は変わることがあります。</p>
+    body = `<h2>8問答えた！いまの答えに近い3系統</h2><p class="note">まだ途中です。残り4問で変わることがあります。絵は系統の目印で、偉人は最後に決まります。</p>
       <div class="sils">${three.map((t) => `<div><img class="tile" src="${avatar(t.figures[0].id, true)}" alt="" style="${themeVars(t.id)}">
         <div class="note" style="margin-top:4px">${esc(typeLabel(t, mode).name)}</div></div>`).join("")}</div>`;
   }
