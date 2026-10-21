@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=f8024e7-202610192302";
-import { mountMotion } from "./motion.js?v=f8024e7-202610192302";
-import { mountGuide } from "./guide.js?v=f8024e7-202610192302";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=f8024e7-202610192302";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f8024e7-202610192302";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f8024e7-202610192302";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f8024e7-202610192302";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f8024e7-202610192302";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f8024e7-202610192302";
-import { storedResultMatches, storedList } from "./stored_result.js?v=f8024e7-202610192302";
-import { clearPrefixedStorage } from "./storage_clear.js?v=f8024e7-202610192302";
+import { AXES, Shindan, loadData } from "./shindan.js?v=f198618-202610211955";
+import { mountMotion } from "./motion.js?v=f198618-202610211955";
+import { mountGuide } from "./guide.js?v=f198618-202610211955";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=f198618-202610211955";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f198618-202610211955";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f198618-202610211955";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f198618-202610211955";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f198618-202610211955";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f198618-202610211955";
+import { storedResultMatches, storedList } from "./stored_result.js?v=f198618-202610211955";
+import { clearPrefixedStorage } from "./storage_clear.js?v=f198618-202610211955";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f8024e7-202610192302")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f198618-202610211955")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -256,9 +256,49 @@ separateLegacyLinkedResults(store, engines, validCode, (id) => !!SD.figures[id])
 // 図鑑：{figureId: {src: "me|friend_diag|match|next|friend", sources: string[], at}}
 // src は「今のところいちばん強い発見経路」（後方互換のため残す）。sources は出会った経路を全部ためる配列（新設）
 const DISCOVER_SRC = new Set(["me", "friend_diag"]); // この2つだけが正式な図鑑「発見」（旧データの src:"me" もそのまま discovered 扱い）
+function readZukanStorage() {
+  let raw;
+  try { raw = localStorage.getItem("ijin.zukan"); }
+  catch { return { status: "unavailable", zukan: {} }; }
+  if (raw === null) return { status: "ok", raw, zukan: {} };
+  let zukan;
+  try { zukan = JSON.parse(raw); }
+  catch { return { status: "damaged", raw, zukan: {} }; }
+  if (!zukan || typeof zukan !== "object" || Array.isArray(zukan)
+    || Object.values(zukan).some((e) => !e || typeof e !== "object" || Array.isArray(e)
+      || typeof e.src !== "string" || (e.sources !== undefined
+        && (!Array.isArray(e.sources) || e.sources.some((s) => typeof s !== "string"))))) {
+    return { status: "damaged", raw, zukan: {} };
+  }
+  return { status: "ok", raw, zukan };
+}
+const zukanData = () => readZukanStorage().zukan;
+const zukanStorageAlert = () => {
+  const status = readZukanStorage().status;
+  if (status === "ok") return "";
+  const message = status === "damaged"
+    ? "保存済みの図鑑記録を読み込めません。画面の発見数は正確ではありません。元の記録は変更せず、新しい図鑑登録を止めています。図鑑画面で元の記録のファイル保存を試せます。"
+    : "この端末では図鑑記録を読み込めません。画面の発見数は正確ではありません。図鑑の登録を止めています。";
+  return `<p class="note" role="alert">${message}</p>`;
+};
+function exportDamagedZukanRaw(raw) {
+  const url = URL.createObjectURL(new Blob([raw], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  try {
+    link.href = url;
+    link.download = "ijin-zukan-original.txt";
+    document.body.append(link);
+    link.click();
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+}
 function meet(id, src) {
   if (!id || !isFree(id)) return;
-  const z = store.get("zukan", {});
+  const snapshot = readZukanStorage();
+  if (snapshot.status !== "ok") return;
+  const z = snapshot.zukan;
   const cur = z[id];
   const prevSources = cur?.sources ?? (cur ? [cur.src] : []);
   const sources = prevSources.includes(src) ? prevSources : [...prevSources, src];
@@ -269,19 +309,21 @@ function meet(id, src) {
   } else {
     z[id] = { ...cur, sources };
   }
+  // 読込後からこの照合時点までの別タブ更新を検出したら、古い内容を書かない。
+  try { if (localStorage.getItem("ijin.zukan") !== snapshot.raw) return; } catch { return; }
   store.set("zukan", z);
 }
 // 図鑑の状態（保存形式は変えない。src の意味で3段階に読み分ける）
 //   DISCOVERED：自分の正式な診断結果（通常・恋愛）src "me"、または友達診断で登録 src "friend_diag"。全身画像・説明・動きを見せる
 //   KNOWN     ：相性・もしも・共有結果などで名前だけ知った ＝ src "match" | "next" | "friend"。名前＋シルエット＋🔒未発見
 //   UNKNOWN   ：まだ記録がない。？？？＋シルエット
-const zState = (id) => { const e = store.get("zukan", {})[id]; return !e ? "unknown" : DISCOVER_SRC.has(e.src) ? "discovered" : "known"; };
+const zState = (id) => { const e = zukanData()[id]; return !e ? "unknown" : DISCOVER_SRC.has(e.src) ? "discovered" : "known"; };
 const isDiscovered = (id) => zState(id) === "discovered";
-const zukanCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
-const knownCount = () => Object.entries(store.get("zukan", {})).filter(([id, e]) => !DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
+const zukanCount = () => Object.entries(zukanData()).filter(([id, e]) => DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
+const knownCount = () => Object.entries(zukanData()).filter(([id, e]) => !DISCOVER_SRC.has(e.src) && SD.figures[id] && isFree(id)).length;
 // 図鑑の「取得元」を日本語表示用に（discoveredな経路だけ）
 const SRC_LABEL = { me: "自分の診断", friend_diag: "旧版の友達診断" };
-const sourceLabels = (id) => { const e = store.get("zukan", {})[id]; return [...new Set(e?.sources ?? (e ? [e.src] : []))].map((s) => SRC_LABEL[s]).filter(Boolean); };
+const sourceLabels = (id) => { const e = zukanData()[id]; return [...new Set(e?.sources ?? (e ? [e.src] : []))].map((s) => SRC_LABEL[s]).filter(Boolean); };
 // 関連表示（相性・もしも・友達）の顔：発見済みだけ通常の絵、それ以外はシルエット＋「🔒 未発見」
 const relFace = (id) => avatar(id, !isDiscovered(id));
 const undiscTag = (id) => (isDiscovered(id) ? "" : `<span class="undisc">🔒 未発見</span>`);
@@ -313,7 +355,7 @@ function renderTop() {
   const parade = types.map((t) => pick(t.figures.slice(0, MAX_TIER + 1), 1)[0].id);
   parade.splice(2, 0, pick(FREE, 1)[0].id);
   // 5人目は「まだ見ぬ誰か」のシルエット（鍵つきがいなければ、無料のうち出会っていない人から）
-  const unseen = FREE.filter((f) => !parade.includes(f.id) && !store.get("zukan", {})[f.id]);
+  const unseen = FREE.filter((f) => !parade.includes(f.id) && !zukanData()[f.id]);
   const lockedOne = pick(LOCKED.length ? LOCKED : unseen.length ? unseen : FREE, 1)[0].id;
   const faces = parade.slice(0, 4).map((id, i) =>
     `<img class="face f${i}" src="${avatar(id)}" alt="" style="--t-bg:${THEMES[fig(id).type].bg}">`).join("")
@@ -335,6 +377,7 @@ function renderTop() {
       <h1>${FREE.length}人の偉人のうち、<br>あなたは誰？</h1>
       <p class="sub">12問・約1分半・登録なし</p>
     </section>
+    ${zukanStorageAlert()}
     <div class="cta">
       ${topQuizCtas()}
     </div>
@@ -726,7 +769,7 @@ function renderResult(mode, code) {
       <button class="btn sub" data-share="copy">リンクをコピー</button>
     </div>
     <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${freshSource === "friend" ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}</p>
-    ${!localSaveOk ? '<p class="note" role="alert">このブラウザには結果を保存できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
+    ${!localSaveOk ? '<p class="note" role="alert">このブラウザでは結果または図鑑の登録を確認できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
     ${freshSource !== "friend" ? returnSharedHtml : ""}
     ${(() => { const prev = store.get("me.prev." + mode); return verifiedResult(mode, prev) && prev.code !== code
       ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
@@ -753,7 +796,7 @@ function renderResult(mode, code) {
       <p>自分の共有リンクを開いた場合もこの画面になります。実際に別の人から届いた結果のときだけ、人物カードへ追加してください。返事を送りたい場合は自分の結果リンクをコピーできます。</p>
       <button class="btn sub" data-add-same-person>友達の人物カードに追加</button>
       <button class="btn sub" data-share="copy">自分の結果リンクを返す</button></details>
-    <section class="card"><h2>図鑑</h2>
+    <section class="card"><h2>図鑑</h2>${zukanStorageAlert()}
       <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人を発見</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
       <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a>
       </section>
@@ -1063,11 +1106,14 @@ async function shareImage(r, mode, trigger = null) {
 // ---------------- 図鑑 ----------------
 function renderZukan() {
   document.title = "図鑑｜世界の偉人性格診断";
-  const z = store.get("zukan", {});
+  const snapshot = readZukanStorage();
+  const z = snapshot.zukan;
   app.style.cssText = "";
   const zPct = Math.round((zukanCount() / Math.max(1, FREE.length)) * 100);
   app.innerHTML = `
     <div class="zhead"><h1>偉人図鑑</h1><span class="cnt">発見 <b>${zukanCount()}</b> / ${FREE.length}${LOCKED.length ? `（＋鍵つき ${LOCKED.length}）` : ""}</span></div>
+    ${zukanStorageAlert()}
+    ${snapshot.status === "damaged" ? '<p class="note">元の記録に診断結果が含まれる場合があります。ファイルは人に送らず保管してください。保存してもサイト内の記録は変わりません。押した後、ファイルが保存されたか確認してください。</p><button class="btn sub" data-export-zukan>元の図鑑記録をファイルに保存</button>' : ""}
     <div class="progress-line" style="margin:0 0 10px"><div class="bar"><i style="width:${zPct}%"></i></div></div>
     <p class="note" style="text-align:left">全100人を無料で発見できます。🔒は課金ではなく、自分の診断ではまだ出会っていない印です。自分の診断（通常・恋愛）で出た偉人が「発見」としてこの端末に登録されます。相性や共有リンクで名前を見かけただけの偉人は未発見のまま（${knownCount()}人）。</p>
     ${SD.types.map((t) => `<div class="zrow"><h2><i style="background:${THEMES[t.id].accent}"></i>${esc(t.name)}</h2>
@@ -1078,6 +1124,12 @@ function renderZukan() {
           <span class="star">★${k + 1}</span>${st === "known" ? `<span class="znm">${esc(f.name)}</span>` : ""}${st === "locked" || st === "known" ? '<span class="lock">🔒</span>' : ""}</button>`;
       }).join("")}</div></div>`).join("")}
     <div style="display:grid;gap:10px"><a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a></div>`;
+  app.querySelector("[data-export-zukan]")?.addEventListener("click", () => {
+    const latest = readZukanStorage();
+    if (latest.status !== "damaged" || latest.raw !== snapshot.raw) return toast("図鑑記録が変わりました。画面を開き直して確認してください");
+    try { exportDamagedZukanRaw(snapshot.raw); }
+    catch { toast("元の図鑑記録を保存できませんでした"); }
+  });
   app.querySelectorAll(".zcell").forEach((b) => (b.onclick = () => {
     const { id, st } = b.dataset;
     if (st === "locked") return toast("この人物は現在の図鑑では表示できません");
@@ -1107,6 +1159,7 @@ function zukanSummaryCard() {
   const n = zukanCount(), total = FREE.length, pct = Math.round((n / Math.max(1, total)) * 100);
   return `<section class="card zukan-summary">
       <h2 style="margin:0 0 10px">偉人図鑑</h2>
+      ${zukanStorageAlert()}
       <div class="zukan-big"><b>${n}</b><span>/ ${total}</span></div>
       <div class="progress-line" style="margin:10px 0 4px"><div class="bar"><i style="width:${pct}%"></i></div></div>
       <p class="note" style="text-align:left;margin:8px 0 14px">名前だけ知っている偉人　🔒 ${knownCount()}人</p>
@@ -1521,7 +1574,7 @@ function renderPeople() {
   const varietyMessage = varietyCount === 0
     ? "届いた結果をカードに追加すると、キャラがここに並びます。"
     : varietyCount === 1 ? "次はどんなキャラが来る？"
-      : varietyCount === 2 ? "あと1種類で3キャラ集合！" : "3種類のキャラが並びました。もっと増やしてみよう。";
+      : varietyCount === 2 ? "あと1種類のキャラで3キャラ集合！" : "3種類のキャラが並びました。もっと増やしてみよう。";
   const varietySlots = Array.from({ length: 3 }, (_, i) => {
     const id = figureIds[i];
     return id ? `<div class="variety-slot"><img src="${avatar(id)}" alt=""><span>${esc(fig(id).name)}</span></div>`
@@ -1543,6 +1596,7 @@ function renderPeople() {
     <section class="social-entry variety-entry" aria-labelledby="variety-title"><div class="social-badge">${varietyCount < 3 ? `${varietyCount}/3種類` : `${varietyCount}種類`}</div>
       <h2 id="variety-title">キャラの顔ぶれ</h2><p>${varietyMessage}</p>
       <div class="variety-slots">${varietySlots}</div>
+      ${varietyCount >= 3 ? '<div class="variety-award"><span class="variety-award-icon" aria-hidden="true"><i></i><i></i><i></i></span><strong>3キャラ集合！</strong><span>この端末で3種類のキャラがそろったよ</span></div>' : ""}
       ${varietyCount > 3 ? `<p class="variety-extra">ほか${varietyCount - 3}種類のキャラも下のカード一覧にいます。</p>` : ""}
       ${verifiedCards.length < cards.length ? '<p class="variety-extra">結果を確認できないカードは、キャラの種類に数えていません。</p>' : ""}
       ${heroes.found.length ? `<div class="theme-set"><strong>三英傑のキャラ <span>${heroes.found.length}/3</span></strong>

@@ -527,6 +527,15 @@ details p { font-size: 14px; margin: 8px 0; }
 .variety-slot span { color: var(--ink); font-size: 13px; font-weight: 900; line-height: 1.25; overflow-wrap: anywhere; }
 .variety-slot.empty { border-style: dashed; background: var(--card); }
 .variety-slot.empty span { color: var(--ink-soft); font-size: 32px; }
+.variety-award { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; width: fit-content;
+  max-width: 100%; margin-top: 12px; padding: 8px 10px; border: 2px solid var(--world-edge);
+  border-radius: var(--r-tile); background: var(--hero-mint); box-shadow: 3px 3px 0 var(--world-shadow);
+  color: var(--ink); font-size: 13px; line-height: 1.4; }
+.variety-award strong { font-size: 14px; }
+.variety-award-icon { display: flex; gap: 2px; align-items: end; flex: none; }
+.variety-award-icon i { display: block; width: 9px; height: 9px; border: 1px solid var(--world-edge); background: var(--hero-pink); }
+.variety-award-icon i:nth-child(2) { height: 13px; background: var(--scene-sun); }
+.variety-award-icon i:nth-child(3) { background: var(--scene-hill); }
 .variety-entry .variety-extra { color: var(--ink-soft); font-size: 13px; }
 .variety-entry .variety-note { color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .theme-set { display: grid; gap: 6px; padding: 10px 12px; border: 2px solid var(--line);
