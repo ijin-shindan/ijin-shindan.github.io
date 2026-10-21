@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=4cd4c65-202610212134";
-import { mountMotion } from "./motion.js?v=4cd4c65-202610212134";
-import { mountGuide } from "./guide.js?v=4cd4c65-202610212134";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=4cd4c65-202610212134";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=4cd4c65-202610212134";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=4cd4c65-202610212134";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=4cd4c65-202610212134";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=4cd4c65-202610212134";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=4cd4c65-202610212134";
-import { storedResultMatches, storedList } from "./stored_result.js?v=4cd4c65-202610212134";
-import { clearPrefixedStorage } from "./storage_clear.js?v=4cd4c65-202610212134";
+import { AXES, Shindan, loadData } from "./shindan.js?v=7c2526d-202610212153";
+import { mountMotion } from "./motion.js?v=7c2526d-202610212153";
+import { mountGuide } from "./guide.js?v=7c2526d-202610212153";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=7c2526d-202610212153";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7c2526d-202610212153";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7c2526d-202610212153";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7c2526d-202610212153";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=7c2526d-202610212153";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7c2526d-202610212153";
+import { storedResultMatches, storedList } from "./stored_result.js?v=7c2526d-202610212153";
+import { clearPrefixedStorage } from "./storage_clear.js?v=7c2526d-202610212153";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=4cd4c65-202610212134")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7c2526d-202610212153")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -131,6 +131,90 @@ const answersOf = (sd, code) => { const d = digits(code); return Object.fromEntr
 const validCode = (sd, code) => { const d = digits(code); return !!d && d.length === ordered(sd).length; };
 const validProgress = (p) => p && Number.isFinite(p.t) && Array.isArray(p.answers) && p.answers.length <= 12
   && p.answers.every((v) => Number.isInteger(v) && v >= 1 && v <= 5);
+const quizProgressKey = (mode) => `ijin.progress.${mode}`;
+function readQuizProgress(mode) {
+  let raw;
+  try { raw = localStorage.getItem(quizProgressKey(mode)); }
+  catch { return { status: "unavailable" }; }
+  if (raw === null) return { status: "ok", raw, progress: null };
+  try {
+    const progress = JSON.parse(raw);
+    return validProgress(progress) ? { status: "ok", raw, progress } : { status: "invalid", raw };
+  } catch { return { status: "invalid", raw }; }
+}
+// 生の保存値を比較する。別タブの同時 read/write は原子的には防げない。
+function quizProgressFreshness(mode, expectedRaw) {
+  const current = readQuizProgress(mode);
+  if (current.status === "unavailable") return "unavailable";
+  // 読み取り不能から復旧し、空の保存先を確認できた場合だけメモリ内の続行を許す。
+  return current.status === "ok" && (current.raw === expectedRaw || (expectedRaw === undefined && current.raw === null)) ? "ok" : "changed";
+}
+function saveQuizProgress(mode, activeQuiz, progress) {
+  const freshness = quizProgressFreshness(mode, activeQuiz.progressRaw);
+  if (freshness !== "ok") return freshness;
+  const raw = JSON.stringify(progress);
+  try { localStorage.setItem(quizProgressKey(mode), raw); }
+  catch { return "unavailable"; }
+  activeQuiz.progressRaw = raw;
+  return "saved";
+}
+function clearQuizCursor(mode) {
+  try { sessionStorage.removeItem(quizCursorKey(mode)); } catch {}
+}
+function showQuizProgressConflict(mode, invalid = false) {
+  clearTimers();
+  quiz = null;
+  clearQuizCursor(mode);
+  const openLatestQuiz = () => {
+    if (location.hash === `#/q/${mode}`) renderQuiz(mode);
+    else location.hash = `#/q/${mode}`;
+  };
+  const damagedSnapshot = invalid ? readQuizProgress(mode) : null;
+  app.innerHTML = `<section class="card"><h1>${invalid ? "途中の記録を読み込めません" : "別のタブで診断の記録が変わりました"}</h1>
+    <p class="note">${invalid
+      ? "この端末の途中記録は消していません。消して最初から答えることもできます。"
+      : "この画面の古い回答は保存していません。開き直すと、この端末に続きがあれば再開できます。"}</p>
+    ${invalid ? '<button class="btn start" type="button" data-clear-invalid>読めない途中記録を消して最初から答える</button><a class="btn sub" href="#/">トップへ戻る</a>' : '<button class="btn start" type="button" data-reload-quiz>診断を開き直す</button>'}</section>`;
+  window.scrollTo(0, 0);
+  $(".card h1").tabIndex = -1;
+  $(".card h1").focus({ preventScroll: true });
+  if (!invalid) $("[data-reload-quiz]").onclick = openLatestQuiz;
+  else $("[data-clear-invalid]").onclick = () => {
+    const latest = readQuizProgress(mode);
+    if (latest.status !== "invalid" || latest.raw !== damagedSnapshot.raw) return showQuizProgressConflict(mode, latest.status === "invalid");
+    try {
+      localStorage.removeItem(quizProgressKey(mode));
+      if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
+    } catch { return toast("途中の記録を消せませんでした。端末の保存設定を確認してください"); }
+    openLatestQuiz();
+  };
+}
+function bindFreshQuizLinks() {
+  app.querySelectorAll("[data-fresh]").forEach((link) => {
+    const mode = link.dataset.fresh;
+    const snapshot = readQuizProgress(mode);
+    link.addEventListener("click", (event) => {
+      const freshness = quizProgressFreshness(mode, snapshot.raw);
+      if (snapshot.status === "invalid" || freshness === "changed") {
+        event.preventDefault();
+        showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid");
+        return;
+      }
+      if (freshness === "ok") {
+        try {
+          localStorage.removeItem(quizProgressKey(mode));
+          if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
+        } catch {
+          event.preventDefault();
+          toast("途中の記録を消せませんでした。端末の保存設定を確認してください");
+          return;
+        }
+      }
+      clearQuizCursor(mode);
+      quiz = null;
+    });
+  });
+}
 // 見直し位置はタブ内だけに保存し、別タブの回答記録を上書きしない。
 const quizCursorKey = (mode) => `ijin.quiz.cursor.${mode}`;
 function rememberQuizCursor(mode, progress, index) {
@@ -394,7 +478,7 @@ function renderTop() {
     <div class="type-strip" aria-hidden="true">${SD.types.map((t) => `<i style="background:${THEMES[t.id].bg2}"></i>`).join("")}</div>
     <p class="note">${LOCKED.length ? `無料で出会えるのは${FREE.length}人。ほか${LOCKED.length}人はシルエットで待機中。` : `${FREE.length}人すべてに、無料で出会えます。`}<br>逸話には伝承や諸説あるものを含みます。</p>
     <p class="note"><a href="#/how">使い方</a>　・　<a href="#/me">この端末の記録</a>　・　<a href="#/about">このサイトについて</a></p>`;
-  app.querySelectorAll("[data-fresh]").forEach((a) => (a.onclick = () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  bindFreshQuizLinks();
   disposeGuide = mountGuide($("#guide"));
   window.scrollTo(0, 0);
   // 決め台詞は読み切れる間隔で切り替える。動きを抑える設定では静止。
@@ -442,9 +526,11 @@ function rankTypes(sd, u) {
 function renderQuiz(mode, anim = false) {
   const sd = engines[mode];
   if (!quiz || quiz.mode !== mode) {
-    const saved = store.get("progress." + mode);
+    const snapshot = readQuizProgress(mode);
+    if (snapshot.status === "invalid") return showQuizProgressConflict(mode, true);
+    const saved = snapshot.progress;
     const qs = ordered(sd);
-    quiz = { mode, qs, answers: [], i: 0 };
+    quiz = { mode, qs, answers: [], i: 0, progressRaw: snapshot.raw };
     if (validProgress(saved) && Date.now() - saved.t < 864e5) { quiz.answers = saved.answers; quiz.i = resumeQuizIndex(mode, saved, qs.length); }
     const resumed = validProgress(saved) && saved.answers.length > 0 && Date.now() - saved.t < 864e5;
     quiz.source = resumed ? saved.source ?? "resume" : nextSrc ?? "top";
@@ -475,13 +561,14 @@ function renderQuiz(mode, anim = false) {
   $(".qtext").focus({ preventScroll: true });
   if (i > 0) $(".back").onclick = () => {
     clearTimers(); quiz.busy = false; quiz.i--;
-    const saved = store.get("progress." + mode);
+    const saved = readQuizProgress(mode).progress;
     if (validProgress(saved) && saved.answers.length === quiz.answers.length
       && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
     renderQuiz(mode, true);
   };
   app.querySelectorAll(".dotbtn").forEach((b) => (b.onclick = () => {
     if (quiz.busy) return;
+    if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
     quiz.busy = true;
     const activeQuiz = quiz;
     quiz.answers[i] = Number(b.dataset.v);
@@ -494,7 +581,9 @@ function renderQuiz(mode, anim = false) {
     b.setAttribute("aria-label", `${b.querySelector("span").textContent}（選択中）`);
     navigator.vibrate?.(8);
     const progress = { answers: quiz.answers.slice(), t: Date.now(), source: quiz.source };
-    if (store.set("progress." + mode, progress)) rememberQuizCursor(mode, progress, Math.min(i + 1, qs.length - 1));
+    const saveStatus = saveQuizProgress(mode, quiz, progress);
+    if (saveStatus === "changed") return showQuizProgressConflict(mode);
+    if (saveStatus === "saved") rememberQuizCursor(mode, progress, Math.min(i + 1, qs.length - 1));
     later(120, () => { if (quiz === activeQuiz && quiz.i === i && location.hash === `#/q/${mode}`) $(".qbox")?.classList.add("out"); });
     later(300, () => {
       if (quiz !== activeQuiz || quiz.i !== i || location.hash !== `#/q/${mode}`) return;
@@ -537,9 +626,10 @@ function renderCheckpoint(mode, n) {
 }
 
 function finishQuiz(mode) {
+  if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
   const code = makeCode(quiz.answers);
-  store.del("progress." + mode);
-  try { sessionStorage.removeItem(quizCursorKey(mode)); } catch {}
+  try { localStorage.removeItem(quizProgressKey(mode)); } catch {}
+  clearQuizCursor(mode);
   justFinished = { mode, code, source: quiz.source };
   quiz = null;
   location.hash = `#/r/${mode}/${code}`;
@@ -830,7 +920,7 @@ function renderResult(mode, code) {
     if (ch === "copy") { e.preventDefault(); try { await navigator.clipboard.writeText(url); toast("リンクをコピーしました"); } catch { prompt("このリンクをコピーしてください", url); } }
     if (ch === "image") { e.preventDefault(); shareImage(r, mode, b); }
   }));
-  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  bindFreshQuizLinks();
   $("[data-add-same-person]")?.addEventListener("click", () => {
     if (peopleCards().some((card) => card.mode === mode && card.code === code)
       && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
@@ -918,7 +1008,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     <div class="claim">${past
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
       : `<p class="note">${personCard ? "人物カードに保存した結果です。" : prevLink ? "以前リンクから保存した結果です。" : "開いた共有リンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
-  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
+  bindFreshQuizLinks();
   $("[data-return-self]")?.setAttribute("aria-label", "自分の結果リンクを送る。リンクを知る人は12問の答えを読み取れます");
   $("[data-return-self]")?.addEventListener("click", () => shareLink(shareUrl(mode, mine.fig, mine.code), "あなたから届いた結果を見たよ。私の結果も送るね。"));
   $("[data-add-person]")?.addEventListener("click", () => {
@@ -1224,7 +1314,7 @@ function renderMe() {
       </section>
     <a class="btn sub" href="#/how">このサイトの使い方</a>
     <a class="btn sub" href="#/">トップへ</a>`;
-  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  bindFreshQuizLinks();
   window.scrollTo(0, 0);
 }
 
@@ -1248,7 +1338,7 @@ function renderHow() {
     <a class="btn start" data-fresh="normal" data-src="how" href="#/q/normal">診断スタート</a>
     ${OTHER_PILOT ? '<a class="btn sub" style="margin-top:10px" href="#/ask">友達に聞く（試作）</a>' : ""}
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a>`;
-  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + a.dataset.fresh); quiz = null; }));
+  bindFreshQuizLinks();
   window.scrollTo(0, 0);
 }
 
@@ -1706,7 +1796,7 @@ function renderFigure(mode, id) {
     <div style="display:grid;gap:8px;margin:16px 0">
       <a class="btn start" data-fresh="${mode}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a></div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>`;
-  app.querySelectorAll("[data-fresh]").forEach((a) => a.addEventListener("click", () => { store.del("progress." + mode); quiz = null; }));
+  bindFreshQuizLinks();
   attachMotion(f.name);
   window.scrollTo(0, 0);
 }
