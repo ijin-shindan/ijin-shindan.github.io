@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 37b6a16-202610212059
+版番号: 02172ba-202610212115
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 842（この一覧を含む）
 合計サイズ: 29.20 MB
@@ -856,7 +856,7 @@
   data/questions_friend.json  2997
   data/questions_love.json  6455
   data/rules.json  6121
-  data/texts.json  116918
+  data/texts.json  116993
   data/types.json  20106
   index.html  450
   robots.txt  265

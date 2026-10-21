@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=37b6a16-202610212059";
-import { mountMotion } from "./motion.js?v=37b6a16-202610212059";
-import { mountGuide } from "./guide.js?v=37b6a16-202610212059";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=37b6a16-202610212059";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=37b6a16-202610212059";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=37b6a16-202610212059";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=37b6a16-202610212059";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=37b6a16-202610212059";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=37b6a16-202610212059";
-import { storedResultMatches, storedList } from "./stored_result.js?v=37b6a16-202610212059";
-import { clearPrefixedStorage } from "./storage_clear.js?v=37b6a16-202610212059";
+import { AXES, Shindan, loadData } from "./shindan.js?v=02172ba-202610212115";
+import { mountMotion } from "./motion.js?v=02172ba-202610212115";
+import { mountGuide } from "./guide.js?v=02172ba-202610212115";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=02172ba-202610212115";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=02172ba-202610212115";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=02172ba-202610212115";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=02172ba-202610212115";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=02172ba-202610212115";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=02172ba-202610212115";
+import { storedResultMatches, storedList } from "./stored_result.js?v=02172ba-202610212115";
+import { clearPrefixedStorage } from "./storage_clear.js?v=02172ba-202610212115";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=37b6a16-202610212059")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=02172ba-202610212115")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
