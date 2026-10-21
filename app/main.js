@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=f5a15fb-202610212222";
-import { mountMotion } from "./motion.js?v=f5a15fb-202610212222";
-import { mountGuide } from "./guide.js?v=f5a15fb-202610212222";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=f5a15fb-202610212222";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f5a15fb-202610212222";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f5a15fb-202610212222";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f5a15fb-202610212222";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f5a15fb-202610212222";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f5a15fb-202610212222";
-import { storedResultMatches, storedList } from "./stored_result.js?v=f5a15fb-202610212222";
-import { clearPrefixedStorage } from "./storage_clear.js?v=f5a15fb-202610212222";
+import { AXES, Shindan, loadData } from "./shindan.js?v=1d63bbf-202610212246";
+import { mountMotion } from "./motion.js?v=1d63bbf-202610212246";
+import { mountGuide } from "./guide.js?v=1d63bbf-202610212246";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=1d63bbf-202610212246";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1d63bbf-202610212246";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1d63bbf-202610212246";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1d63bbf-202610212246";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=1d63bbf-202610212246";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1d63bbf-202610212246";
+import { storedResultMatches, storedList } from "./stored_result.js?v=1d63bbf-202610212246";
+import { clearPrefixedStorage } from "./storage_clear.js?v=1d63bbf-202610212246";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f5a15fb-202610212222")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1d63bbf-202610212246")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -142,15 +142,22 @@ function readQuizProgress(mode) {
     return validProgress(progress) ? { status: "ok", raw, progress } : { status: "invalid", raw };
   } catch { return { status: "invalid", raw }; }
 }
-// 生の保存値を比較する。別タブの同時 read/write は原子的には防げない。
+// 生の保存値を比較する。Web Locks非対応のブラウザーでは最終照合と書込は原子的にならない。
 function quizProgressFreshness(mode, expectedRaw) {
   const current = readQuizProgress(mode);
   if (current.status === "unavailable") return "unavailable";
   // 読み取り不能から復旧し、空の保存先を確認できた場合だけメモリ内の続行を許す。
   return current.status === "ok" && (current.raw === expectedRaw || (expectedRaw === undefined && current.raw === null)) ? "ok" : "changed";
 }
-function saveQuizProgress(mode, activeQuiz, progress) {
-  const freshness = quizProgressFreshness(mode, activeQuiz.progressRaw);
+// 対応ブラウザーでは同じ診断版のタブ間で read→write/remove を直列化する。
+// Web Locks非対応時は従来の保存値照合を維持し、ロック取得失敗時は書き込まない。
+async function withQuizProgressLock(mode, action) {
+  if (typeof navigator === "undefined" || !navigator.locks?.request) return action();
+  try { return await navigator.locks.request(`ijin.quiz.progress.${mode}`, { mode: "exclusive" }, action); }
+  catch { return "lock_error"; }
+}
+function saveQuizProgress(mode, activeQuiz, progress, expectedRaw = activeQuiz.progressRaw) {
+  const freshness = quizProgressFreshness(mode, expectedRaw);
   if (freshness !== "ok") return freshness;
   const raw = JSON.stringify(progress);
   try { localStorage.setItem(quizProgressKey(mode), raw); }
@@ -179,13 +186,22 @@ function showQuizProgressConflict(mode, invalid = false) {
   $(".card h1").tabIndex = -1;
   $(".card h1").focus({ preventScroll: true });
   if (!invalid) $("[data-reload-quiz]").onclick = openLatestQuiz;
-  else $("[data-clear-invalid]").onclick = () => {
-    const latest = readQuizProgress(mode);
-    if (latest.status !== "invalid" || latest.raw !== damagedSnapshot.raw) return showQuizProgressConflict(mode, latest.status === "invalid");
-    try {
-      localStorage.removeItem(quizProgressKey(mode));
-      if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
-    } catch { return toast("途中の記録を消せませんでした。端末の保存設定を確認してください"); }
+  else $("[data-clear-invalid]").onclick = async () => {
+    const button = $("[data-clear-invalid]");
+    button.disabled = true;
+    const status = await withQuizProgressLock(mode, () => {
+      if (button.isConnected === false) return "cancelled";
+      const latest = readQuizProgress(mode);
+      if (latest.status !== "invalid" || latest.raw !== damagedSnapshot.raw) return "changed";
+      try {
+        localStorage.removeItem(quizProgressKey(mode));
+        if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
+      } catch { return "unavailable"; }
+      return "cleared";
+    });
+    if (button.isConnected === false || status === "cancelled") return;
+    if (status === "changed") return showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid");
+    if (status !== "cleared") { button.disabled = false; return toast("途中の記録を消せませんでした。端末の保存設定を確認してください"); }
     openLatestQuiz();
   };
 }
@@ -193,25 +209,34 @@ function bindFreshQuizLinks() {
   app.querySelectorAll("[data-fresh]").forEach((link) => {
     const mode = link.dataset.fresh;
     const snapshot = readQuizProgress(mode);
-    link.addEventListener("click", (event) => {
-      const freshness = quizProgressFreshness(mode, snapshot.raw);
-      if (snapshot.status === "invalid" || freshness === "changed") {
-        event.preventDefault();
-        showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid");
+    link.addEventListener("click", async (event) => {
+      if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        nextSrc = null;
         return;
       }
-      if (freshness === "ok") {
-        try {
-          localStorage.removeItem(quizProgressKey(mode));
-          if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
-        } catch {
-          event.preventDefault();
-          toast("途中の記録を消せませんでした。端末の保存設定を確認してください");
-          return;
+      event.preventDefault();
+      const fromHash = location.hash;
+      const status = await withQuizProgressLock(mode, () => {
+        if (location.hash !== fromHash || link.isConnected === false) return "cancelled";
+        const freshness = quizProgressFreshness(mode, snapshot.raw);
+        if (snapshot.status === "invalid" || freshness === "changed") return "changed";
+        if (freshness === "ok") {
+          try {
+            localStorage.removeItem(quizProgressKey(mode));
+            if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
+          } catch { return "unavailable"; }
         }
-      }
+        return "cleared";
+      });
+      if (location.hash !== fromHash || link.isConnected === false) { nextSrc = null; return; }
+      if (status === "cancelled") { nextSrc = null; return; }
+      if (status === "changed") { nextSrc = null; showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid"); return; }
+      if (status !== "cleared") { nextSrc = null; toast("途中の記録を消せませんでした。端末の保存設定を確認してください"); return; }
       clearQuizCursor(mode);
       quiz = null;
+      nextSrc = link.dataset.src ?? null;
+      if (location.hash === link.getAttribute?.("href")) renderQuiz(mode);
+      else location.hash = link.getAttribute?.("href") || `#/q/${mode}`;
     });
   });
 }
@@ -566,13 +591,14 @@ function renderQuiz(mode, anim = false) {
       && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
     renderQuiz(mode, true);
   };
-  app.querySelectorAll(".dotbtn").forEach((b) => (b.onclick = () => {
+  app.querySelectorAll(".dotbtn").forEach((b) => (b.onclick = async () => {
     if (quiz.busy) return;
     if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
     quiz.busy = true;
     const activeQuiz = quiz;
-    quiz.answers[i] = Number(b.dataset.v);
-    quiz.answers.length = Math.max(quiz.answers.length, i + 1);
+    const nextAnswers = quiz.answers.slice();
+    nextAnswers[i] = Number(b.dataset.v);
+    nextAnswers.length = Math.max(nextAnswers.length, i + 1);
     app.querySelectorAll(".dotbtn").forEach((choice) => {
       choice.classList.remove("sel");
       choice.setAttribute("aria-label", choice.querySelector("span").textContent);
@@ -580,15 +606,31 @@ function renderQuiz(mode, anim = false) {
     b.classList.add("sel");
     b.setAttribute("aria-label", `${b.querySelector("span").textContent}（選択中）`);
     navigator.vibrate?.(8);
-    const progress = { answers: quiz.answers.slice(), t: Date.now(), source: quiz.source };
-    const saveStatus = saveQuizProgress(mode, quiz, progress);
+    const progress = { answers: nextAnswers, t: Date.now(), source: quiz.source };
+    const expectedRaw = activeQuiz.progressRaw;
+    const generation = activeQuiz.saveGeneration = (activeQuiz.saveGeneration || 0) + 1;
+    const saveStatus = await withQuizProgressLock(mode, () => {
+      if (quiz !== activeQuiz || activeQuiz.i !== i || activeQuiz.saveGeneration !== generation || b.isConnected === false
+        || location.hash !== `#/q/${mode}`) return "cancelled";
+      return saveQuizProgress(mode, activeQuiz, progress, expectedRaw);
+    });
+    if (quiz !== activeQuiz || activeQuiz.i !== i || activeQuiz.saveGeneration !== generation || b.isConnected === false
+      || location.hash !== `#/q/${mode}`) return;
+    if (saveStatus === "cancelled") return;
     if (saveStatus === "changed") return showQuizProgressConflict(mode);
+    if (saveStatus === "lock_error") {
+      quiz.busy = false;
+      renderQuiz(mode);
+      toast("途中の記録を保存できませんでした。もう一度押してください");
+      return;
+    }
+    activeQuiz.answers = nextAnswers;
     if (saveStatus === "saved") rememberQuizCursor(mode, progress, Math.min(i + 1, qs.length - 1));
     later(120, () => { if (quiz === activeQuiz && quiz.i === i && location.hash === `#/q/${mode}`) $(".qbox")?.classList.add("out"); });
     later(300, () => {
       if (quiz !== activeQuiz || quiz.i !== i || location.hash !== `#/q/${mode}`) return;
-      quiz.busy = false;
       if (i + 1 >= qs.length) return finishQuiz(mode);
+      quiz.busy = false;
       quiz.i++;
       const seen = store.get("seen_checkpoint", false);
       if (!seen && (i + 1 === 4 || i + 1 === 8)) return renderCheckpoint(mode, i + 1);
@@ -625,12 +667,38 @@ function renderCheckpoint(mode, n) {
   $(".checkpoint button").onclick = () => { if (n === 8) store.set("seen_checkpoint", true); renderQuiz(mode, true); };
 }
 
-function finishQuiz(mode) {
-  if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
-  const code = makeCode(quiz.answers);
-  try { localStorage.removeItem(quizProgressKey(mode)); } catch {}
+async function finishQuiz(mode) {
+  const activeQuiz = quiz;
+  if (!activeQuiz || activeQuiz.mode !== mode) return;
+  const questionNode = $(".qtext");
+  activeQuiz.busy = true;
+  const expectedRaw = activeQuiz.progressRaw;
+  const generation = activeQuiz.saveGeneration;
+  const status = await withQuizProgressLock(mode, () => {
+    if (quiz !== activeQuiz || activeQuiz.saveGeneration !== generation || questionNode?.isConnected === false
+      || location.hash !== `#/q/${mode}`) return "cancelled";
+    const freshness = quizProgressFreshness(mode, expectedRaw);
+    if (freshness === "changed") return "changed";
+    // 保存API自体が読めない場合は、従来どおりメモリ内の12回答から結果へ進める。
+    if (freshness === "unavailable") return "finished";
+    try {
+      localStorage.removeItem(quizProgressKey(mode));
+      if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
+    } catch { return "uncleared"; }
+    return "finished";
+  });
+  if (quiz !== activeQuiz || activeQuiz.saveGeneration !== generation || questionNode?.isConnected === false
+    || location.hash !== `#/q/${mode}`) return;
+  if (status === "cancelled") return;
+  if (status === "changed") return showQuizProgressConflict(mode);
+  if (status !== "finished" && status !== "uncleared") {
+    activeQuiz.busy = false;
+    toast("診断を完了できませんでした。もう一度押してください");
+    return;
+  }
+  const code = makeCode(activeQuiz.answers);
   clearQuizCursor(mode);
-  justFinished = { mode, code, source: quiz.source };
+  justFinished = { mode, code, source: activeQuiz.source, progressDeleteUnconfirmed: status === "uncleared" };
   quiz = null;
   location.hash = `#/r/${mode}/${code}`;
 }
@@ -782,6 +850,7 @@ function renderResult(mode, code) {
   const mine = savedResult(mode);
   const fresh = justFinished && justFinished.mode === mode && justFinished.code === code;
   const freshSource = fresh ? justFinished.source : null;
+  const progressDeleteUnconfirmed = fresh && justFinished.progressDeleteUnconfirmed;
   justFinished = null;
   const who = fromSharedPage ? "friend" : (fresh || mine?.code === code ? "me" : "friend");
   const seen = storedList(store.get("seen_results", []));
@@ -872,6 +941,7 @@ function renderResult(mode, code) {
   app.style.cssText = themeVars(r.type.id);
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
+    ${progressDeleteUnconfirmed ? '<p class="note" role="alert">途中の記録が消えたか確認できませんでした。この端末に残っている可能性があります。結果は表示できます。</p>' : ""}
     ${freshSource === "friend" ? returnSharedHtml : ""}
     <p class="note share-warning ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
