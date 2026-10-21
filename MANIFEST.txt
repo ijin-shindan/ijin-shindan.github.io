@@ -1,11 +1,11 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: f198618-202610211955
+版番号: 37b6a16-202610212059
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 842（この一覧を含む）
-合計サイズ: 29.19 MB
+合計サイズ: 29.20 MB
 
 主なフォルダ（ファイル数・サイズ）:
-  app/og/                    201 件    23.45 MB
+  app/og/                    201 件    23.46 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
   app/                        19 件     0.23 MB
@@ -434,8 +434,8 @@
   app/icons/favicon.svg  1412
   app/index.html  1857
   app/legacy_data.js  1933
-  app/main.js  130105
-  app/meta.json  7834
+  app/main.js  130735
+  app/meta.json  7869
   app/motion.css  2141
   app/motion.js  10614
   app/og/love/akechi-mitsuhide.png  121232
@@ -495,7 +495,7 @@
   app/og/love/michelangelo.png  136817
   app/og/love/minakata-kumagusu.png  132575
   app/og/love/miyazawa-kenji.png  122588
-  app/og/love/mori-motonari.png  122787
+  app/og/love/mori-motonari.png  131292
   app/og/love/mozart.png  127589
   app/og/love/murasaki-shikibu.png  119510
   app/og/love/naoe-kanetsugu.png  114530
@@ -595,7 +595,7 @@
   app/og/normal/michelangelo.png  127956
   app/og/normal/minakata-kumagusu.png  116962
   app/og/normal/miyazawa-kenji.png  109819
-  app/og/normal/mori-motonari.png  110173
+  app/og/normal/mori-motonari.png  118901
   app/og/normal/mozart.png  114451
   app/og/normal/murasaki-shikibu.png  109459
   app/og/normal/naoe-kanetsugu.png  108941
@@ -700,7 +700,7 @@
   app/s/love/michelangelo.html  1141
   app/s/love/minakata-kumagusu.html  1144
   app/s/love/miyazawa-kenji.html  1120
-  app/s/love/mori-motonari.html  1116
+  app/s/love/mori-motonari.html  1162
   app/s/love/mozart.html  1129
   app/s/love/murasaki-shikibu.html  1114
   app/s/love/naoe-kanetsugu.html  1168
@@ -800,7 +800,7 @@
   app/s/normal/michelangelo.html  1119
   app/s/normal/minakata-kumagusu.html  1155
   app/s/normal/miyazawa-kenji.html  1110
-  app/s/normal/mori-motonari.html  1088
+  app/s/normal/mori-motonari.html  1134
   app/s/normal/mozart.html  1086
   app/s/normal/murasaki-shikibu.html  1104
   app/s/normal/naoe-kanetsugu.html  1113

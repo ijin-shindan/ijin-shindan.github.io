@@ -154,7 +154,7 @@
   "bismarck": "とがった軍帽、カイゼルひげ",
   "hijikata-toshizo": "「誠」の旗",
   "hojo-ujiyasu": "汁かけ飯の茶碗",
-  "mori-motonari": "3本の矢",
+  "mori-motonari": "三本の矢（後世の伝説を図案化）",
   "ninomiya-sontoku": "背負った薪、本",
   "washington": "小さな斧と桜の木（史実ではない後世の伝説を図案化）",
   "tokugawa-ieyasu": "指にとまるホトトギス（鳴くまで待とう）、肩の葵の紋",
@@ -225,5 +225,5 @@
   "marcus-aurelius": "覚え書きの書字板、月桂冠"
  },
  "contact": "https://github.com/ijin-shindan/ijin-shindan.github.io/issues",
- "updated": "2026-09-28"
+ "updated": "2026-10-21"
 }

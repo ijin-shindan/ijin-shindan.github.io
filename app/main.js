@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=f198618-202610211955";
-import { mountMotion } from "./motion.js?v=f198618-202610211955";
-import { mountGuide } from "./guide.js?v=f198618-202610211955";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=f198618-202610211955";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f198618-202610211955";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f198618-202610211955";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f198618-202610211955";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f198618-202610211955";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f198618-202610211955";
-import { storedResultMatches, storedList } from "./stored_result.js?v=f198618-202610211955";
-import { clearPrefixedStorage } from "./storage_clear.js?v=f198618-202610211955";
+import { AXES, Shindan, loadData } from "./shindan.js?v=37b6a16-202610212059";
+import { mountMotion } from "./motion.js?v=37b6a16-202610212059";
+import { mountGuide } from "./guide.js?v=37b6a16-202610212059";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=37b6a16-202610212059";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=37b6a16-202610212059";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=37b6a16-202610212059";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=37b6a16-202610212059";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=37b6a16-202610212059";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=37b6a16-202610212059";
+import { storedResultMatches, storedList } from "./stored_result.js?v=37b6a16-202610212059";
+import { clearPrefixedStorage } from "./storage_clear.js?v=37b6a16-202610212059";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f198618-202610211955")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=37b6a16-202610212059")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -606,6 +606,7 @@ function stars(tier) {
 function resultCard(r, mode, who, reveal) {
   const f = r.figure, t = r.type, tl = typeLabel(t, mode);
   const artNote = (f.id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : "")
+    + (f.id === "mori-motonari" ? '<p class="note">※ 三本の矢は後世の伝説を図案化したものです</p>' : "")
     + (f.id === "natsume-soseki" && mode === "love" ? '<p class="note">※「月が綺麗ですね」を漱石が訳したという出典は確認されていません</p>' : "");
   const lead = who === "friend" ? "リンクに含まれる回答から見える姿" : who === "past" ? "以前のあなたの回答から見える姿" : who === "saved" ? "リンクから保存した、この端末の「自分の結果」" : (mode === "love" ? "恋愛についての回答から見えるあなた" : "あなた自身の回答から見えるあなた");
   return `
@@ -646,6 +647,7 @@ function shareText(r, mode, fate) {
   const f = r.figure;
   return `${mode === "love" ? "恋をした私は" : "私は"}「${f.name}」タイプだった\n「${mainLine(f.id, mode)}」\n`
     + (mode === "love" && f.id === "natsume-soseki" ? "※漱石訳という出典は未確認\n" : "")
+    + (f.id === "mori-motonari" ? "※三本の矢は後世の伝説イメージ\n" : "")
     + (fate ? `因縁の相手：${fig(fate.other).name}（${fate.label}）\n` : "")
     + `あなたはどの偉人？ 12問でわかる👇\n#${engines[mode].modeConf.name}`;
 }
@@ -1070,6 +1072,7 @@ async function drawShare(r, mode) {
   const lf = Math.min(48, Math.floor(960 / [...line].length));
   center(line, Y + S + 170 + fs + 20, `900 ${lf}px "Noto Serif JP", serif`, "#26221d");
   if (r.figure.id === "washington") center("※ 斧と桜は後世の伝説イメージ", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
+  if (r.figure.id === "mori-motonari") center("※ 三本の矢は後世の伝説イメージ", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   if (r.figure.id === "natsume-soseki" && mode === "love") center("※ 漱石訳という出典は確認されていません", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   center(`${"★".repeat(r.tier + 1)}${"☆".repeat(MAX_TIER - r.tier)}　Lv.${r.lv}`, H - 110, '800 36px "M PLUS Rounded 1c", sans-serif', "#b08a3e");
   center(`世界の偉人性格診断　${location.host}`, H - 44, '500 30px "M PLUS Rounded 1c", sans-serif', "#6b6358");
@@ -1143,6 +1146,7 @@ function renderZukan() {
           ${srcTxt ? `<div class="note" style="text-align:left">取得元：${esc(srcTxt)}</div>` : ""}</div></div>
       <p style="font-family:var(--serif);font-weight:900;margin:0 0 8px">「${esc(tx.serif)}」</p><p class="body">${esc(tx.body)}</p>
       ${id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : ""}
+      ${id === "mori-motonari" ? '<p class="note">※ 三本の矢は後世の伝説を図案化したものです</p>' : ""}
       <details><summary>元ネタを見る</summary><p>${esc(tx.motoneta.text)}</p></details>
       <button class="btn sub close" style="margin-top:14px">閉じる</button></div>`, b);
   }));
@@ -1689,6 +1693,7 @@ function renderFigure(mode, id) {
     <section class="rcard" style="${themeVars(t.id)}">
       <div class="stage" data-state="done"><img class="avatar color" src="${avatar(id)}" alt="${esc(f.name)}のイラスト"></div>
       ${id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : ""}
+      ${id === "mori-motonari" ? '<p class="note">※ 三本の矢は後世の伝説を図案化したものです</p>' : ""}
       ${id === "natsume-soseki" && mode === "love" ? '<p class="note">※「月が綺麗ですね」を漱石が訳したという出典は確認されていません</p>' : ""}
       <h1 class="fig-name" style="--len:${[...f.name].length}">${esc(f.name)}</h1>
       <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
