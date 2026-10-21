@@ -1,24 +1,24 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=7c2526d-202610212153";
-import { mountMotion } from "./motion.js?v=7c2526d-202610212153";
-import { mountGuide } from "./guide.js?v=7c2526d-202610212153";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=7c2526d-202610212153";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7c2526d-202610212153";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7c2526d-202610212153";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7c2526d-202610212153";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=7c2526d-202610212153";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7c2526d-202610212153";
-import { storedResultMatches, storedList } from "./stored_result.js?v=7c2526d-202610212153";
-import { clearPrefixedStorage } from "./storage_clear.js?v=7c2526d-202610212153";
+import { AXES, Shindan, loadData } from "./shindan.js?v=d225a48-202610212211";
+import { mountMotion } from "./motion.js?v=d225a48-202610212211";
+import { mountGuide } from "./guide.js?v=d225a48-202610212211";
+import { separateLegacyLinkedResults } from "./legacy_data.js?v=d225a48-202610212211";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d225a48-202610212211";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=d225a48-202610212211";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=d225a48-202610212211";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=d225a48-202610212211";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d225a48-202610212211";
+import { storedResultMatches, storedList } from "./stored_result.js?v=d225a48-202610212211";
+import { clearPrefixedStorage } from "./storage_clear.js?v=d225a48-202610212211";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7c2526d-202610212153")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=d225a48-202610212211")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -761,11 +761,28 @@ function renderResult(mode, code) {
   }
   const r = sd.diagnose(answersOf(sd, code));
   const f = r.figure;
+  const fromSharedPage = isSharedResultEntry(location.href, mode, code);
+  // 静的な共有カードの人物と、回答コードから計算した人物を照合する。
+  // shared_fig / shared_mode は共有URLには含めず、静的ページからアプリへの内部遷移だけで渡す。
+  const sharedUrl = new URL(location.href);
+  const expectedSharedFigure = sharedUrl.searchParams.get("shared_fig");
+  const expectedSharedMode = sharedUrl.searchParams.get("shared_mode");
+  if (fromSharedPage && (
+    (sharedUrl.searchParams.has("shared_fig")
+      && (!Object.prototype.hasOwnProperty.call(SD.figures, expectedSharedFigure)
+        || expectedSharedFigure !== f.id))
+    || (sharedUrl.searchParams.has("shared_mode") && expectedSharedMode !== mode)
+  )) {
+    justFinished = null;
+    document.title = "共有結果を確認できません｜世界の偉人性格診断";
+    app.style.cssText = "";
+    app.innerHTML = `<section class="card"><h1>この共有結果は確認できません</h1><p>カードの人物か診断の種類が、回答結果と一致しません。送った人にリンクを作り直してもらってください。</p><a class="btn start" href="#/q/${mode}">自分を診断する</a><a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+    return;
+  }
   const mine = savedResult(mode);
   const fresh = justFinished && justFinished.mode === mode && justFinished.code === code;
   const freshSource = fresh ? justFinished.source : null;
   justFinished = null;
-  const fromSharedPage = isSharedResultEntry(location.href, mode, code);
   const who = fromSharedPage ? "friend" : (fresh || mine?.code === code ? "me" : "friend");
   const seen = storedList(store.get("seen_results", []));
   const reveal = fresh;
@@ -1853,8 +1870,12 @@ window.addEventListener("hashchange", (event) => {
   // 受信ページから別画面へ進んだ後の履歴項目には、共有文脈を持ち越さない。
   const before = new URL(event.oldURL), after = new URL(event.newURL);
   if (before.searchParams.get("shared") === "1" && before.hash !== after.hash
-    && after.searchParams.get("shared") === "1")
-    history.replaceState(history.state, "", withoutSharedResultParam(after.href));
+    && after.searchParams.get("shared") === "1") {
+    const clean = new URL(withoutSharedResultParam(after.href));
+    clean.searchParams.delete("shared_fig");
+    clean.searchParams.delete("shared_mode");
+    history.replaceState(history.state, "", clean.href);
+  }
   route();
   focusPageHeading();
 });

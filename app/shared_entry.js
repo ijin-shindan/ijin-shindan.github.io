@@ -17,5 +17,7 @@ export function isSharedResultEntry(url, mode, code) {
 export function withoutSharedResultParam(url) {
   const next = new URL(url);
   next.searchParams.delete(SHARED_RESULT_PARAM);
+  next.searchParams.delete("shared_fig");
+  next.searchParams.delete("shared_mode");
   return next.href;
 }
