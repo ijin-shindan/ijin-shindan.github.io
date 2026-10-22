@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=f350d4e-202610222248";
-import { mountMotion } from "./motion.js?v=f350d4e-202610222248";
-import { mountGuide } from "./guide.js?v=f350d4e-202610222248";
+import { AXES, Shindan, loadData } from "./shindan.js?v=fda1af7-202610222253";
+import { mountMotion } from "./motion.js?v=fda1af7-202610222253";
+import { mountGuide } from "./guide.js?v=fda1af7-202610222253";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=f350d4e-202610222248";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=f350d4e-202610222248";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=f350d4e-202610222248";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=f350d4e-202610222248";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=f350d4e-202610222248";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=f350d4e-202610222248";
-import { storedResultMatches, storedList } from "./stored_result.js?v=f350d4e-202610222248";
-import { clearPrefixedStorage } from "./storage_clear.js?v=f350d4e-202610222248";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=f350d4e-202610222248";
-import { applyZukanBatch } from "./zukan_batch.js?v=f350d4e-202610222248";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=fda1af7-202610222253";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=fda1af7-202610222253";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=fda1af7-202610222253";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=fda1af7-202610222253";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=fda1af7-202610222253";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=fda1af7-202610222253";
+import { storedResultMatches, storedList } from "./stored_result.js?v=fda1af7-202610222253";
+import { clearPrefixedStorage } from "./storage_clear.js?v=fda1af7-202610222253";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=fda1af7-202610222253";
+import { applyZukanBatch } from "./zukan_batch.js?v=fda1af7-202610222253";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=f350d4e-202610222248")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=fda1af7-202610222253")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
