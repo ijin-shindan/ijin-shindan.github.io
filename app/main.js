@@ -1,24 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=1d63bbf-202610212246";
-import { mountMotion } from "./motion.js?v=1d63bbf-202610212246";
-import { mountGuide } from "./guide.js?v=1d63bbf-202610212246";
-import { separateLegacyLinkedResults } from "./legacy_data.js?v=1d63bbf-202610212246";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1d63bbf-202610212246";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1d63bbf-202610212246";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1d63bbf-202610212246";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=1d63bbf-202610212246";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1d63bbf-202610212246";
-import { storedResultMatches, storedList } from "./stored_result.js?v=1d63bbf-202610212246";
-import { clearPrefixedStorage } from "./storage_clear.js?v=1d63bbf-202610212246";
+import { AXES, Shindan, loadData } from "./shindan.js?v=c8c1dbc-202610222223";
+import { mountMotion } from "./motion.js?v=c8c1dbc-202610222223";
+import { mountGuide } from "./guide.js?v=c8c1dbc-202610222223";
+import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=c8c1dbc-202610222223";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=c8c1dbc-202610222223";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=c8c1dbc-202610222223";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=c8c1dbc-202610222223";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=c8c1dbc-202610222223";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=c8c1dbc-202610222223";
+import { storedResultMatches, storedList } from "./stored_result.js?v=c8c1dbc-202610222223";
+import { clearPrefixedStorage } from "./storage_clear.js?v=c8c1dbc-202610222223";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=c8c1dbc-202610222223";
+import { applyZukanBatch } from "./zukan_batch.js?v=c8c1dbc-202610222223";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1d63bbf-202610212246")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=c8c1dbc-202610222223")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -104,7 +107,7 @@ function openSheet(html, trigger, objectUrl = null) {
 }
 const pick = (arr, n) => [...arr].sort(() => Math.random() - 0.5).slice(0, n);
 const fig = (id) => SD.figures[id];
-const isFree = (id) => fig(id).tier <= MAX_TIER;
+const isFree = (id) => !!SD.figures[id] && SD.figures[id].tier <= MAX_TIER;
 const avatar = (id, sil = false) => (isFree(id) ? (sil ? `avatars/full/sil/${id}.svg?v=2` : `avatars/full/${id}.svg?v=2`) : `avatars/sil/${id}.svg`);
 const lum = (hex) => { const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 // 系統色の上の文字は、白と黒のうち読みやすいほう（コントラスト比が大きいほう）にする
@@ -129,9 +132,109 @@ const makeCode = (answers) => `${CODE_VER}.${answers.join("")}`;
 const digits = (code) => { const m = /^(?:(\d+)\.)?([1-5]+)$/.exec(code || ""); return m && (m[1] ?? "1") === CODE_VER ? m[2] : null; };
 const answersOf = (sd, code) => { const d = digits(code); return Object.fromEntries(ordered(sd).map((q, i) => [q.id, Number(d[i])])); };
 const validCode = (sd, code) => { const d = digits(code); return !!d && d.length === ordered(sd).length; };
+// 人物カード保存と全記録削除の順序を共有する。
+// API非対応時は従来の照合へ戻るが、別タブとの原子的な順序は保証しない。
+// ロックの取得失敗時は無ロックで再実行しない。
+async function withSiteRecordsLock(action) {
+  if (typeof navigator === "undefined" || !navigator.locks?.request) return action();
+  try { return await navigator.locks.request("ijin.site.records", { mode: "exclusive" }, action); }
+  catch { return "lock_error"; }
+}
+// SELF の単一キー更新は、別タブを直列化できない環境では永続保存しない。
+function selfLockAvailable() {
+  return typeof navigator !== "undefined" && typeof navigator.locks?.request === "function";
+}
+function currentClearEpoch() {
+  try { return readClearEpoch(localStorage); }
+  catch { return { status: "unavailable" }; }
+}
+function clearEpochMatches(captured) {
+  try { return compareClearEpoch(localStorage, captured).matches; }
+  catch { return false; }
+}
+function viewEpochMatches(captured) {
+  return captured.status === "present" ? clearEpochMatches(captured)
+    : currentClearEpoch().status === captured.status;
+}
+function personCardEpochStatus(captured) {
+  if (captured?.status !== "present") return "epoch_unavailable";
+  try {
+    const result = compareClearEpoch(localStorage, captured);
+    if (result.status === "mismatch") return "stale_epoch";
+    if (result.status !== "match") return "epoch_unavailable";
+    // An older tab can erase SELF without advancing the deletion epoch. Do not
+    // recreate person cards, quiz progress or zukan from a still-open new tab.
+    return selfStateSnapshot().status === "ok" ? "current" : "state_unverified";
+  } catch { return "epoch_unavailable"; }
+}
+// ロック待ちは画面表示を止めない。初回に世代がなかった画面だけ、
+// 同じ初期化処理が自分で作った token を待つ。他タブが先に作った世代や
+// クリック時の新しい世代は採用しない（削除後の旧画面を復活させない）。
+const initialEpochAtStart = currentClearEpoch();
+const initialEpochPromise = withSiteRecordsLock(() => ensureClearEpoch(localStorage));
+function capturePersonCardEpoch() {
+  const atRender = currentClearEpoch();
+  if (atRender.status !== "missing") return atRender;
+  if (initialEpochAtStart.status !== "missing") return atRender;
+  return initialEpochPromise.then((result) => result?.status === "initialized"
+    ? { status: "present", token: result.token } : { status: "unavailable" });
+}
+// 削除世代の更新を確認できなければ、保存記録には触れない。
+async function clearSiteRecords(stillConfirmed = () => true) {
+  if (!selfLockAvailable()) return "lock_error";
+  return withSiteRecordsLock(() => {
+    if (!stillConfirmed()) return "cancelled";
+    const before = currentClearEpoch();
+    if (before.status !== "present" || !armSelfClear(localStorage, before.token)) return "epoch_error";
+    let advanced;
+    try { advanced = advanceClearEpoch(localStorage); }
+    catch { return "epoch_error"; }
+    if (advanced.status !== "advanced") return "epoch_error";
+    const localOk = clearPrefixedStorage(() => localStorage);
+    const sessionOk = clearPrefixedStorage(() => sessionStorage);
+    if (sessionOk) externalSessionClearFailed = false;
+    let selfOk = false;
+    try {
+      const raw = localStorage.getItem(SELF_KEY);
+      const validSelfResult = (mode, entry) => storedResultMatches(mode, entry, engines,
+        SD.figures, validCode, answersOf);
+      if (writeSelfState(localStorage, blankSelfState(advanced.token), raw, validSelfResult) === "saved") {
+        // 新世代の authority だけでは未確定。gate まで書き戻してから成功とする。
+        selfOk = initializeSelfState(localStorage, advanced.token, validSelfResult).status === "ok";
+      }
+    } catch {}
+    quiz = null;
+    justFinished = null;
+    otherQuiz = null;
+    confirmedOtherToken = null;
+    nextSrc = null;
+    lastSharedInMemory.normal = null;
+    lastSharedInMemory.love = null;
+    personSnapshot = null;
+    shareCache = { key: null, blob: null };
+    selfViewGeneration++;
+    trustedEpoch = advanced.token;
+    lastRevokedState = null;
+    return localOk && sessionOk && selfOk ? "cleared" : "partial";
+  });
+}
 const validProgress = (p) => p && Number.isFinite(p.t) && Array.isArray(p.answers) && p.answers.length <= 12
   && p.answers.every((v) => Number.isInteger(v) && v >= 1 && v <= 5);
 const quizProgressKey = (mode) => `ijin.progress.${mode}`;
+// 全記録削除との順序は常に site → 当該診断の progress の順にする。
+async function withSiteQuizLock(mode, action) {
+  return withSiteRecordsLock(() => withQuizProgressLock(mode, action));
+}
+function quizAttemptId(mode, saved) {
+  if (typeof saved?.attemptId === "string" && /^[a-zA-Z0-9:._-]{1,100}$/.test(saved.attemptId)) return saved.attemptId;
+  // 旧版の進行記録は同じ保存値から同じ ID を作り、再試行で診断回数を増やさない。
+  if (saved) return `legacy:${mode}:${saved.t}:${saved.answers.join("")}`;
+  return `new:${mode}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+async function capturedQuizEpoch(activeQuiz) {
+  try { return await activeQuiz.epoch; }
+  catch { return { status: "unavailable" }; }
+}
 function readQuizProgress(mode) {
   let raw;
   try { raw = localStorage.getItem(quizProgressKey(mode)); }
@@ -168,7 +271,7 @@ function saveQuizProgress(mode, activeQuiz, progress, expectedRaw = activeQuiz.p
 function clearQuizCursor(mode) {
   try { sessionStorage.removeItem(quizCursorKey(mode)); } catch {}
 }
-function showQuizProgressConflict(mode, invalid = false) {
+function showQuizProgressConflict(mode, invalid = false, epochAtView = capturePersonCardEpoch()) {
   clearTimers();
   quiz = null;
   clearQuizCursor(mode);
@@ -189,8 +292,11 @@ function showQuizProgressConflict(mode, invalid = false) {
   else $("[data-clear-invalid]").onclick = async () => {
     const button = $("[data-clear-invalid]");
     button.disabled = true;
-    const status = await withQuizProgressLock(mode, () => {
+    const captured = await epochAtView;
+    const status = await withSiteQuizLock(mode, () => {
       if (button.isConnected === false) return "cancelled";
+      const epochStatus = personCardEpochStatus(captured);
+      if (epochStatus !== "current") return epochStatus;
       const latest = readQuizProgress(mode);
       if (latest.status !== "invalid" || latest.raw !== damagedSnapshot.raw) return "changed";
       try {
@@ -200,7 +306,7 @@ function showQuizProgressConflict(mode, invalid = false) {
       return "cleared";
     });
     if (button.isConnected === false || status === "cancelled") return;
-    if (status === "changed") return showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid");
+    if (status === "changed" || status === "stale_epoch") return showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid");
     if (status !== "cleared") { button.disabled = false; return toast("途中の記録を消せませんでした。端末の保存設定を確認してください"); }
     openLatestQuiz();
   };
@@ -208,6 +314,7 @@ function showQuizProgressConflict(mode, invalid = false) {
 function bindFreshQuizLinks() {
   app.querySelectorAll("[data-fresh]").forEach((link) => {
     const mode = link.dataset.fresh;
+    const epochAtView = capturePersonCardEpoch();
     const snapshot = readQuizProgress(mode);
     link.addEventListener("click", async (event) => {
       if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -216,8 +323,11 @@ function bindFreshQuizLinks() {
       }
       event.preventDefault();
       const fromHash = location.hash;
-      const status = await withQuizProgressLock(mode, () => {
+      const captured = await epochAtView;
+      const status = await withSiteQuizLock(mode, () => {
         if (location.hash !== fromHash || link.isConnected === false) return "cancelled";
+        const epochStatus = personCardEpochStatus(captured);
+        if (epochStatus !== "current") return epochStatus;
         const freshness = quizProgressFreshness(mode, snapshot.raw);
         if (snapshot.status === "invalid" || freshness === "changed") return "changed";
         if (freshness === "ok") {
@@ -230,7 +340,7 @@ function bindFreshQuizLinks() {
       });
       if (location.hash !== fromHash || link.isConnected === false) { nextSrc = null; return; }
       if (status === "cancelled") { nextSrc = null; return; }
-      if (status === "changed") { nextSrc = null; showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid"); return; }
+      if (status === "changed" || status === "stale_epoch") { nextSrc = null; showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid"); return; }
       if (status !== "cleared") { nextSrc = null; toast("途中の記録を消せませんでした。端末の保存設定を確認してください"); return; }
       clearQuizCursor(mode);
       quiz = null;
@@ -336,6 +446,10 @@ function exportDamagedPersonCardRaw(raw) {
 }
 function showPersonCardAddFailure(button, status) {
   if (status === "full") return toast("人物カードは50枚まで。追加するには人物カード画面で不要なカードを削除してください");
+  if (status === "stale_epoch") return toast("この画面を開いた後に端末の記録が消されました。画面を開き直してください");
+  if (status === "state_unverified") return toast("端末の記録を確認できないため、カードの保存を止めました。この端末の記録をご確認ください");
+  if (status === "epoch_unavailable") return toast("保存の準備を確認できません。少し待って画面を開き直してください");
+  if (status === "lock_error" || status === "lock_unsupported") return toast("安全に保存できませんでした。別のタブを閉じてから再読み込みしてください");
   if (status !== "damaged") return toast("この端末に保存できませんでした");
   let warning = button.parentElement.querySelector("[data-person-save-error]");
   if (!warning) {
@@ -358,9 +472,95 @@ function addPersonCard(mode, code, figureId) {
   if (!store.set("people.cards", next)) return "error";
   return peopleCards().some((card) => card.id === id) ? "saved" : "error";
 }
+// 対応ブラウザーではカードの追加・呼び名変更・削除を同じロックで直列化する。
+// API非対応時は既存の保存値照合へ戻す。取得失敗時は無ロックで再実行しない。
+async function withPersonCardsLock(action) {
+  if (typeof navigator === "undefined" || !navigator.locks?.request) return action();
+  try { return await navigator.locks.request("ijin.people.cards", { mode: "exclusive" }, action); }
+  catch { return "lock_error"; }
+}
+function personCardActionCurrent(button, hash, sheetButton = null) {
+  return button.isConnected !== false && location.hash === hash
+    && (!sheetButton || (sheet.hidden !== true && sheetButton.isConnected !== false));
+}
+function personCardSnapshotUnchanged(raw) {
+  const latest = readPersonCardStorage();
+  return latest.status === "ok" && latest.raw === raw ? latest.cards : null;
+}
+function personCardTargetUnchanged(cards, displayIndex, rawIndex, displayedId) {
+  const resolved = personCardsFromRaw(cards);
+  return resolved.indexes[displayIndex] === rawIndex && resolved.cards[displayIndex]?.id === displayedId
+    && usablePersonCard(cards[rawIndex]);
+}
+async function addPersonCardFromButton(button, mode, code, figureId, capturedEpoch) {
+  if (button.disabled) return "cancelled";
+  const hash = location.hash;
+  button.disabled = true;
+  const stop = (status) => { button.disabled = false; return status; };
+  const captured = await capturedEpoch;
+  if (!personCardActionCurrent(button, hash)) return stop("cancelled");
+  if (captured?.status !== "present") return stop("epoch_unavailable");
+  if (!clearEpochMatches(captured)) return stop("stale_epoch");
+  const before = readPersonCardStorage();
+  if (before.status !== "ok") return stop(before.status === "damaged" ? "damaged" : "error");
+  const duplicate = personCardsFromRaw(before.cards).cards.some((card) => card.mode === mode && card.code === code);
+  // 確認ダイアログ中にロックを保持しない。
+  if (duplicate && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return stop("cancelled");
+  if (!personCardActionCurrent(button, hash)) return stop("cancelled");
+  // ロック順は必ず site → people。カード保存後の図鑑 KNOWN 登録も
+  // site ロック内で行い、全記録削除を間に挟ませない。
+  const status = await withSiteRecordsLock(async () => {
+    if (!personCardActionCurrent(button, hash)) return "cancelled";
+    if (!clearEpochMatches(captured)) return "stale_epoch";
+    return withPersonCardsLock(() => {
+      if (!personCardActionCurrent(button, hash)) return "cancelled";
+      if (!clearEpochMatches(captured)) return "stale_epoch";
+      const latest = readPersonCardStorage();
+      if (latest.status !== "ok") return latest.status === "damaged" ? "damaged" : "error";
+      if (before.raw !== null && latest.raw === null) return "changed";
+      // 別カードの追加なら最新配列から再計算する。新たな同一回答は再確認を促す。
+      const duplicateNow = personCardsFromRaw(latest.cards).cards.some((card) => card.mode === mode && card.code === code);
+      if (latest.raw !== before.raw && duplicateNow && !duplicate) return "changed";
+      const saved = addPersonCard(mode, code, figureId);
+      if (saved !== "saved") return saved;
+      // 別キーなので部分失敗は残り得るが、削除による割込みはここでは起きない。
+      return meet(figureId, "friend") ? "saved" : "saved_without_zukan";
+    });
+  });
+  if (status !== "saved" && status !== "saved_without_zukan") button.disabled = false;
+  return personCardActionCurrent(button, hash) ? status : "cancelled";
+}
+
 const verifiedResult = (mode, entry) => storedResultMatches(mode, entry, engines, SD.figures, validCode, answersOf);
-const savedResult = (mode) => { const entry = store.get("me." + mode); return verifiedResult(mode, entry) ? entry : null; };
-separateLegacyLinkedResults(store, engines, validCode, (id) => !!SD.figures[id]);
+function selfStateSnapshot() {
+  const epoch = currentClearEpoch();
+  return readSelfState(localStorage, epoch.status === "present" ? epoch.token : null, verifiedResult);
+}
+// gate_unverified は内部に妥当な state を持つことがあるが、表示には使わない。
+const verifiedSelfState = () => {
+  const snapshot = selfStateSnapshot();
+  return snapshot.status === "ok" ? snapshot.state : null;
+};
+const savedResult = (mode) => verifiedSelfState()?.current[mode] ?? null;
+const previousResult = (mode) => verifiedSelfState()?.previous[mode] ?? null;
+const seenSelfResults = () => verifiedSelfState()?.seenResults ?? [];
+function exportSelfOriginalRaw() {
+  const keys = [SELF_KEY, ...LEGACY_SELF_KEYS];
+  const originals = Object.fromEntries(keys.map((key) => [key, localStorage.getItem(key)]));
+  const url = URL.createObjectURL(new Blob([JSON.stringify(originals, null, 2)],
+    { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  try {
+    link.href = url;
+    link.download = "ijin-self-original.txt";
+    document.body.append(link);
+    link.click();
+  } finally {
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+  return Object.fromEntries(LEGACY_SELF_KEYS.map((key) => [key, originals[key]]));
+}
 
 // 図鑑：{figureId: {src: "me|friend_diag|match|next|friend", sources: string[], at}}
 // src は「今のところいちばん強い発見経路」（後方互換のため残す）。sources は出会った経路を全部ためる配列（新設）
@@ -403,25 +603,20 @@ function exportDamagedZukanRaw(raw) {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 }
-function meet(id, src) {
-  if (!id || !isFree(id)) return;
+function meetBatch(entries) {
+  if (selfStateSnapshot().status !== "ok") return false;
+  const eligible = entries.filter(({ id }) => id && isFree(id));
+  if (!eligible.length) return false;
   const snapshot = readZukanStorage();
-  if (snapshot.status !== "ok") return;
-  const z = snapshot.zukan;
-  const cur = z[id];
-  const prevSources = cur?.sources ?? (cur ? [cur.src] : []);
-  const sources = prevSources.includes(src) ? prevSources : [...prevSources, src];
-  const discovering = DISCOVER_SRC.has(src);
-  const wasDiscovered = cur && DISCOVER_SRC.has(cur.src);
-  if (!cur || discovering || !wasDiscovered) {
-    z[id] = { src: discovering ? src : (wasDiscovered ? cur.src : src), sources, at: Date.now() };
-  } else {
-    z[id] = { ...cur, sources };
-  }
+  if (snapshot.status !== "ok") return false;
+  let z;
+  try { z = applyZukanBatch(snapshot.zukan, eligible.map((entry) => ({ ...entry, at: Date.now() })), isFree); }
+  catch { return false; }
   // 読込後からこの照合時点までの別タブ更新を検出したら、古い内容を書かない。
-  try { if (localStorage.getItem("ijin.zukan") !== snapshot.raw) return; } catch { return; }
-  store.set("zukan", z);
+  try { if (localStorage.getItem("ijin.zukan") !== snapshot.raw) return false; } catch { return false; }
+  return store.set("zukan", z);
 }
+const meet = (id, src) => meetBatch([{ id, src }]);
 // 図鑑の状態（保存形式は変えない。src の意味で3段階に読み分ける）
 //   DISCOVERED：自分の正式な診断結果（通常・恋愛）src "me"、または友達診断で登録 src "friend_diag"。全身画像・説明・動きを見せる
 //   KNOWN     ：相性・もしも・共有結果などで名前だけ知った ＝ src "match" | "next" | "friend"。名前＋シルエット＋🔒未発見
@@ -551,13 +746,22 @@ function rankTypes(sd, u) {
 function renderQuiz(mode, anim = false) {
   const sd = engines[mode];
   if (!quiz || quiz.mode !== mode) {
+    // 世代を進行記録より先に捕捉する。初期化待ちでも旧画面が新世代を再捕捉しない。
+    const epoch = capturePersonCardEpoch();
     const snapshot = readQuizProgress(mode);
-    if (snapshot.status === "invalid") return showQuizProgressConflict(mode, true);
+    if (snapshot.status === "invalid") return showQuizProgressConflict(mode, true, epoch);
     const saved = snapshot.progress;
     const qs = ordered(sd);
-    quiz = { mode, qs, answers: [], i: 0, progressRaw: snapshot.raw };
-    if (validProgress(saved) && Date.now() - saved.t < 864e5) { quiz.answers = saved.answers; quiz.i = resumeQuizIndex(mode, saved, qs.length); }
     const resumed = validProgress(saved) && saved.answers.length > 0 && Date.now() - saved.t < 864e5;
+    quiz = { mode, qs, answers: [], i: 0, progressRaw: snapshot.raw,
+      epoch, attemptId: quizAttemptId(mode, resumed ? saved : null) };
+    // 旧版には試行 ID がない。12回答と保存済みの自分の結果が一致する場合、
+    // 旧版で完了後に進行記録だけ消せなかった可能性があり、二重加算できない。
+    if (resumed && saved.answers.length === qs.length && !saved.attemptId
+      && savedResult(mode)?.code === makeCode(saved.answers)) {
+      quiz.legacyPossibleDuplicateCode = makeCode(saved.answers);
+    }
+    if (resumed) { quiz.answers = saved.answers; quiz.i = resumeQuizIndex(mode, saved, qs.length); }
     quiz.source = resumed ? saved.source ?? "resume" : nextSrc ?? "top";
     nextSrc = null;
     if (!resumed) track("quiz_start", { mode, source: quiz.source });
@@ -606,12 +810,16 @@ function renderQuiz(mode, anim = false) {
     b.classList.add("sel");
     b.setAttribute("aria-label", `${b.querySelector("span").textContent}（選択中）`);
     navigator.vibrate?.(8);
-    const progress = { answers: nextAnswers, t: Date.now(), source: quiz.source };
+    const progress = { answers: nextAnswers, t: Date.now(), source: quiz.source, attemptId: quiz.attemptId };
     const expectedRaw = activeQuiz.progressRaw;
     const generation = activeQuiz.saveGeneration = (activeQuiz.saveGeneration || 0) + 1;
-    const saveStatus = await withQuizProgressLock(mode, () => {
+    const captured = await capturedQuizEpoch(activeQuiz);
+    const saveStatus = await withSiteQuizLock(mode, () => {
       if (quiz !== activeQuiz || activeQuiz.i !== i || activeQuiz.saveGeneration !== generation || b.isConnected === false
         || location.hash !== `#/q/${mode}`) return "cancelled";
+      const epochStatus = personCardEpochStatus(captured);
+      if (epochStatus === "stale_epoch") return "changed";
+      if (epochStatus !== "current" || activeQuiz.persistenceUnavailable) return "unavailable";
       return saveQuizProgress(mode, activeQuiz, progress, expectedRaw);
     });
     if (quiz !== activeQuiz || activeQuiz.i !== i || activeQuiz.saveGeneration !== generation || b.isConnected === false
@@ -625,6 +833,7 @@ function renderQuiz(mode, anim = false) {
       return;
     }
     activeQuiz.answers = nextAnswers;
+    if (saveStatus === "unavailable") activeQuiz.persistenceUnavailable = true;
     if (saveStatus === "saved") rememberQuizCursor(mode, progress, Math.min(i + 1, qs.length - 1));
     later(120, () => { if (quiz === activeQuiz && quiz.i === i && location.hash === `#/q/${mode}`) $(".qbox")?.classList.add("out"); });
     later(300, () => {
@@ -664,7 +873,84 @@ function renderCheckpoint(mode, n) {
   window.scrollTo(0, 0);
   $(".checkpoint h2").tabIndex = -1;
   $(".checkpoint h2").focus({ preventScroll: true });
-  $(".checkpoint button").onclick = () => { if (n === 8) store.set("seen_checkpoint", true); renderQuiz(mode, true); };
+  $(".checkpoint button").onclick = async () => {
+    const activeQuiz = quiz;
+    const captured = await capturedQuizEpoch(activeQuiz);
+    if (n === 8 && !activeQuiz.persistenceUnavailable) {
+      const status = await withSiteRecordsLock(() => {
+        if (quiz !== activeQuiz || location.hash !== `#/q/${mode}`) return "cancelled";
+        return personCardEpochStatus(captured) === "current" && store.set("seen_checkpoint", true)
+          ? "saved" : "unavailable";
+      });
+      if (status === "cancelled") return;
+      if (personCardEpochStatus(captured) === "stale_epoch") return showQuizProgressConflict(mode);
+    }
+    if (quiz === activeQuiz && location.hash === `#/q/${mode}`) renderQuiz(mode, true);
+  };
+}
+
+// SELFの現在・前回・回数・履歴は1つの権威キーで確定する。
+function diagnosisCount() {
+  const snapshot = selfStateSnapshot();
+  return snapshot.status === "ok" ? snapshot.state.count : 0;
+}
+function commitFreshSelfResult(mode, activeQuiz, code, captured) {
+  if (!selfLockAvailable()) return "memory_only";
+  const snapshot = readSelfState(localStorage, captured.token, verifiedResult);
+  if (["damaged", "gate_unverified", "missing_after_migration", "legacy_changed", "legacy_unverified"].includes(snapshot.status))
+    return "state_unverified";
+  if (snapshot.status !== "ok") return "memory_only";
+  let committed = snapshot;
+  const sd = engines[mode];
+  const r = sd.diagnose(answersOf(sd, code));
+  const f = r.figure;
+  const fate = fateOf(f.id);
+  const ms = sd.matchups(r.u, r.type, r.tier, f.id, sd.types.length);
+  const strongId = ms.strong.find((id) => id !== fate?.other);
+  const weakId = ms.weak.find((id) => id !== fate?.other && id !== strongId);
+  const entries = [
+    { id: f.id, src: "me" },
+    ...[strongId, weakId, fate?.other].map((id) => ({ id, src: "match" })),
+    ...(r.levelup && !r.levelup.locked ? [{ id: r.levelup.to, src: "next" }] : []),
+  ].filter((entry) => !!entry.id);
+  const plan = nextDiagnosisState(snapshot.state, mode, activeQuiz.attemptId, code,
+    { code, fig: f.id, at: Date.now() }, entries);
+  if (plan.status === "attempt_changed") return "attempt_changed";
+  if (plan.status === "already_completed_not_current") return "already_completed_not_current";
+  if (plan.status === "zukan_queue_full") return "zukan_queue_full";
+  if (plan.status === "ready") {
+    if (personCardEpochStatus(captured) !== "current") return "changed";
+    const write = writeSelfState(localStorage, plan.state, snapshot.raw, verifiedResult);
+    if (write !== "saved") return write === "changed" ? "changed" : "save_unverified";
+    committed = readSelfState(localStorage, captured.token, verifiedResult);
+    if (committed.status !== "ok" || committed.state.done[mode]?.attemptId !== activeQuiz.attemptId)
+      return "save_unverified";
+  }
+  const pending = committed.state.pendingZukan.find((entry) => entry.mode === mode
+    && entry.attemptId === activeQuiz.attemptId);
+  if (!pending) return "saved";
+  if (!meetBatch(pending.entries)) return "saved_zukan_pending";
+  if (personCardEpochStatus(captured) !== "current") return "saved_zukan_pending";
+  const settled = nextZukanSettledState(committed.state, mode, activeQuiz.attemptId);
+  return settled && writeSelfState(localStorage, settled, committed.raw, verifiedResult) === "saved"
+    ? "saved" : "saved_zukan_pending";
+}
+async function retryPendingZukan(captured, match = () => true) {
+  if (!selfLockAvailable()) return "unavailable";
+  return withSiteRecordsLock(() => {
+    if (personCardEpochStatus(captured) !== "current") return "changed";
+    let snapshot = selfStateSnapshot();
+    if (snapshot.status !== "ok") return "unavailable";
+    for (const pending of snapshot.state.pendingZukan.filter(match)) {
+      if (!meetBatch(pending.entries)) return "pending";
+      const settled = nextZukanSettledState(snapshot.state, pending.mode, pending.attemptId);
+      if (!settled || writeSelfState(localStorage, settled, snapshot.raw, verifiedResult) !== "saved")
+        return "pending";
+      snapshot = selfStateSnapshot();
+      if (snapshot.status !== "ok") return "pending";
+    }
+    return "saved";
+  });
 }
 
 async function finishQuiz(mode) {
@@ -674,31 +960,49 @@ async function finishQuiz(mode) {
   activeQuiz.busy = true;
   const expectedRaw = activeQuiz.progressRaw;
   const generation = activeQuiz.saveGeneration;
-  const status = await withQuizProgressLock(mode, () => {
+  const captured = await capturedQuizEpoch(activeQuiz);
+  const code = makeCode(activeQuiz.answers);
+  const status = await withSiteQuizLock(mode, () => {
     if (quiz !== activeQuiz || activeQuiz.saveGeneration !== generation || questionNode?.isConnected === false
       || location.hash !== `#/q/${mode}`) return "cancelled";
+    const epochStatus = personCardEpochStatus(captured);
+    if (epochStatus === "stale_epoch") return "changed";
+    activeQuiz.wasSeen = seenSelfResults().includes(mode + code);
+    if (epochStatus !== "current" || activeQuiz.persistenceUnavailable) return "memory_only";
     const freshness = quizProgressFreshness(mode, expectedRaw);
     if (freshness === "changed") return "changed";
-    // 保存API自体が読めない場合は、従来どおりメモリ内の12回答から結果へ進める。
-    if (freshness === "unavailable") return "finished";
+    // 保存が使えないときは、結果表示だけに進み永続記録を一切新規作成しない。
+    if (freshness === "unavailable") return "memory_only";
+    if (activeQuiz.legacyPossibleDuplicateCode === code) return "legacy_possible_duplicate";
+    const commit = commitFreshSelfResult(mode, activeQuiz, code, captured);
+    if (commit !== "saved" && commit !== "saved_zukan_pending") return commit;
+    activeQuiz.progressDeleteUnconfirmed = false;
     try {
       localStorage.removeItem(quizProgressKey(mode));
       if (localStorage.getItem(quizProgressKey(mode)) !== null) throw new Error("progress not cleared");
-    } catch { return "uncleared"; }
-    return "finished";
+    } catch {
+      activeQuiz.progressDeleteUnconfirmed = true;
+      return commit === "saved" ? "saved_progress_uncleared" : "saved_zukan_pending";
+    }
+    return commit;
   });
   if (quiz !== activeQuiz || activeQuiz.saveGeneration !== generation || questionNode?.isConnected === false
     || location.hash !== `#/q/${mode}`) return;
   if (status === "cancelled") return;
   if (status === "changed") return showQuizProgressConflict(mode);
-  if (status !== "finished" && status !== "uncleared") {
+  if (status !== "saved" && status !== "saved_progress_uncleared" && status !== "saved_zukan_pending"
+    && status !== "save_unverified" && status !== "memory_only" && status !== "state_unverified"
+    && status !== "zukan_queue_full"
+    && status !== "partial" && status !== "attempt_changed" && status !== "already_completed_not_current"
+    && status !== "legacy_possible_duplicate") {
     activeQuiz.busy = false;
     toast("診断を完了できませんでした。もう一度押してください");
     return;
   }
-  const code = makeCode(activeQuiz.answers);
   clearQuizCursor(mode);
-  justFinished = { mode, code, source: activeQuiz.source, progressDeleteUnconfirmed: status === "uncleared" };
+  justFinished = { mode, code, source: activeQuiz.source, epoch: captured,
+    saveStatus: status, wasSeen: !!activeQuiz.wasSeen,
+    progressDeleteUnconfirmed: status === "saved_progress_uncleared" || !!activeQuiz.progressDeleteUnconfirmed };
   quiz = null;
   location.hash = `#/r/${mode}/${code}`;
 }
@@ -770,7 +1074,7 @@ function resultCard(r, mode, who, reveal) {
   const artNote = (f.id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : "")
     + (f.id === "mori-motonari" ? '<p class="note">※ 三本の矢は後世の伝説を図案化したものです</p>' : "")
     + (f.id === "natsume-soseki" && mode === "love" ? '<p class="note">※「月が綺麗ですね」を漱石が訳したという出典は確認されていません</p>' : "");
-  const lead = who === "friend" ? "リンクに含まれる回答から見える姿" : who === "past" ? "以前のあなたの回答から見える姿" : who === "saved" ? "リンクから保存した、この端末の「自分の結果」" : (mode === "love" ? "恋愛についての回答から見えるあなた" : "あなた自身の回答から見えるあなた");
+  const lead = who === "unverified" ? "古い保存欄にある回答（本人か未確認）" : who === "readonly" ? "以前の保存結果（照合前・読取専用）" : who === "friend" ? "リンクに含まれる回答から見える姿" : who === "past" ? "以前のあなたの回答から見える姿" : who === "saved" ? "リンクから保存した、この端末の「自分の結果」" : (mode === "love" ? "恋愛についての回答から見えるあなた" : "あなた自身の回答から見えるあなた");
   return `
   <section class="rcard ${reveal ? "reveal-wait" : ""}" style="${themeVars(t.id)}">
     <p class="anata">${lead}</p>
@@ -829,7 +1133,10 @@ function renderResult(mode, code) {
   }
   const r = sd.diagnose(answersOf(sd, code));
   const f = r.figure;
-  const fromSharedPage = isSharedResultEntry(location.href, mode, code);
+  // 共有ページから診断へ進んでも query は残る。新たに Q12 を終えた結果を
+  // 偶然同じ回答コードだった受信リンクとして扱わない。
+  const fromSharedPage = !(justFinished && justFinished.mode === mode && justFinished.code === code)
+    && isSharedResultEntry(location.href, mode, code);
   // 静的な共有カードの人物と、回答コードから計算した人物を照合する。
   // shared_fig / shared_mode は共有URLには含めず、静的ページからアプリへの内部遷移だけで渡す。
   const sharedUrl = new URL(location.href);
@@ -847,39 +1154,57 @@ function renderResult(mode, code) {
     app.innerHTML = `<section class="card"><h1>この共有結果は確認できません</h1><p>カードの人物か診断の種類が、回答結果と一致しません。送った人にリンクを作り直してもらってください。</p><a class="btn start" href="#/q/${mode}">自分を診断する</a><a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
     return;
   }
-  const mine = savedResult(mode);
-  const fresh = justFinished && justFinished.mode === mode && justFinished.code === code;
-  const freshSource = fresh ? justFinished.source : null;
-  const progressDeleteUnconfirmed = fresh && justFinished.progressDeleteUnconfirmed;
+  const pendingFresh = justFinished && justFinished.mode === mode && justFinished.code === code ? justFinished : null;
+  const renderEpochStatus = pendingFresh?.epoch?.status === "present"
+    ? personCardEpochStatus(pendingFresh.epoch) : "epoch_unavailable";
+  if (pendingFresh && renderEpochStatus === "stale_epoch") {
+    justFinished = null;
+    document.title = "診断の記録が変わりました｜世界の偉人性格診断";
+    app.style.cssText = "";
+    app.innerHTML = `<section class="card"><h1>別のタブで端末の記録が変わりました</h1><p>この画面の診断結果は、保存済みの自分の結果として表示しません。新しく診断するか、この端末の記録を開き直してください。</p><a class="btn start" href="#/q/${mode}">新しく診断する</a><a class="btn sub" href="#/me">この端末の記録を見る</a></section>`;
+    return;
+  }
+  // Q12 の保存後でも、画面遷移までに別タブが以前の結果を戻せる。
+  // 保存成功を記憶しただけでは「現在の結果」と断定せず、表示直前の権威記録で確認する。
+  const committedFresh = pendingFresh && ["saved", "saved_progress_uncleared", "saved_zukan_pending"].includes(pendingFresh.saveStatus);
+  const stateAtResult = committedFresh ? selfStateSnapshot() : null;
+  if (committedFresh && stateAtResult.status !== "ok") {
+    justFinished = null;
+    document.title = "診断の記録を確認できません｜世界の偉人性格診断";
+    app.style.cssText = "";
+    app.innerHTML = `<section class="card"><h1>この端末の結果を確認できません</h1><p>診断結果を保存しましたが、いまの保存状態を読み取れません。今回の結果が現在の結果かは確認できないため、この画面では表示しません。必要ならこのページのURLを控え、端末の記録を確認してください。</p><p class="note">このURLを知る人は12問の答えを読み取れます。</p><a class="btn sub" href="#/me">この端末の記録を見る</a><a class="btn sub" href="#/">トップへ</a></section>`;
+    return;
+  }
+  if (committedFresh && stateAtResult.state.current[mode]?.code !== code) {
+    justFinished = null;
+    document.title = `${f.name}タイプ｜${sd.modeConf.name}`;
+    return renderFriend(sd, mode, code, r, null, fromSharedPage);
+  }
+  const mine = stateAtResult?.state.current[mode] ?? savedResult(mode);
+  const fresh = !!pendingFresh;
+  const freshSource = fresh ? pendingFresh.source : null;
+  const progressDeleteUnconfirmed = fresh && pendingFresh.progressDeleteUnconfirmed;
+  const freshSaveStatus = fresh && renderEpochStatus === "epoch_unavailable"
+    && (["saved", "saved_progress_uncleared", "saved_zukan_pending"].includes(pendingFresh.saveStatus))
+    ? "save_unverified" : fresh ? pendingFresh.saveStatus : null;
+  const shortReveal = fresh && !!pendingFresh.wasSeen;
   justFinished = null;
   const who = fromSharedPage ? "friend" : (fresh || mine?.code === code ? "me" : "friend");
-  const seen = storedList(store.get("seen_results", []));
   const reveal = fresh;
-  const shortReveal = fresh && seen.includes(mode + code);
   document.title = `${f.name}タイプ｜${sd.modeConf.name}`;
   if (fresh) track("quiz_complete", { mode, source: freshSource, figure: f.id, type: r.type.id, tier: r.tier + 1, capped: r.capped ? "yes" : "no" });
 
   if (who === "friend") return renderFriend(sd, mode, code, r, null, fromSharedPage);
+  const pendingSnapshot = selfStateSnapshot();
+  const pendingFigure = pendingSnapshot.status === "ok"
+    && pendingSnapshot.state.pendingZukan.some((entry) => entry.mode === mode && entry.code === code);
 
-  // 自分の結果として記録する
-  if (fresh) {
-    if (mine && mine.code !== code) store.set("me.prev." + mode, mine);
-    store.set("me." + mode, { code, fig: f.id, at: Date.now() });
-    store.set("seen_results", [...new Set([...seen, mode + code])].slice(-30));
-  }
-  // 図鑑：自分でこの端末で診断した結果だけ DISCOVERED。リンクから保存した結果（via:"link"）は KNOWN のまま
-  meet(f.id, !fresh && mine?.via === "link" ? "friend" : "me");
-  if (fresh) {
-    store.set("diagCount", store.get("diagCount", 0) + 1);
-    // 公開版の診断記録は、この端末内にだけ保存する。
-  }
-  const localSaveOk = !fresh || (store.get("me." + mode)?.code === code && isDiscovered(f.id));
   const fate = fateOf(f.id);
   const ms = sd.matchups(r.u, r.type, r.tier, f.id, sd.types.length);
   const strongId = ms.strong.find((id) => id !== fate?.other);
   const weakId = ms.weak.find((id) => id !== fate?.other && id !== strongId);
-  [strongId, weakId, fate?.other].forEach((id) => meet(id, "match"));
-  if (r.levelup && !r.levelup.locked) meet(r.levelup.to, "next");
+  // 新規結果の保存は診断完了時の site → quiz ロック内で確定済み。表示時は読み取り専用。
+  const localSaveOk = !fresh || ["saved", "saved_progress_uncleared"].includes(freshSaveStatus);
   const friend = lastSharedInMemory[mode] || store.get("lastFriend." + mode);
   const validFriend = friend && typeof friend.code === "string" && typeof friend.fig === "string"
     && SD.figures[friend.fig] && validCode(sd, friend.code)
@@ -941,6 +1266,16 @@ function renderResult(mode, code) {
   app.style.cssText = themeVars(r.type.id);
   app.innerHTML = `
     ${resultCard(r, mode, !fresh && mine?.via === "link" ? "saved" : "me", reveal)}
+    ${freshSaveStatus === "memory_only" ? '<p class="note" role="alert">結果はこの画面で見られますが、この端末への保存はできませんでした。図鑑にも登録していません。必要ならページのリンクを控えてください。</p>' : ""}
+    ${freshSaveStatus === "state_unverified" ? '<p class="note" role="alert">元の自己診断記録を確認できないため、今回の結果は保存していません。元の記録は上書きしていません。「この端末の記録」で状態を確認し、結果リンクも控えてください。</p>' : ""}
+    ${freshSaveStatus === "zukan_queue_full" ? '<p class="note" role="alert">図鑑に未反映の結果がたまっているため、今回の結果は保存していません。「この端末の記録」で図鑑登録を再試行してください。元の結果は変更していません。</p>' : ""}
+    ${freshSaveStatus === "save_unverified" ? '<p class="note" role="alert">診断結果を保存できたか確認できませんでした。途中の回答は残してあります。リンクを控え、端末の記録を確認してから再試行してください。</p>' : ""}
+    ${freshSaveStatus === "partial" ? '<p class="note" role="alert">結果は表示できますが、端末への保存は一部だけ成功した可能性があります。診断回数・自分の結果・図鑑が一致しない場合があります。途中の回答は削除していません。必要ならこの結果リンクを控えてください。</p>' : ""}
+    ${freshSaveStatus === "saved_zukan_pending" ? '<p class="note" role="alert">自分の結果・診断回数・履歴は保存済みですが、図鑑への登録を確認できませんでした。下のボタンから図鑑登録だけを再試行できます。</p>' : ""}
+    ${pendingFigure && !fresh ? '<p class="note" role="alert">この結果の図鑑への登録は未確認です。下のボタンで再試行できます。</p>' : ""}
+    ${freshSaveStatus === "attempt_changed" ? '<p class="note" role="alert">この診断は前の回答で保存済みです。回答を変えた今回の結果は端末に保存していません。結果リンクを控えるか、新しく診断を始めてください。</p>' : ""}
+    ${freshSaveStatus === "already_completed_not_current" ? '<p class="note" role="alert">この途中記録の診断は以前に完了しています。その後、自分の結果は別のものに戻されています。今回の画面は保存済みの現在結果ではなく、診断回数も増やしていません。</p>' : ""}
+    ${freshSaveStatus === "legacy_possible_duplicate" ? '<p class="note" role="alert">旧版の途中記録と同じ回答の結果が、すでにこの端末にあります。前回の完了記録か判別できないため、診断回数を増やさず、途中記録も残しました。この結果は表示のみです。</p>' : ""}
     ${progressDeleteUnconfirmed ? '<p class="note" role="alert">途中の記録が消えたか確認できませんでした。この端末に残っている可能性があります。結果は表示できます。</p>' : ""}
     ${freshSource === "friend" ? returnSharedHtml : ""}
     <p class="note share-warning ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
@@ -952,9 +1287,9 @@ function renderResult(mode, code) {
       <button class="btn sub" data-share="copy">リンクをコピー</button>
     </div>
     <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${freshSource === "friend" ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}</p>
-    ${!localSaveOk ? '<p class="note" role="alert">このブラウザでは結果または図鑑の登録を確認できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
+    ${!localSaveOk && freshSaveStatus !== "saved_zukan_pending" ? '<p class="note" role="alert">このブラウザでは結果または図鑑の登録を確認できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
     ${freshSource !== "friend" ? returnSharedHtml : ""}
-    ${(() => { const prev = store.get("me.prev." + mode); return verifiedResult(mode, prev) && prev.code !== code
+    ${(() => { const prev = previousResult(mode); return verifiedResult(mode, prev) && prev.code !== code
       ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
     <section class="card"><h2>偉人に重ねたあなたの物語</h2>
       ${mode === "love" && tx.love.note ? `<p class="love-note">※${esc(tx.love.note)}</p>` : ""}
@@ -976,7 +1311,7 @@ function renderResult(mode, code) {
       <p>友達に12問答えてもらい、その答えを受け取る試作です。人物への当てはめはまだ行いません。</p>
       <a class="btn sub" href="#/ask">友達に12問答えてもらう（試作）</a></section>` : ""}
     <details class="card social-entry"><summary>友達から同じ結果リンクが届いた？</summary>
-      <p>自分の共有リンクを開いた場合もこの画面になります。実際に別の人から届いた結果のときだけ、人物カードへ追加してください。返事を送りたい場合は自分の結果リンクをコピーできます。</p>
+      <p>自分の共有リンクを開いた場合もこの画面になります。実際に別の人から届いた結果のときだけ、人物カードへ追加してください。追加すると、この端末にカード名と回答入りの結果リンクが保存されます。返事を送りたい場合は自分の結果リンクをコピーできます。</p>
       <button class="btn sub" data-add-same-person>友達の人物カードに追加</button>
       <button class="btn sub" data-share="copy">自分の結果リンクを返す</button></details>
     <section class="card"><h2>図鑑</h2>${zukanStorageAlert()}
@@ -984,7 +1319,11 @@ function renderResult(mode, code) {
       <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a>
       </section>
     <div style="display:grid;gap:10px;margin-top:20px">
+      ${pendingFigure ? '<button class="btn sub" data-retry-self-zukan>図鑑への登録を再試行</button>' : ""}
+      ${["partial", "save_unverified", "zukan_queue_full", "state_unverified"].includes(freshSaveStatus) ? `<a class="btn sub" href="#/q/${mode}">途中の回答に戻って保存を再試行</a>` : ""}
       <a class="btn sub" data-fresh="${mode}" data-src="retry" href="#/q/${mode}">もう一度診断する</a>
+      ${["partial", "save_unverified", "saved_zukan_pending", "state_unverified", "zukan_queue_full", "attempt_changed", "already_completed_not_current", "legacy_possible_duplicate"].includes(freshSaveStatus)
+        ? '<p class="note" style="margin:0">「もう一度診断する」は残っている途中の回答を消し、1問目から始めます。結果を残したい場合は先にリンクを控えてください。</p>' : ""}
       <a class="btn sub" href="#/me">この端末の記録</a>
       <a class="btn sub" href="#/">トップへ</a></div>
     <p class="note" style="margin-top:16px"><a href="#/about">このサイトについて</a></p>
@@ -998,27 +1337,47 @@ function renderResult(mode, code) {
   duoShareButton?.setAttribute("aria-label", `${duoShareButton.textContent.trim()}。投稿する結果リンクを知る人は12問の答えを読み取れます`);
   // シェア
   const url = shareUrl(mode, f.id, code), text = shareText(r, mode, fate);
+  const currentResultView = capturedSelfViewGuard();
   $('[data-share="x"]').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
   $('[data-share="line"]').href = `https://line.me/R/share?text=${encodeURIComponent(`${f.name}タイプだった😂 あなたは誰？ ${url}`)}`;
   app.querySelectorAll("[data-share]").forEach((b) => b.addEventListener("click", async (e) => {
+    if (!currentResultView()) {
+      e.preventDefault();
+      revokeStaleSelfView();
+      route();
+      return;
+    }
     const ch = b.dataset.share;
     track("share_click", { channel: ch, mode, figure: f.id });
-    if (ch === "friend") { e.preventDefault(); shareLink(url, `私は「${f.name}」タイプだった！あなたも診断して、結果リンクを返してね。`); }
-    if (ch === "copy") { e.preventDefault(); try { await navigator.clipboard.writeText(url); toast("リンクをコピーしました"); } catch { prompt("このリンクをコピーしてください", url); } }
+    if (ch === "friend") { e.preventDefault(); shareLink(url, `私は「${f.name}」タイプだった！あなたも診断して、結果リンクを返してね。`, currentResultView); }
+    if (ch === "copy") { e.preventDefault(); try { await navigator.clipboard.writeText(url); if (currentResultView()) toast("リンクをコピーしました"); } catch { if (currentResultView()) prompt("このリンクをコピーしてください", url); } }
     if (ch === "image") { e.preventDefault(); shareImage(r, mode, b); }
   }));
   bindFreshQuizLinks();
-  $("[data-add-same-person]")?.addEventListener("click", () => {
-    if (peopleCards().some((card) => card.mode === mode && card.code === code)
-      && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
-    try {
-      const status = addPersonCard(mode, code, f.id);
-      if (status !== "saved") return showPersonCardAddFailure($('[data-add-same-person]'), status);
-      $("[data-add-same-person]").disabled = true;
-      toast("友達の人物カードを1枚追加しました");
-    } catch { toast("この端末ではカードを保存できません"); }
+  const retryFigureEpoch = capturePersonCardEpoch();
+  $("[data-retry-self-zukan]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const status = await retryPendingZukan(await retryFigureEpoch,
+      (entry) => entry.mode === mode && entry.code === code);
+    if (!button.isConnected) return;
+    button.disabled = false;
+    if (status !== "saved") return toast("図鑑への登録を確認できませんでした。端末の記録を確認してください");
+    route();
+    toast("図鑑への登録を確認しました");
+  });
+  const personCardEpoch = capturePersonCardEpoch();
+  $("[data-add-same-person]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const status = await addPersonCardFromButton(button, mode, code, f.id, personCardEpoch);
+    if (status === "cancelled") return;
+    if (status === "changed") return toast("別タブでカードが変わりました。もう一度押してください");
+    if (status === "saved_without_zukan") return toast("カードは保存しました。図鑑への名前登録は確認できませんでした");
+    if (status !== "saved") return showPersonCardAddFailure(button, status);
+    toast("友達の人物カードを1枚追加しました");
   });
   $("[data-duo]")?.addEventListener("click", () => {
+    if (!currentResultView()) { route(); return; }
     const [n, l] = $("[data-duo]").dataset.duo.split(",");
     track("share_click", { channel: "duo", figure: f.id });
     const t = `ふだんの私は「${fig(n).name}」、恋をすると「${fig(l).name}」でした。\nあなたの表の顔と恋の顔は？👇\n#偉人性格診断`;
@@ -1035,21 +1394,17 @@ function renderResult(mode, code) {
   attachMotion(f.name);
 }
 
-// 友達の結果（シェアされたリンクを開いた人）
+// 結果リンクの表示。URLだけでは送り主が友達か本人か判断できない。
 function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = false) {
   const f = r.figure;
-  const own = storedList(store.get("seen_results", [])).includes(mode + code);  // この端末で自分で診断したことがある結果
-  const prevE = store.get("me.prev." + mode);
+  const own = seenSelfResults().includes(mode + code);  // この端末で自分で診断したことがある結果
+  const prevE = previousResult(mode);
   const prevHere = verifiedResult(mode, prevE) && prevE.code === code; // 入れかえ前の結果
   const prevLink = !personCard && !fromSharedPage && !own && prevHere && prevE.via === "link"; // 入れかえ前の結果が、リンクから保存したもの
   const past = !personCard && !fromSharedPage && (own || (prevHere && !prevLink)); // 以前のあなた自身の結果
-  if (!past && !personCard) {
-    const friends = storedList(store.get("friends", []));
-    if (!friends.some((x) => x && x.mode === mode && x.code === code && verifiedResult(mode, x)))
-      store.set("friends", [{ mode, code, fig: f.id, at: Date.now() }, ...friends].slice(0, 20));
+  if (fromSharedPage && !personCard) {
+    // 共有ページ経由の往復だけタブ内に保持。直URLや過去結果を受信扱いしない。
     lastSharedInMemory[mode] = { code, fig: f.id };
-    store.set("lastFriend." + mode, lastSharedInMemory[mode]);
-    meet(f.id, "friend");
   }
   const tx = texts[f.id];
   app.style.cssText = themeVars(r.type.id);
@@ -1062,15 +1417,15 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     const mu = sd.score(answersOf(sd, mine.code));
     compat = `<section class="card"><h2>あなたとの相性</h2>
       <p class="rel-note">性格タイプの組み合わせで見た相性です（史実の勝ち負けではありません）。矢印の先が、押されやすい側。</p>
-      <div class="rels">${duelRow(sd, mu, r.u, mine.fig, f.id, { label: "届いたリンクの結果", otherWho: "リンクの結果", otherFace: avatar(f.id) })}</div></section>`;
+      <div class="rels">${duelRow(sd, mu, r.u, mine.fig, f.id, { label: "結果リンクの偉人", otherWho: "リンクの結果", otherFace: avatar(f.id) })}</div></section>`;
   }
-  if (!personCard && !past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
+  if (fromSharedPage && !personCard && !past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });
   const personCta = personCard ? `<section class="card social-entry"><h2>保存した人物カード</h2>
     <p>${esc(personCard.label || "友達カード")}の共有結果です。あなた自身の診断結果とは別に保存しています。</p>
     <a class="btn sub" href="#/people">人物カード一覧へ</a></section>` : past || prevLink ? `<details class="card social-entry"><summary>友達がこの結果と同じだった場合</summary>
-    <p>以前の自分や保存したリンクと同じ回答でも、別の友達から届いた結果なら人物カードに追加できます。</p>
-    <button class="btn sub" data-add-person>友達の人物カードに追加する</button></details>` : `<section class="card social-entry"><h2>共有リンクを人物カードへ</h2>
-    <p>友達から届いた結果だけカードに追加してください。リンクの送り主は確認できません。あなたの結果とは別に保存されます。</p>
+    <p>以前の自分や保存したリンクと同じ回答でも、別の友達から届いた結果なら人物カードに追加できます。追加すると、この端末にカード名と回答入りの結果リンクが保存されます。</p>
+    <button class="btn sub" data-add-person>友達の人物カードに追加する</button></details>` : `<section class="card social-entry"><h2>結果リンクを人物カードへ</h2>
+    <p>友達から届いた結果だけカードに追加してください。リンクの送り主は確認できません。追加すると、この端末にカード名と回答入りの結果リンクが、あなたの結果とは別に保存されます。</p>
     ${peopleCards().some((x) => x.mode === mode && x.code === code)
       ? '<p class="social-note">同じ回答のカードが保存されています。別の人から届いた結果なら、もう1枚追加できます。</p>'
       : ""}<button class="btn sub" data-add-person>人物カードに追加する</button></section>`;
@@ -1079,73 +1434,71 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
       : past || prevLink
       ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
-      : `<h1>共有リンクの結果は<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。あなた自身の結果と同じになることもあります。</p>`}
+      : `<h1>結果リンクの偉人は<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。送り主は確認できず、あなた自身の結果と同じになることもあります。</p>`}
       <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="${esc(fromSharedPage && mine.code === code ? withoutSharedResultParam(location.href) : `#/r/${mode}/${mine.code}`)}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">この端末の記録</a></p></div>
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
     ${personCta}
-    ${!personCard && !past && !prevLink && ownReply ? `<section class="card social-entry"><h2>自分の結果を友達に返す</h2>
+    ${fromSharedPage && !personCard && !past && !prevLink && ownReply ? `<section class="card social-entry"><h2>自分の結果を友達に返す</h2>
       <p>友達から届いたリンクなら、最初にリンクを送った友達を選んで、自分の結果リンクを返してください。結果は自動では届きません。自分で開いたリンクなら操作は不要です。</p>
       <p class="social-note">送る結果リンクを知る人は、あなたの12問の答えを読み取れます。</p>
       <button class="btn start" data-return-self>自分の結果リンクを送る</button></section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
-      ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="friend" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
+      ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら自分の結果リンクを共有できます。友達から届いたなら、その友達へ返せます。</p>`}
     </div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
     <div class="claim">${past
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
-      : `<p class="note">${personCard ? "人物カードに保存した結果です。" : prevLink ? "以前リンクから保存した結果です。" : "開いた共有リンクの結果です。"}自分の診断結果とは別に保存され、上書きしません。</p>`}</div>`;
+      : `<p class="note">${personCard ? "人物カードに保存した結果です。自分の診断結果は上書きしません。" : prevLink ? "以前リンクから保存した結果です。自分の診断結果は上書きしません。" : "結果リンクを見ています。この回答は、見るだけでは端末の結果記録へ追加せず、自分の診断結果も上書きしません。"}</p>`}</div>`;
   bindFreshQuizLinks();
   $("[data-return-self]")?.setAttribute("aria-label", "自分の結果リンクを送る。リンクを知る人は12問の答えを読み取れます");
-  $("[data-return-self]")?.addEventListener("click", () => shareLink(shareUrl(mode, mine.fig, mine.code), "あなたから届いた結果を見たよ。私の結果も送るね。"));
-  $("[data-add-person]")?.addEventListener("click", () => {
-    if (peopleCards().some((card) => card.mode === mode && card.code === code)
-      && !confirm("同じ回答のカードが既にあります。別の人のカードとしてもう1枚追加しますか？")) return;
-    try {
-      const status = addPersonCard(mode, code, f.id);
-      if (status !== "saved") return showPersonCardAddFailure($('[data-add-person]'), status);
-    } catch { return toast("この端末ではカードを保存できません"); }
+  const returnSelfButton = $("[data-return-self]");
+  const returnSelfView = capturedSelfViewGuard();
+  const canReturnSelf = () => returnSelfView() && returnSelfButton?.isConnected
+    && savedResult(mode)?.code === mine?.code;
+  returnSelfButton?.addEventListener("click", () => {
+    if (!canReturnSelf()) { route(); return; }
+    shareLink(shareUrl(mode, mine.fig, mine.code), "あなたから届いた結果を見たよ。私の結果も送るね。", canReturnSelf);
+  });
+  const personCardEpoch = capturePersonCardEpoch();
+  $("[data-add-person]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const status = await addPersonCardFromButton(button, mode, code, f.id, personCardEpoch);
+    if (status === "cancelled") return;
+    if (status === "changed") return toast("別タブでカードが変わりました。もう一度押してください");
+    if (status === "saved_without_zukan") {
+      location.hash = "#/people";
+      return toast("カードは保存しました。図鑑への名前登録は確認できませんでした");
+    }
+    if (status !== "saved") return showPersonCardAddFailure(button, status);
     location.hash = "#/people";
     toast("人物カードに保存しました");
   });
   if (past) {
-    const currentKey = "me." + mode, previousKey = "me.prev." + mode;
-    const currentAtDisplay = store.get(currentKey), previousAtDisplay = store.get(previousKey);
-    const unchanged = () => JSON.stringify(store.get(currentKey)) === JSON.stringify(currentAtDisplay)
-      && JSON.stringify(store.get(previousKey)) === JSON.stringify(previousAtDisplay)
-      && JSON.stringify(savedResult(mode)) === JSON.stringify(mine)
-      && JSON.stringify(previousAtDisplay) === JSON.stringify(prevE);
+    const stateAtDisplay = selfStateSnapshot();
+    const restoreEpoch = capturePersonCardEpoch();
     const refreshChanged = () => {
       route();
       focusPageHeading();
       toast("別タブで自己診断結果が変わりました。更新して選び直してください");
     };
     const restoreButton = $("[data-restore-self]");
-    restoreButton.onclick = () => {
-      if (!unchanged()) return refreshChanged();
+    restoreButton.onclick = async () => {
+      const captured = await restoreEpoch;
+      if (!selfLockAvailable()) return toast("このブラウザーでは結果を安全に戻せません。別のブラウザーでお試しください");
+      if (stateAtDisplay.status !== "ok" || personCardEpochStatus(captured) !== "current"
+        || selfStateSnapshot().raw !== stateAtDisplay.raw) return refreshChanged();
       if (!confirm(`以前の自己診断結果（${f.name}）を、現在の自分の結果に戻しますか？`)) return;
-      if (!unchanged()) return refreshChanged();
-      const replacePrevious = mine && mine.code !== code;
-      if (replacePrevious && !store.set(previousKey, mine)) return toast("前の結果を保存できず、戻せませんでした");
-      if (!store.set(currentKey, { code, fig: f.id, at: Date.now() })) {
-        let previousRestored = true;
-        if (replacePrevious) {
-          if (previousAtDisplay === null) store.del(previousKey);
-          else store.set(previousKey, previousAtDisplay);
-          previousRestored = JSON.stringify(store.get(previousKey)) === JSON.stringify(previousAtDisplay);
-        }
-        if (!previousRestored) {
-          const warning = document.createElement("p");
-          warning.className = "clear-status";
-          warning.setAttribute("role", "alert");
-          warning.tabIndex = -1;
-          warning.textContent = "現在の結果を保存できず、前の結果の記録も元に戻せませんでした。ページを閉じる前に、このページ（以前の結果）のURLを控え、この端末の記録を確認してください。";
-          restoreButton.insertAdjacentElement("afterend", warning);
-          warning.focus();
-          return;
-        }
-        return toast("現在の結果を保存できませんでした。端末の記録を確認してください");
-      }
+      const status = await withSiteRecordsLock(() => {
+        if (!restoreButton.isConnected || personCardEpochStatus(captured) !== "current") return "changed";
+        const latest = selfStateSnapshot();
+        if (latest.status !== "ok" || latest.raw !== stateAtDisplay.raw) return "changed";
+        const next = nextRestoredState(latest.state, mode, { code, fig: f.id, at: Date.now() });
+        return writeSelfState(localStorage, next, latest.raw, verifiedResult);
+      });
+      if (!restoreButton.isConnected) return;
+      if (status === "changed") return refreshChanged();
+      if (status !== "saved") return toast("結果を戻したか確認できませんでした。端末の記録を確認してください");
       route();
       focusPageHeading();
     };
@@ -1265,12 +1618,20 @@ function prerenderShare(r, mode) {
   drawShare(r, mode).then((blob) => { if (shareCache.key === key) shareCache.blob = blob; }).catch(() => {});
 }
 async function shareImage(r, mode, trigger = null) {
+  const generation = selfViewGeneration;
+  const epoch = currentClearEpoch();
+  const stateStatus = selfStateSnapshot().status;
   let blob;
   try {
     blob = shareCache.key === shareKey(r, mode) ? shareCache.blob : null;
     blob ||= await drawShare(r, mode);
     if (!blob) throw new Error("画像の生成に失敗しました");
   } catch { track("share_image_done", { method: "fail" }); return toast("画像を作れませんでした。スクショで保存してください"); }
+  // Image/font loading can finish after another tab has deleted this result.
+  // Never present a stale image or start a download in that case.
+  if (generation !== selfViewGeneration || !viewEpochMatches(epoch)
+    || stateStatus === "missing_after_migration" || selfStateSnapshot().status !== stateStatus
+    || (trigger && !trigger.isConnected)) return;
   const src = URL.createObjectURL(blob);
   if (/Line\/|Instagram|FBAN|FBAV|Twitter|; wv\)/i.test(navigator.userAgent)) {
     // アプリ内ブラウザはダウンロードできないので、画像を出して長押しで保存してもらう
@@ -1286,6 +1647,13 @@ async function shareImage(r, mode, trigger = null) {
   toast("画像を保存しました");
 }
 
+function capturedSelfViewGuard() {
+  const generation = selfViewGeneration;
+  const epoch = currentClearEpoch();
+  const stateStatus = selfStateSnapshot().status;
+  return () => generation === selfViewGeneration && viewEpochMatches(epoch)
+    && stateStatus !== "missing_after_migration" && selfStateSnapshot().status === stateStatus;
+}
 
 // ---------------- 図鑑 ----------------
 function renderZukan() {
@@ -1362,33 +1730,77 @@ function renderMe() {
   const row = (m, e, lbl, face, href = `#/r/${m}/${e.code}`) => `<a class="me-row" href="${href}">
       <img class="tile" src="${face ?? avatar(e.fig)}" alt="" style="${themeVars(fig(e.fig).type)}">
       <span><span class="lbl">${esc(lbl)}</span><span class="nm">${esc(fig(e.fig).name)}</span></span><span class="go">›</span></a>`;
+  const selfSnapshot = selfStateSnapshot();
   // 自分の結果：いま・前の結果・この端末で診断した過去の結果（seen_results から計算し直す）
-  const mineHtml = MODES.map(([m, name]) => {
-    const cur = store.get("me." + m), prev = store.get("me.prev." + m);
+  const selfReadable = ["ok", "legacy_changed", "legacy_unverified"].includes(selfSnapshot.status);
+  const mineHtml = !selfReadable
+    ? '<div class="me-empty">自己診断の記録を確認できません。上の案内をご確認ください。</div>'
+    : MODES.map(([m, name]) => {
+    const cur = selfSnapshot.state.current[m], prev = selfSnapshot.state.previous[m];
     const shown = new Set([ok(m, cur) ? cur.code : null, ok(m, prev) ? prev.code : null]);
-    const hist = storedList(store.get("seen_results", [])).filter((x) => typeof x === "string" && x.startsWith(m)).map((x) => x.slice(m.length)).reverse()
+    const hist = selfSnapshot.state.seenResults.filter((x) => typeof x === "string" && x.startsWith(m)).map((x) => x.slice(m.length)).reverse()
       .filter((c) => !shown.has(c) && validCode(engines[m], c)).slice(0, 5)
       .map((c) => ({ code: c, fig: engines[m].diagnose(answersOf(engines[m], c)).figure.id }));
     if (!ok(m, cur) && !ok(m, prev) && !hist.length)
-      return `<div class="me-empty">${name}：まだ結果がありません　<a href="#/q/${m}" data-fresh="${m}">診断する</a></div>`;
-    return (ok(m, cur) ? row(m, cur, `いまの${name}の結果${cur.via === "link" ? "（リンクから保存）" : ""}`) : "")
-      + (ok(m, prev) ? row(m, prev, `前の${name}の結果${prev.via === "link" ? "（リンクから保存）" : ""} ${date(prev.at)}`) : "")
-      + hist.map((h) => row(m, h, `以前の${name}の結果`)).join("");
+      return `<div class="me-empty">${name}：まだ結果がありません${selfSnapshot.status === "ok"
+        ? `　<a href="#/q/${m}" data-fresh="${m}">診断する</a>` : "。照合が終わるまで新しい結果の保存はできません。"}</div>`;
+    const prefix = selfSnapshot.status === "ok" ? "" : "照合前・";
+    const readHref = (code) => selfSnapshot.status === "ok" ? `#/r/${m}/${code}` : `#/saved-readonly/${m}/${code}`;
+    return (ok(m, cur) ? row(m, cur, `${prefix}いまの${name}の結果${cur.via === "link" ? "（リンクから保存）" : ""}`, undefined, readHref(cur.code)) : "")
+      + (ok(m, prev) ? row(m, prev, `${prefix}前の${name}の結果${prev.via === "link" ? "（リンクから保存）" : ""} ${date(prev.at)}`, undefined, readHref(prev.code)) : "")
+      + hist.map((h) => row(m, h, `以前の${name}の結果`, undefined, readHref(h.code))).join("");
   }).join("");
-  const friends = storedList(store.get("friends", [])).filter((x) => x && ok(x.mode, x));
+  const verifiedState = selfReadable ? selfSnapshot.state : null;
+  const legacyLinks = verifiedState?.legacyLinks ?? [];
+  const legacyUnverified = verifiedState?.legacyUnverified ?? [];
+  const selfWarnings = verifiedState?.migrationWarnings ?? [];
+  const selfAlert = selfSnapshot.status === "missing_after_migration"
+    ? "以前保存した自己診断の中心記録が見つかりません。古いタブで全記録を消した場合などに起こります。空の記録は自動で作らず、自己診断の保存を止めています。古いタブを閉じ、下のボタンでこの端末に残る元データを書き出して保管してください。以前の結果が残っているとは限りません。最初から始める場合は「このサイトについて・記録を消す」から全記録を消してください。"
+    : selfSnapshot.status === "legacy_changed"
+    ? "古いタブが、移行後に自己診断の保存欄を書き換えた可能性があります。旧版の結果を本人の結果として自動登録していません。古いタブを閉じ、下のボタンで元の記録をファイルに保存してください。新たな保存は照合を終えるまで止めています。"
+    : selfSnapshot.status === "legacy_unverified"
+    ? "以前の自己診断記録と古いタブの保存欄を照合できません。元の記録を上書きせず保存を止めています。古いタブを閉じ、下のボタンで元の記録をファイルに保存してください。"
+    : !selfLockAvailable()
+    ? "このブラウザーは複数タブの同時操作保護に対応していません。自己診断結果の端末保存と旧記録の移行を止めています。結果を見ることはできます。"
+    : selfSnapshot.status !== "ok"
+    ? "自己診断の保存記録を読み込めません。元のデータは変更せず、自己診断結果の表示と保存を止めています。"
+    : selfWarnings.length
+      ? "以前の自己診断記録の一部を確認できませんでした。読めた結果は残し、読めない元データは上書きしていません。"
+      : "";
+  // A legacy key changed after migration. It may be an old tab's new SELF
+  // result, but the old slot could also contain a received link. Offer only a
+  // read-only view; never count or promote it without an explicit recovery flow.
+  const lateLegacyCandidates = selfSnapshot.status === "legacy_changed"
+    ? MODES.flatMap(([mode, name]) => {
+      const key = `ijin.me.${mode}`;
+      if (selfSnapshot.state.legacySnapshot?.[key] === undefined) return [];
+      let raw;
+      try { raw = localStorage.getItem(key); } catch { return []; }
+      if (raw === null || raw === selfSnapshot.state.legacySnapshot[key]) return [];
+      let entry;
+      try { entry = JSON.parse(raw); } catch { return []; }
+      return verifiedResult(mode, entry) ? [{ mode, name, entry }] : [];
+    }) : [];
+  const friends = [...storedList(store.get("friends", [])), ...legacyLinks]
+    .filter((x) => x && ok(x.mode, x));
   const personCardSnapshot = readPersonCardStorage();
   const personCardCount = personCardSnapshot.status === "ok"
     ? `${personCardsFromRaw(personCardSnapshot.cards).cards.length}枚`
     : "確認できません";
+  const pendingFigureCount = selfSnapshot.status === "ok" ? verifiedState?.pendingZukan.length ?? 0 : 0;
   app.innerHTML = `
     <div class="zhead"><h1>この端末の記録</h1></div>
+    ${selfAlert ? `<section class="card"><h2>自己診断の記録を確認してください</h2><p role="alert">${selfAlert}</p><p class="note">元データに12問の答えが含まれる場合があります。ファイルは人に送らず、この端末に保管してください。書き出しは記録を変更しません。</p><button class="btn sub" data-export-self>元の記録をファイルに保存</button>${["legacy_changed", "legacy_unverified"].includes(selfSnapshot.status) ? `<div style="margin-top:14px"><p class="note">保存を再開しても、古い保存欄の変更は自分の結果には取り込みません。現在の自己診断記録は残ります。旧版で新しく出た結果を残したい場合は先に結果画面をスクリーンショットで残してください。復旧後、この未確認結果は一覧に表示されなくなります。</p><label><input type="checkbox" data-self-recovery-check> ファイルの保存を確認し、古いタブを閉じた</label><button class="btn sub" data-rebaseline-self disabled>未確認の旧結果を取り込まず保存を再開</button></div>` : ""}</section>` : ""}
+    ${lateLegacyCandidates.length ? `<section class="card"><h2>古い保存欄にある結果（本人か未確認）</h2><p class="note">古いタブで後から保存された可能性がある結果です。本人が答えた証拠はないため、自分の結果・診断回数には加えていません。ここでは結果を読むだけで、人物カードには追加しません。</p><div class="me-list">${lateLegacyCandidates.map(({ mode, name, entry }) => row(mode, entry, `${name}・出所未確認`, relFace(entry.fig), `#/legacy/${mode}/${entry.code}`)).join("")}</div></section>` : ""}
     ${accountCard()}
     ${zukanSummaryCard()}
-    <section class="card"><h2>自分の診断結果</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${store.get("diagCount", 0)}回</p><div class="me-list">${mineHtml}</div></section>
-    <section class="card"><h2>開いた共有リンクの結果</h2>
-      ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に開いた結果${store.get("me." + x.mode)?.code === x.code ? "（自分と同じ回答）" : ""}`, relFace(x.fig), sharedResultViewPath(x.mode, x.code))).join("")}</div>
-        <p class="note" style="text-align:left;margin:8px 0 0">開いた共有リンクの記録です。自分のリンクも含まれ、同じ回答コードは1件にまとまります。人の数ではありません（最大20件）。</p>`
-        : `<p class="note" style="text-align:left;margin:0">まだありません。共有リンクを開くと、ここに結果が並びます。</p>`}</section>
+    <section class="card"><h2>自分の診断結果${selfSnapshot.status === "ok" ? "" : "（読取専用）"}</h2><p class="note" style="text-align:left;margin:0 0 10px">これまでの診断回数：${selfReadable ? `${selfSnapshot.state.count}回${selfSnapshot.status === "ok" ? "" : "（照合前）"}` : "確認できません"}</p><div class="me-list">${mineHtml}</div></section>
+    ${pendingFigureCount ? `<section class="card"><h2>図鑑への登録を確認中</h2><p>${pendingFigureCount}件の結果は保存済みですが、図鑑への反映が未確認です。</p><button class="btn sub" data-retry-all-self-zukan>図鑑への登録を再試行</button></section>` : ""}
+    ${legacyUnverified.length ? `<section class="card"><h2>出所未確認の旧結果</h2><p class="note">以前の保存欄にあった結果ですが、本人が答えた記録か確認できません。自分の診断結果や友達の人数には数えません。元の記録は上のボタンから保存できます。</p>${legacyUnverified.map((x) => `<p>${x.mode === "love" ? "恋愛診断" : "性格診断"}：${esc(fig(x.fig).name)}（出所未確認）</p>`).join("")}</section>` : ""}
+    <section class="card"><h2>以前の共有リンク履歴</h2>
+      ${friends.length ? `<div class="me-list">${friends.map((x) => row(x.mode, x, `${x.mode === "love" ? "恋愛" : "性格"}・${date(x.at)}に開いた結果${savedResult(x.mode)?.code === x.code ? "（自分と同じ回答）" : ""}`, relFace(x.fig), sharedResultViewPath(x.mode, x.code))).join("")}</div>
+        <p class="note" style="text-align:left;margin:8px 0 0">以前に保存されたリンクの記録です。自分のリンクも含まれ、同じ回答コードは1件にまとまります。人の数ではありません（最大20件）。今はリンクを開くだけでは追加されません。</p>`
+        : `<p class="note" style="text-align:left;margin:0">以前の履歴はありません。共有リンクの回答は、開くだけではこの履歴に追加されません。残したいときはリンク先で人物カードに追加してください。</p>`}</section>
     ${OTHER_PILOT ? `<section class="card"><h2>友達から見た自分 <span class="dev-badge">試作</span></h2>
       <p class="social-note">あなたについての返信リンクを、自分で保存した記録です。回答者の本人確認はできず、自分の結果も置き換えません。</p>
       <p>${otherReplies().length}件の返信をこの端末に保存中。回答した人の人数とは限りません。</p>
@@ -1402,6 +1814,56 @@ function renderMe() {
     <a class="btn sub" href="#/how">このサイトの使い方</a>
     <a class="btn sub" href="#/">トップへ</a>`;
   bindFreshQuizLinks();
+  let exportedLegacyRaw = null;
+  const recoveryCheck = $("[data-self-recovery-check]");
+  const recoveryButton = $("[data-rebaseline-self]");
+  const updateRecoveryButton = () => {
+    if (recoveryButton) recoveryButton.disabled = !(exportedLegacyRaw && recoveryCheck?.checked);
+  };
+  $("[data-export-self]")?.addEventListener("click", () => {
+    try {
+      exportedLegacyRaw = exportSelfOriginalRaw();
+      updateRecoveryButton();
+    } catch { toast("元の記録を保存できませんでした。サイトデータは消さずに保管してください"); }
+  });
+  recoveryCheck?.addEventListener("change", updateRecoveryButton);
+  recoveryButton?.addEventListener("click", async () => {
+    if (!exportedLegacyRaw || !recoveryCheck.checked || !selfLockAvailable()) return;
+    if (!window.confirm("古い保存欄の変更は自分の結果へ取り込みません。元の記録を保存し、古いタブを閉じたことを確認しましたか？")) return;
+    const captured = currentClearEpoch();
+    const expectedRaw = selfSnapshot.raw;
+    recoveryButton.disabled = true;
+    const outcome = captured.status === "present" && typeof expectedRaw === "string"
+      ? await withSiteRecordsLock(() => {
+        if (!recoveryButton.isConnected || location.hash !== "#/me" || !clearEpochMatches(captured))
+          return { status: "changed" };
+        const latest = selfStateSnapshot();
+        if (latest.status !== selfSnapshot.status || latest.raw !== expectedRaw)
+          return { status: "changed" };
+        return rebaselineLegacySelfState(localStorage, captured.token, expectedRaw, exportedLegacyRaw, verifiedResult);
+      }) : { status: "unavailable" };
+    if (!recoveryButton.isConnected) return;
+    if (outcome?.status !== "ok") {
+      recoveryButton.disabled = false;
+      toast("保存を再開できませんでした。古いタブを閉じ、元の記録を保管してください");
+      route();
+      return;
+    }
+    route();
+    focusPageHeading();
+    toast("保存を再開しました。古い結果は自分の結果へ追加していません");
+  });
+  const pendingEpoch = capturePersonCardEpoch();
+  $("[data-retry-all-self-zukan]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    const status = await retryPendingZukan(await pendingEpoch);
+    if (!button.isConnected) return;
+    button.disabled = false;
+    if (status !== "saved") return toast("図鑑への登録を確認できませんでした。後でもう一度お試しください");
+    route();
+    toast("図鑑への登録を確認しました");
+  });
   window.scrollTo(0, 0);
 }
 
@@ -1446,7 +1908,8 @@ function renderAbout() {
     <h2>これからの機能 <span class="dev-badge">※開発中</span></h2>
     <p>友達を招いてあなたについて答えてもらう他己診断、複数人の独立した回答を保証する総合結果、人物カード同士の組み合わせバッジは、公開版ではまだ使えません。LINEスタンプやグッズの販売導線も未公開です。</p>
     <h2>記録の削除</h2>
-    <p>このブラウザーで、このサイトが保存した記録を消します。別のタブで開いている途中の答えは残る場合があります。ブラウザーの閲覧履歴や、すでに送った結果リンクは消えません。</p>
+    <p>このブラウザーで、このサイトが保存した診断記録を消します。再保存や旧記録の再移行を防ぐため、回答を含まない削除・移行の管理値は端末に残ります。別タブや古い版が動いている場合、記録が再び残ることがあります。ブラウザーの閲覧履歴や、すでに送った結果リンクは消えません。</p>
+    <p>このブラウザーが複数タブの同時操作保護に対応しない場合、自己診断結果の端末保存・以前の結果への復元・サイト内からの全記録削除は安全のため行いません。結果は画面で見られますが、保存が必要なら対応ブラウザーでお試しください。確実に消したい場合は、すべてのタブを閉じてブラウザーのサイトデータを削除してください。</p>
     <p><b>以前の版でログインした方へ：</b>この操作では、その認証セッションやクラウド上の既存データは削除しません。</p>
     <button class="btn sub" type="button" data-clear aria-expanded="false" aria-controls="clear-confirm">このサイトの保存記録を消す</button>
     <section class="clear-confirm" id="clear-confirm" aria-labelledby="clear-confirm-title" hidden>
@@ -1461,29 +1924,35 @@ function renderAbout() {
   const clearConfirm = $("[data-confirm-clear]");
   const clearHeading = $("#clear-confirm-title");
   const clearPanel = $("#clear-confirm");
+  let clearConfirmationSerial = 0;
   clearButton.onclick = () => {
+    clearConfirmationSerial++;
     clearPanel.hidden = false;
     clearButton.setAttribute("aria-expanded", "true");
     clearHeading.focus();
   };
   $("[data-cancel-clear]").onclick = () => {
+    clearConfirmationSerial++;
     clearPanel.hidden = true;
     clearButton.setAttribute("aria-expanded", "false");
     clearButton.focus();
   };
-  clearConfirm.onclick = () => {
-    const localOk = clearPrefixedStorage(() => localStorage);
-    const sessionOk = clearPrefixedStorage(() => sessionStorage);
-    quiz = null;
-    justFinished = null;
-    otherQuiz = null;
-    confirmedOtherToken = null;
-    nextSrc = null;
-    lastSharedInMemory.normal = null;
-    lastSharedInMemory.love = null;
-    if (!localOk || !sessionOk) {
+  clearConfirm.onclick = async () => {
+    if (clearConfirm.disabled) return;
+    clearConfirm.disabled = true;
+    const hashAtClick = location.hash;
+    const serialAtClick = clearConfirmationSerial;
+    const cleared = await clearSiteRecords(() => clearConfirm.isConnected
+      && !clearPanel.hidden && location.hash === hashAtClick
+      && clearConfirmationSerial === serialAtClick);
+    if (!clearConfirm.isConnected) return;
+    clearConfirm.disabled = false;
+    if (cleared === "cancelled") return;
+    if (cleared !== "cleared") {
       const status = $("[data-clear-status]");
-      status.textContent = "保存記録をすべて消したとは確認できません。もう一度「保存記録を消す」を押すか、ブラウザーのサイトデータを削除してください。";
+      status.textContent = cleared === "partial"
+        ? "保存記録をすべて消したとは確認できません。ブラウザーのサイトデータを削除してください。"
+        : "安全に削除を開始できませんでした。別のタブを閉じて再読み込みするか、ブラウザーのサイトデータを削除してください。";
       status.hidden = false;
       status.focus();
       return;
@@ -1509,16 +1978,19 @@ function renderUnavailable() {
 
 // ---------------- 友達から見た自分（端末内・手動で往復） ----------------
 // 旧 #/invite は別仕様のため再利用しない。新しいURLは #/ask/<token> と #/reply/<token>/<code>。
-function copyLink(url, okText = "リンクをコピーしました") {
-  navigator.clipboard?.writeText(url).then(() => toast(okText)).catch(() => prompt("このリンクをコピーしてください", url));
-  if (!navigator.clipboard?.writeText) prompt("このリンクをコピーしてください", url);
+function copyLink(url, okText = "リンクをコピーしました", stillValid = () => true) {
+  if (!stillValid()) return;
+  navigator.clipboard?.writeText(url).then(() => { if (stillValid()) toast(okText); })
+    .catch(() => { if (stillValid()) prompt("このリンクをコピーしてください", url); });
+  if (!navigator.clipboard?.writeText && stillValid()) prompt("このリンクをコピーしてください", url);
 }
-function shareLink(url, text) {
+function shareLink(url, text, stillValid = () => true) {
+  if (!stillValid()) return;
   if (navigator.share) {
     navigator.share({ title: "世界の偉人性格診断", text, url }).catch((e) => {
-      if (e?.name !== "AbortError") copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました");
+      if (e?.name !== "AbortError" && stillValid()) copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
     });
-  } else copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました");
+  } else copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
 }
 function renderAskHome() {
   document.title = "友達に聞く｜世界の偉人性格診断";
@@ -1724,6 +2196,7 @@ function renderOtherReply(token, code) {
 function renderPeople() {
   document.title = "人物カード｜世界の偉人性格診断";
   app.style.cssText = "";
+  const capturedEpoch = capturePersonCardEpoch();
   const snapshot = readPersonCardStorage();
   if (snapshot.status !== "ok") {
     const message = snapshot.status === "damaged"
@@ -1805,12 +2278,32 @@ function renderPeople() {
     const result = engines[mode].diagnose(answersOf(engines[mode], code));
     const url = shareUrl(mode, result.figure.id, code);
     const label = mode === "love" ? "恋愛版" : "性格版";
+    const shareView = capturedSelfViewGuard();
+    const inviteButton = $("[data-invite-self=\"" + mode + "\"]");
+    const copyButton = $("[data-copy-self=\"" + mode + "\"]");
+    const stillCurrent = (button) => shareView() && button?.isConnected && savedResult(mode)?.code === code;
     $(`[data-invite-self="${mode}"]`)?.setAttribute("aria-label", `${label}の結果を友達に送る。リンクを知る人は12問の答えを読み取れます`);
     $(`[data-copy-self="${mode}"]`)?.setAttribute("aria-label", `${label}の結果リンクをコピー。リンクを知る人は12問の答えを読み取れます`);
-    $(`[data-invite-self="${mode}"]`)?.addEventListener("click", () => shareLink(url, `${label}では私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`));
-    $(`[data-copy-self="${mode}"]`)?.addEventListener("click", () => copyLink(url, `${label}の結果リンクをコピーしました`));
+    inviteButton?.addEventListener("click", () => {
+      if (!stillCurrent(inviteButton)) { route(); return; }
+      shareLink(url, `${label}では私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`, () => stillCurrent(inviteButton));
+    });
+    copyButton?.addEventListener("click", () => {
+      if (!stillCurrent(copyButton)) { route(); return; }
+      copyLink(url, `${label}の結果リンクをコピーしました`, () => stillCurrent(copyButton));
+    });
   });
-  app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = () => {
+  app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = async () => {
+    if (b.disabled) return;
+    const hash = location.hash;
+    const captured = await capturedEpoch;
+    if (!personCardActionCurrent(b, hash)) return;
+    const epochAtClick = personCardEpochStatus(captured);
+    if (epochAtClick === "stale_epoch") {
+      renderPeople();
+      return toast("端末の記録が削除されました。画面を更新してから選び直してください");
+    }
+    if (epochAtClick !== "current") return toast("保存の準備を確認できません。少し待って画面を開き直してください");
     const refreshChanged = () => {
       renderPeople();
       toast("別タブでカードが変わりました。更新して選び直してください");
@@ -1821,15 +2314,49 @@ function renderPeople() {
       return refreshChanged();
     }
     const beforeConfirm = JSON.stringify(all);
+    const before = readPersonCardStorage();
+    if (before.status !== "ok" || JSON.stringify(before.cards) !== beforeConfirm) return refreshChanged();
     if (!confirm(personDeleteConfirmMessage(current, i, isVerifiedCard(current) ? fig(current.fig).name : ""))) return;
-    const latest = store.get("people.cards", []);
-    if (!Array.isArray(latest) || JSON.stringify(latest) !== beforeConfirm) return refreshChanged();
-    latest.splice(index, 1);
-    if (!store.set("people.cards", latest)) return toast("この端末からカードを削除できませんでした");
+    if (!personCardActionCurrent(b, hash)) return;
+    b.disabled = true;
+    const status = await withSiteRecordsLock(() => {
+      if (!personCardActionCurrent(b, hash)) return "cancelled";
+      const epoch = personCardEpochStatus(captured);
+      if (epoch !== "current") return epoch;
+      return withPersonCardsLock(() => {
+        if (!personCardActionCurrent(b, hash)) return "cancelled";
+        const latestEpoch = personCardEpochStatus(captured);
+        if (latestEpoch !== "current") return latestEpoch;
+        const latest = personCardSnapshotUnchanged(before.raw);
+        if (!latest || !personCardTargetUnchanged(latest, i, index, displayedId)) return "changed";
+        const next = latest.slice();
+        next.splice(index, 1);
+        return store.set("people.cards", next) ? "deleted" : "error";
+      });
+    });
+    b.disabled = false;
+    if (!personCardActionCurrent(b, hash) || status === "cancelled") return;
+    if (status === "stale_epoch" || personCardEpochStatus(captured) === "stale_epoch") {
+      renderPeople();
+      return toast("端末の記録が削除されました。画面を更新してから選び直してください");
+    }
+    if (status === "epoch_unavailable") return toast("保存の準備を確認できません。少し待って画面を開き直してください");
+    if (status === "changed") return refreshChanged();
+    if (status !== "deleted") return toast("この端末からカードを削除できませんでした");
     renderPeople();
     focusPageHeading();
   });
-  app.querySelectorAll("[data-label-person]").forEach((b) => b.onclick = () => {
+  app.querySelectorAll("[data-label-person]").forEach((b) => b.onclick = async () => {
+    if (b.disabled) return;
+    const hash = location.hash;
+    const captured = await capturedEpoch;
+    if (!personCardActionCurrent(b, hash)) return;
+    const epochAtClick = personCardEpochStatus(captured);
+    if (epochAtClick === "stale_epoch") {
+      renderPeople();
+      return toast("端末の記録が削除されました。画面を更新してから選び直してください");
+    }
+    if (epochAtClick !== "current") return toast("保存の準備を確認できません。少し待って画面を開き直してください");
     const refreshChanged = () => {
       closeSheet(false);
       renderPeople();
@@ -1842,18 +2369,46 @@ function renderPeople() {
       return refreshChanged();
     }
     const beforeEdit = JSON.stringify(all);
+    const before = readPersonCardStorage();
+    if (before.status !== "ok" || JSON.stringify(before.cards) !== beforeEdit) return refreshChanged();
     openSheet(`<div class="panel"><h2 id="sheet-title">カードの呼び名</h2>
       <p>自分だけに分かる短い呼び名を付けられます。本名や連絡先は入れないでください。この端末にだけ保存され、結果リンクには入りません。</p>
       <label for="person-label">呼び名（20文字以内）</label>
       <input class="social-input" id="person-label" type="text" maxlength="20" value="${esc(current.label || "")}" placeholder="例：友達A">
       <button class="btn start" data-save-person-label>保存する</button>
       <button class="btn sub close" type="button">閉じる</button></div>`, b);
-    $("[data-save-person-label]", sheet).onclick = () => {
+    const saveButton = $("[data-save-person-label]", sheet);
+    saveButton.onclick = async () => {
+      if (saveButton.disabled) return;
       const label = $("#person-label", sheet).value.trim().replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 20);
-      const latest = store.get("people.cards", []);
-      if (!Array.isArray(latest) || JSON.stringify(latest) !== beforeEdit) return refreshChanged();
-      latest[index] = { ...latest[index], label };
-      if (!store.set("people.cards", latest)) return toast("呼び名を保存できませんでした");
+      if (!personCardActionCurrent(b, hash, saveButton)) return;
+      saveButton.disabled = true;
+      const status = await withSiteRecordsLock(() => {
+        if (!personCardActionCurrent(b, hash, saveButton)) return "cancelled";
+        const epoch = personCardEpochStatus(captured);
+        if (epoch !== "current") return epoch;
+        return withPersonCardsLock(() => {
+          if (!personCardActionCurrent(b, hash, saveButton)) return "cancelled";
+          const latestEpoch = personCardEpochStatus(captured);
+          if (latestEpoch !== "current") return latestEpoch;
+          const latest = personCardSnapshotUnchanged(before.raw);
+          if (!latest || !personCardTargetUnchanged(latest, i, index, displayedId)) return "changed";
+          const next = latest.slice();
+          next[index] = { ...next[index], label };
+          return store.set("people.cards", next) ? "renamed" : "error";
+        });
+      });
+      saveButton.disabled = false;
+      if (!personCardActionCurrent(b, hash, saveButton) || status === "cancelled") return;
+      if (status === "stale_epoch" || personCardEpochStatus(captured) === "stale_epoch") {
+        closeSheet(false);
+        renderPeople();
+        focusPageHeading();
+        return toast("端末の記録が削除されました。画面を更新してから選び直してください");
+      }
+      if (status === "epoch_unavailable") return toast("保存の準備を確認できません。少し待って画面を開き直してください");
+      if (status === "changed") return refreshChanged();
+      if (status !== "renamed") return toast("呼び名を保存できませんでした");
       closeSheet(false);
       renderPeople();
       app.querySelector(`[data-label-person="${i}"]`)?.focus();
@@ -1888,10 +2443,115 @@ function renderFigure(mode, id) {
   window.scrollTo(0, 0);
 }
 
+// Broken legacy synchronization never turns an unverified answer into SELF or
+// a friend's card. These routes only allow inspection of already stored data.
+function renderSelfReadOnly(mode, code, kind) {
+  const snapshot = selfStateSnapshot();
+  if (!["legacy_changed", "legacy_unverified"].includes(snapshot.status)
+    || !engines[mode] || !validCode(engines[mode], code)) return renderUnavailable();
+  let allowed = false;
+  if (kind === "saved-readonly") {
+    const state = snapshot.state;
+    allowed = [state.current[mode], state.previous[mode]].some((entry) => entry?.code === code)
+      || state.seenResults.includes(mode + code);
+  } else if (kind === "legacy" && snapshot.status === "legacy_changed") {
+    const key = `ijin.me.${mode}`;
+    let raw;
+    try { raw = localStorage.getItem(key); } catch { return renderUnavailable(); }
+    if (raw !== null && raw !== snapshot.state.legacySnapshot?.[key]) {
+      let entry;
+      try { entry = JSON.parse(raw); } catch { return renderUnavailable(); }
+      allowed = verifiedResult(mode, entry) && entry.code === code;
+    }
+  }
+  if (!allowed) return renderUnavailable();
+  const result = engines[mode].diagnose(answersOf(engines[mode], code));
+  document.title = `照合前の結果｜世界の偉人性格診断`;
+  app.style.cssText = themeVars(result.type.id);
+  app.innerHTML = `<p class="note" role="alert">${kind === "legacy"
+    ? "古い保存欄にある回答です。本人が答えた結果かは未確認です。"
+    : "以前保存された回答ですが、古いタブの変更後は照合できていません。"} この画面は読むだけで、自己診断や人物カードには登録しません。元の記録を保管してください。</p>
+    ${resultCard(result, mode, kind === "legacy" ? "unverified" : "readonly", false)}
+    <a class="btn sub" href="#/me">この端末の記録へ戻る</a>`;
+  attachMotion(result.figure.name);
+  window.scrollTo(0, 0);
+}
+
 // ---------------- ルーティング ----------------
 let visitSent = false;
 app.addEventListener("click", (e) => { const el = e.target.closest("[data-src]"); if (el) nextSrc = el.dataset.src; }, true);
+function showGlobalSelfWarning() {
+  const status = selfStateSnapshot().status;
+  const warning = externalSessionClearFailed ? "session_clear_failed" : status;
+  const existing = app.querySelector("[data-self-warning]");
+  if (warning === "ok") { existing?.remove(); return; }
+  if (existing?.dataset.selfWarning === warning) return;
+  existing?.remove();
+  const banner = document.createElement("p");
+  banner.className = "note";
+  banner.dataset.selfWarning = warning;
+  banner.setAttribute("role", "alert");
+  banner.innerHTML = warning === "session_clear_failed"
+    ? '別のタブで削除されましたが、このタブの途中回答を消せたか確認できません。タブを閉じ、必要ならブラウザーのサイトデータを削除してください。'
+    : '端末の診断記録を確認できないため、新しい結果は保存されません。先に<a href="#/me">この端末の記録を確認</a>してください。';
+  app.prepend(banner);
+}
+let trustedEpoch = null;
+let lastRevokedState = null;
+let selfViewGeneration = 0;
+let externalSessionClearFailed = false;
+function revokeStaleSelfView() {
+  const status = selfStateSnapshot().status;
+  const currentEpoch = currentClearEpoch();
+  if (trustedEpoch === null && currentEpoch.status === "present") trustedEpoch = currentEpoch.token;
+  const epochChanged = trustedEpoch !== null
+    && (currentEpoch.status !== "present" || currentEpoch.token !== trustedEpoch);
+  if (status !== "missing_after_migration" && !epochChanged) {
+    lastRevokedState = null;
+    return false;
+  }
+  const signature = `${status}:${currentEpoch.status}:${currentEpoch.token ?? ""}`;
+  if (signature === lastRevokedState) {
+    // Do not let Back or a newly entered result hash reopen an unverified
+    // answer-bearing page after an old-tab clear.
+    if (status === "missing_after_migration"
+      && !["#/me", "#/about"].includes(location.hash)) {
+      const safeUrl = new URL(location.href);
+      safeUrl.hash = "#/me";
+      safeUrl.searchParams.delete("shared");
+      safeUrl.searchParams.delete("shared_fig");
+      safeUrl.searchParams.delete("shared_mode");
+      history.replaceState(history.state, "", safeUrl.href);
+    }
+    return false;
+  }
+  lastRevokedState = signature;
+  selfViewGeneration++;
+  if (!clearPrefixedStorage(() => sessionStorage)) externalSessionClearFailed = true;
+  quiz = null;
+  justFinished = null;
+  otherQuiz = null;
+  confirmedOtherToken = null;
+  nextSrc = null;
+  lastSharedInMemory.normal = null;
+  lastSharedInMemory.love = null;
+  personSnapshot = null;
+  shareCache = { key: null, blob: null };
+  legacyHandles.clear();
+  trustedEpoch = currentEpoch.status === "present" ? currentEpoch.token : null;
+  const safeUrl = new URL(location.href);
+  safeUrl.hash = "#/me";
+  safeUrl.searchParams.delete("shared");
+  safeUrl.searchParams.delete("shared_fig");
+  safeUrl.searchParams.delete("shared_mode");
+  history.replaceState(history.state, "", safeUrl.href);
+  return true;
+}
 function route() {
+  // A hash navigation can beat the storage event. Check the last trusted epoch
+  // before rendering a result, without acknowledging an unseen deletion.
+  revokeStaleSelfView();
+  queueMicrotask(showGlobalSelfWarning);
   disposeGuide();
   disposeGuide = () => {};
   disposeMotion();
@@ -1901,13 +2561,15 @@ function route() {
     currentMode = (pg === "q" || pg === "r" || pg === "f") && engines[md] ? md : "none";
     if (!visitSent) {
       visitSent = true;
-      const entry = pg === "r" ? (store.get("me." + md)?.code === cd ? "own_result" : "shared_link")
+      const entry = pg === "r" ? (savedResult(md)?.code === cd ? "own_result" : "shared_link")
         : pg === "f" ? "shared_link" : pg === "q" ? "quiz" : pg === "zukan" ? "zukan" : "top";
       track("visit", { entry, returning: RETURNING ? "yes" : "no" });
     } }
   overlay.hidden = true; app.inert = false; closeSheet(false);
   app.style.cssText = "";
   const [, page, mode, code] = location.hash.split("/");
+  if ((page === "legacy" || page === "saved-readonly") && (mode === "normal" || mode === "love"))
+    return renderSelfReadOnly(mode, code, page);
   if (!OTHER_PILOT && ["ask", "answer", "reply"].includes(page)) return renderUnavailable();
   const socialRoute = parseSocialHash(location.hash);
   if (page === "ask" && !mode) return renderAskHome();
@@ -1962,6 +2624,29 @@ addEventListener("keydown", (e) => {
 addEventListener("pagehide", () => {
   if (quiz && quiz.answers.length && !quiz.abandonSent) { quiz.abandonSent = true; track("quiz_abandon", { mode: quiz.mode, n: quiz.answers.length, source: quiz.source }); }
 });
+function refreshSelfAfterExternalChange() {
+  if (revokeStaleSelfView()) {
+    route();
+    focusPageHeading();
+  } else showGlobalSelfWarning();
+}
+addEventListener("storage", (event) => {
+  if (event.key === null || event.key === SELF_KEY || event.key === "ijin-clear-epoch"
+    || event.key === "ijin-self-migration-gate" || event.key?.startsWith("ijin.me.")
+    || ["ijin.diagLedger", "ijin.diagCount", "ijin.seen_results"].includes(event.key))
+    refreshSelfAfterExternalChange();
+});
+addEventListener("pageshow", refreshSelfAfterExternalChange);
+addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") refreshSelfAfterExternalChange();
+});
+// 権威キーを先に一度だけ移行・初期化し、それ以後は旧 SELF キーを読まない。
+await initialEpochPromise;
+if (selfLockAvailable()) await withSiteRecordsLock(() => {
+  const epoch = currentClearEpoch();
+  return epoch.status === "present" ? initializeSelfState(localStorage, epoch.token, verifiedResult)
+    : { status: "epoch_unavailable" };
+});
 route();
-store.set("visited", true);
+if (selfStateSnapshot().status === "ok") store.set("visited", true);
 // ローカル版では Firebase Auth に接続しない。
