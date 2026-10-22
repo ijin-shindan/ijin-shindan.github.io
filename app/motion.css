@@ -6,8 +6,8 @@
 .rig-impact {position:absolute;inset:0;pointer-events:none;opacity:0;background:repeating-conic-gradient(from 8deg at 50% 29%,#514d4260 0deg 1deg,transparent 1deg 15deg);mask-image:radial-gradient(ellipse at 50% 29%,transparent 27%,#000 77%);}
 .rig-impact.active {opacity:.8;}
 .rig-controls {max-width:360px;margin:14px auto 6px;text-align:center;}
-.rig-buttons {display:flex;justify-content:center;flex-wrap:wrap;gap:5px;}
-.rig-buttons button {font:600 12px/1.4 var(--sans);min-height:40px;padding:7px 12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;box-shadow:none;cursor:pointer;}
+.rig-buttons {display:flex;justify-content:center;flex-wrap:wrap;gap:7px;}
+.rig-buttons button {font:600 12px/1.4 var(--sans);min-height:44px;padding:7px 12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:4px;box-shadow:none;cursor:pointer;}
 .rig-buttons button:hover:not(:disabled) {border-color:var(--kin);background:var(--paper);}
 .rig-buttons button:disabled {opacity:.35;cursor:default;}
 .rig-buttons button:focus-visible,.rig-reduce input:focus-visible {outline:2px solid var(--shu);outline-offset:3px;}
