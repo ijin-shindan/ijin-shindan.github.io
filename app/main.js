@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=7b1111e-202610251819";
-import { mountMotion } from "./motion.js?v=7b1111e-202610251819";
-import { mountGuide } from "./guide.js?v=7b1111e-202610251819";
+import { AXES, Shindan, loadData } from "./shindan.js?v=4b1261d-202610251829";
+import { mountMotion } from "./motion.js?v=4b1261d-202610251829";
+import { mountGuide } from "./guide.js?v=4b1261d-202610251829";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=7b1111e-202610251819";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7b1111e-202610251819";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7b1111e-202610251819";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7b1111e-202610251819";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=7b1111e-202610251819";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7b1111e-202610251819";
-import { storedResultMatches, storedList } from "./stored_result.js?v=7b1111e-202610251819";
-import { clearPrefixedStorage } from "./storage_clear.js?v=7b1111e-202610251819";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=7b1111e-202610251819";
-import { applyZukanBatch } from "./zukan_batch.js?v=7b1111e-202610251819";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=4b1261d-202610251829";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=4b1261d-202610251829";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=4b1261d-202610251829";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=4b1261d-202610251829";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=4b1261d-202610251829";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=4b1261d-202610251829";
+import { storedResultMatches, storedList } from "./stored_result.js?v=4b1261d-202610251829";
+import { clearPrefixedStorage } from "./storage_clear.js?v=4b1261d-202610251829";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=4b1261d-202610251829";
+import { applyZukanBatch } from "./zukan_batch.js?v=4b1261d-202610251829";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7b1111e-202610251819")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=4b1261d-202610251829")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -88,6 +88,11 @@ function closeSheet(restoreFocus = true) {
   const target = sheetReturnFocus;
   sheetReturnFocus = null;
   if (restoreFocus && target?.isConnected) target.focus();
+  // A card list changed in another tab while this dialog was open. Keep the
+  // draft intact until the dialog closes, then reconcile the visible list.
+  if (location.hash === "#/people" && activePeopleCardsView?.pending) {
+    queueMicrotask(refreshPeopleCardsAfterExternalChange);
+  }
 }
 function openSheet(html, trigger, objectUrl = null) {
   closeSheet(false);
@@ -2254,12 +2259,89 @@ function bindPeopleOwnShares(ownShares) {
     });
   });
 }
+let activePeopleCardsView = null;
+function capturePeopleCardsView(snapshot) {
+  activePeopleCardsView = { hash: location.hash, status: snapshot.status,
+    raw: snapshot.raw ?? null, pending: false };
+}
+function peopleCardsRefreshBusy() {
+  return sheet.hidden !== true || !!app.querySelector('[data-remove-person]:disabled, [data-save-person-label]:disabled');
+}
+function showPeopleCardsSheetPending() {
+  if (sheet.hidden || sheet.querySelector('[data-people-cards-sheet-pending]')) return;
+  const panel = sheet.querySelector('.panel');
+  if (!panel) return;
+  const notice = document.createElement('p');
+  notice.className = 'note';
+  notice.dataset.peopleCardsSheetPending = '';
+  notice.setAttribute('role', 'alert');
+  notice.textContent = '別のタブで人物カードが変わりました。今の入力は残しています。この画面を閉じると一覧を更新します。';
+  panel.append(notice);
+}
+function deferPeopleCardsRefresh() {
+  if (!activePeopleCardsView) return;
+  showPeopleCardsSheetPending();
+  if (activePeopleCardsView.pending) return;
+  activePeopleCardsView.pending = true;
+  const notice = document.createElement("p");
+  notice.className = "note";
+  notice.dataset.peopleCardsPending = "";
+  notice.setAttribute("role", "alert");
+  notice.textContent = "別のタブで人物カードが変わりました。今の操作を中断しないため、一覧はまだ更新していません。";
+  const button = document.createElement("button");
+  button.className = "btn sub";
+  button.type = "button";
+  button.textContent = "人物カードを更新して表示";
+  button.addEventListener("click", refreshPeopleCardsAfterExternalChange);
+  notice.append(button);
+  app.prepend(notice);
+}
+function refreshPeopleCardsAfterExternalChange() {
+  const view = activePeopleCardsView;
+  if (location.hash !== "#/people" || view?.hash !== location.hash) return;
+  const latest = readPersonCardStorage();
+  if (latest.status === view.status && (latest.raw ?? null) === view.raw) {
+    if (view.pending) {
+      app.querySelector("[data-people-cards-pending]")?.remove();
+      sheet.querySelector("[data-people-cards-sheet-pending]")?.remove();
+      view.pending = false;
+    }
+    return;
+  }
+  if (peopleCardsRefreshBusy()) return deferPeopleCardsRefresh();
+  const scrollY = window.scrollY;
+  const focused = document.activeElement;
+  let focusTarget = null;
+  if (focused && app.contains(focused)) {
+    const href = focused.tagName === "A" ? focused.getAttribute("href") : null;
+    const action = ["data-label-person", "data-remove-person", "data-invite-self", "data-copy-self", "data-export-damaged"]
+      .find((name) => focused.hasAttribute(name));
+    focusTarget = href ? { kind: "link", href } : action
+      ? { kind: "button", action, value: focused.getAttribute(action), id: focused.getAttribute("data-person-id") }
+      : { kind: "heading" };
+  }
+  renderPeople();
+  window.scrollTo(0, scrollY);
+  if (!focusTarget) return;
+  const match = focusTarget.kind === "link"
+    ? [...app.querySelectorAll("a[href]")].find((link) => link.getAttribute("href") === focusTarget.href)
+    : focusTarget.kind === "button" ? [...app.querySelectorAll(`[${focusTarget.action}]`)]
+      .find((button) => button.getAttribute("data-person-id") === focusTarget.id
+        && (["data-label-person", "data-remove-person"].includes(focusTarget.action)
+          || button.getAttribute(focusTarget.action) === focusTarget.value)) : null;
+  const destination = match && !match.hidden && !match.disabled ? match : app.querySelector("h1");
+  if (typeof destination?.focus === "function") {
+    if (destination !== match) destination.tabIndex = -1;
+    try { destination.focus({ preventScroll: true }); } catch { /* Keep the updated page visible. */ }
+  }
+}
 function renderPeople() {
   document.title = "人物カード｜世界の偉人性格診断";
   captureSelfOverview();
   app.style.cssText = "";
   const capturedEpoch = capturePersonCardEpoch();
   const snapshot = readPersonCardStorage();
+  capturePeopleCardsView(snapshot);
   if (snapshot.status !== "ok") {
     const message = snapshot.status === "damaged"
       ? "この端末の人物カード記録を読み込めません。元の記録を守るため、追加や編集を止めています。サイトデータを消さずに保管してください。"
@@ -2372,6 +2454,7 @@ function renderPeople() {
       });
     });
     b.disabled = false;
+    if (activePeopleCardsView?.pending) queueMicrotask(refreshPeopleCardsAfterExternalChange);
     if (!personCardActionCurrent(b, hash) || status === "cancelled") return;
     if (status === "stale_epoch" || personCardEpochStatus(captured) === "stale_epoch") {
       renderPeople();
@@ -2394,8 +2477,14 @@ function renderPeople() {
       return toast("端末の記録が削除されました。画面を更新してから選び直してください");
     }
     if (epochAtClick !== "current") return toast("保存の準備を確認できません。少し待って画面を開き直してください");
+    let editorOpened = false;
     const refreshChanged = () => {
-      closeSheet(false);
+      if (editorOpened) {
+        // An edit attempted against a changed snapshot must not write, but the
+        // person's unfinished label remains available until they close it.
+        deferPeopleCardsRefresh();
+        return toast("別タブでカードが変わりました。呼び名の入力は残しています。閉じると一覧を更新します");
+      }
       renderPeople();
       focusPageHeading();
       toast("別タブでカードが変わりました。更新して選び直してください");
@@ -2414,6 +2503,7 @@ function renderPeople() {
       <input class="social-input" id="person-label" type="text" maxlength="20" value="${esc(current.label || "")}" placeholder="例：友達A">
       <button class="btn start" data-save-person-label>保存する</button>
       <button class="btn sub close" type="button">閉じる</button></div>`, b);
+    editorOpened = true;
     const saveButton = $("[data-save-person-label]", sheet);
     saveButton.onclick = async () => {
       if (saveButton.disabled) return;
@@ -2436,6 +2526,7 @@ function renderPeople() {
         });
       });
       saveButton.disabled = false;
+      if (activePeopleCardsView?.pending) queueMicrotask(refreshPeopleCardsAfterExternalChange);
       if (!personCardActionCurrent(b, hash, saveButton) || status === "cancelled") return;
       if (status === "stale_epoch" || personCardEpochStatus(captured) === "stale_epoch") {
         closeSheet(false);
@@ -2651,6 +2742,7 @@ function route() {
   revokeStaleSelfView();
   activeSelfResult = null;
   activeSelfOverview = null;
+  activePeopleCardsView = null;
   queueMicrotask(showGlobalSelfWarning);
   disposeGuide();
   disposeGuide = () => {};
@@ -2730,6 +2822,7 @@ function refreshSelfAfterExternalChange() {
     focusPageHeading();
     return;
   }
+  refreshPeopleCardsAfterExternalChange();
   if (activeSelfResult) {
     const snapshot = selfStateSnapshot();
     if (snapshot.status !== "ok") {
