@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=6ad2e46-202610260557";
-import { mountMotion } from "./motion.js?v=6ad2e46-202610260557";
-import { mountGuide } from "./guide.js?v=6ad2e46-202610260557";
+import { AXES, Shindan, loadData } from "./shindan.js?v=e31a3ae-202610260659";
+import { mountMotion } from "./motion.js?v=e31a3ae-202610260659";
+import { mountGuide } from "./guide.js?v=e31a3ae-202610260659";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=6ad2e46-202610260557";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=6ad2e46-202610260557";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=6ad2e46-202610260557";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=6ad2e46-202610260557";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=6ad2e46-202610260557";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=6ad2e46-202610260557";
-import { storedResultMatches, storedList } from "./stored_result.js?v=6ad2e46-202610260557";
-import { clearPrefixedStorage } from "./storage_clear.js?v=6ad2e46-202610260557";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=6ad2e46-202610260557";
-import { applyZukanBatch } from "./zukan_batch.js?v=6ad2e46-202610260557";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=e31a3ae-202610260659";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=e31a3ae-202610260659";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=e31a3ae-202610260659";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=e31a3ae-202610260659";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=e31a3ae-202610260659";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=e31a3ae-202610260659";
+import { storedResultMatches, storedList } from "./stored_result.js?v=e31a3ae-202610260659";
+import { clearPrefixedStorage } from "./storage_clear.js?v=e31a3ae-202610260659";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=e31a3ae-202610260659";
+import { applyZukanBatch } from "./zukan_batch.js?v=e31a3ae-202610260659";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=6ad2e46-202610260557")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=e31a3ae-202610260659")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -651,19 +651,32 @@ const undiscTag = (id) => (isDiscovered(id) ? "" : `<span class="undisc">🔒 �
 
 // ---------------- トップ ----------------
 let firstTop = true;
+function completedQuizProgress(mode, saved, snapshot) {
+  if (saved.answers.length !== 12 || typeof saved.attemptId !== "string"
+    || !/^[a-zA-Z0-9:._-]{1,100}$/.test(saved.attemptId) || snapshot?.status !== "ok") return false;
+  const done = snapshot.state.done[mode];
+  return done?.attemptId === saved.attemptId && done.code === makeCode(saved.answers)
+    && snapshot.state.current[mode]?.code === done.code;
+}
 function topQuizCtas() {
-  const progress = Object.fromEntries(["normal", "love"].map((mode) => {
+  const savedProgress = Object.fromEntries(["normal", "love"].map((mode) => {
     const saved = store.get("progress." + mode);
     return [mode, validProgress(saved) && Date.now() - saved.t < 864e5 && saved.answers.length > 0 ? saved : null];
   }));
+  const completedSnapshot = ["normal", "love"].some((mode) => savedProgress[mode]?.answers.length === 12)
+    ? selfStateSnapshot() : null;
+  const completed = Object.fromEntries(["normal", "love"].map((mode) =>
+    [mode, !!savedProgress[mode] && completedQuizProgress(mode, savedProgress[mode], completedSnapshot)]));
+  const progress = Object.fromEntries(["normal", "love"].map((mode) =>
+    [mode, completed[mode] ? null : savedProgress[mode]]));
   const resumable = ["normal", "love"].filter((mode) => progress[mode]);
   const primary = resumable[0] ?? "normal";
-  const resumeLinks = resumable.map((mode) => `<a class="btn ${mode === primary ? "start" : "sub"}" data-src="resume" href="#/q/${mode}">${mode === "love" ? "恋愛診断" : "性格診断"}の続きから（${progress[mode].answers.length} / 12）</a>`).join("");
+  const resumeLinks = resumable.map((mode) => `<a class="btn ${mode === primary ? "start" : "sub"}" data-src="resume" href="#/q/${mode}">${mode === "love" ? "恋愛診断" : "性格診断"}${progress[mode].answers.length === 12 ? "の回答を見直す" : "の続きから"}（${progress[mode].answers.length} / 12）</a>`).join("");
   const freshLinks = ["normal", "love"].map((mode) => {
     const label = mode === "love" ? "恋愛診断" : "性格診断";
     const text = `${mode === "love" && !progress[mode] ? "💘 " : ""}${label}を${progress[mode] ? "最初から" : ""}始める`;
     const cls = mode === primary && !progress[mode] ? "start" : mode === "love" ? "love-sub" : "sub";
-    return `<a class="btn ${cls}" data-fresh="${mode}" data-src="top" href="#/q/${mode}">${text}</a>`;
+    return `<a class="btn ${cls}" data-fresh="${mode}" data-src="top" href="#/q/${mode}">${text}</a>${completed[mode] ? `<p class="quiz-save-warning">${label}の結果は保存済みです。新しく始めるには、残っている途中の記録を消す必要があります。消せない場合は端末の保存設定を確認してください。</p>` : ""}`;
   }).join("");
   return resumeLinks + freshLinks;
 }
