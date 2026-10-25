@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=7ab8f4b-202610252351";
-import { mountMotion } from "./motion.js?v=7ab8f4b-202610252351";
-import { mountGuide } from "./guide.js?v=7ab8f4b-202610252351";
+import { AXES, Shindan, loadData } from "./shindan.js?v=92e07ce-202610260053";
+import { mountMotion } from "./motion.js?v=92e07ce-202610260053";
+import { mountGuide } from "./guide.js?v=92e07ce-202610260053";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=7ab8f4b-202610252351";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7ab8f4b-202610252351";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7ab8f4b-202610252351";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7ab8f4b-202610252351";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=7ab8f4b-202610252351";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7ab8f4b-202610252351";
-import { storedResultMatches, storedList } from "./stored_result.js?v=7ab8f4b-202610252351";
-import { clearPrefixedStorage } from "./storage_clear.js?v=7ab8f4b-202610252351";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=7ab8f4b-202610252351";
-import { applyZukanBatch } from "./zukan_batch.js?v=7ab8f4b-202610252351";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=92e07ce-202610260053";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=92e07ce-202610260053";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=92e07ce-202610260053";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=92e07ce-202610260053";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=92e07ce-202610260053";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=92e07ce-202610260053";
+import { storedResultMatches, storedList } from "./stored_result.js?v=92e07ce-202610260053";
+import { clearPrefixedStorage } from "./storage_clear.js?v=92e07ce-202610260053";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=92e07ce-202610260053";
+import { applyZukanBatch } from "./zukan_batch.js?v=92e07ce-202610260053";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7ab8f4b-202610252351")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=92e07ce-202610260053")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -2025,11 +2025,19 @@ function copyLink(url, okText = "リンクをコピーしました", stillValid 
 }
 function shareLink(url, text, stillValid = () => true) {
   if (!stillValid()) return;
-  if (navigator.share) {
-    navigator.share({ title: "世界の偉人性格診断", text, url }).catch((e) => {
-      if (e?.name !== "AbortError" && stillValid()) copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
-    });
-  } else copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
+  try {
+    const pending = typeof navigator.share === "function"
+      ? navigator.share({ title: "世界の偉人性格診断", text, url }) : null;
+    if (pending && typeof pending.then === "function") {
+      pending.then(undefined, (e) => {
+        if (e?.name !== "AbortError" && stillValid()) copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
+      });
+      return;
+    }
+  } catch (e) {
+    if (e?.name === "AbortError") return;
+  }
+  if (stillValid()) copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
 }
 function renderAskHome() {
   document.title = "友達に聞く｜世界の偉人性格診断";
