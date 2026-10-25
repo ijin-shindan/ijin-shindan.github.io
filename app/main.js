@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=8d3b38c-202610251405";
-import { mountMotion } from "./motion.js?v=8d3b38c-202610251405";
-import { mountGuide } from "./guide.js?v=8d3b38c-202610251405";
+import { AXES, Shindan, loadData } from "./shindan.js?v=5c7c98f-202610251759";
+import { mountMotion } from "./motion.js?v=5c7c98f-202610251759";
+import { mountGuide } from "./guide.js?v=5c7c98f-202610251759";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=8d3b38c-202610251405";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=8d3b38c-202610251405";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=8d3b38c-202610251405";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=8d3b38c-202610251405";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=8d3b38c-202610251405";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=8d3b38c-202610251405";
-import { storedResultMatches, storedList } from "./stored_result.js?v=8d3b38c-202610251405";
-import { clearPrefixedStorage } from "./storage_clear.js?v=8d3b38c-202610251405";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=8d3b38c-202610251405";
-import { applyZukanBatch } from "./zukan_batch.js?v=8d3b38c-202610251405";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5c7c98f-202610251759";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5c7c98f-202610251759";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5c7c98f-202610251759";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5c7c98f-202610251759";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=5c7c98f-202610251759";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5c7c98f-202610251759";
+import { storedResultMatches, storedList } from "./stored_result.js?v=5c7c98f-202610251759";
+import { clearPrefixedStorage } from "./storage_clear.js?v=5c7c98f-202610251759";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5c7c98f-202610251759";
+import { applyZukanBatch } from "./zukan_batch.js?v=5c7c98f-202610251759";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=8d3b38c-202610251405")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5c7c98f-202610251759")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -2733,8 +2733,29 @@ function refreshSelfAfterExternalChange() {
         if (activeSelfOverview.status !== "ok") deferUnverifiedMeRefresh();
         else {
           const scrollY = window.scrollY;
+          const focused = document.activeElement;
+          let focusTarget = null;
+          if (focused && app.contains(focused)) {
+            const href = focused.tagName === "A" ? focused.getAttribute("href") : null;
+            const marker = focused.tagName === "BUTTON"
+              ? ["data-export-self", "data-retry-all-self-zukan"].find((name) => focused.hasAttribute(name)) : null;
+            focusTarget = href ? { kind: "link", href } : marker ? { kind: "button", marker } : { kind: "heading" };
+          }
           renderMe();
           window.scrollTo(0, scrollY);
+          if (focusTarget) {
+            const match = focusTarget.kind === "link"
+              ? [...app.querySelectorAll("a[href]")].find((link) => link.getAttribute("href") === focusTarget.href)
+              : focusTarget.kind === "button" ? app.querySelector(`[${focusTarget.marker}]`) : null;
+            const destination = match && !match.hidden && !match.disabled ? match : app.querySelector("h1");
+            if (typeof destination?.focus === "function") {
+              if (destination !== match) destination.tabIndex = -1;
+              try {
+                destination.focus({ preventScroll: true });
+                destination.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+              } catch { /* Keep the updated page visible. */ }
+            }
+          }
         }
       } else if (location.hash === "#/people") {
         const ownShares = ownSelfShares(snapshot);
