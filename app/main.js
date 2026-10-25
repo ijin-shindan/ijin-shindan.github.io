@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=46842be-202610260353";
-import { mountMotion } from "./motion.js?v=46842be-202610260353";
-import { mountGuide } from "./guide.js?v=46842be-202610260353";
+import { AXES, Shindan, loadData } from "./shindan.js?v=a324442-202610260456";
+import { mountMotion } from "./motion.js?v=a324442-202610260456";
+import { mountGuide } from "./guide.js?v=a324442-202610260456";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=46842be-202610260353";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=46842be-202610260353";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=46842be-202610260353";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=46842be-202610260353";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=46842be-202610260353";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=46842be-202610260353";
-import { storedResultMatches, storedList } from "./stored_result.js?v=46842be-202610260353";
-import { clearPrefixedStorage } from "./storage_clear.js?v=46842be-202610260353";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=46842be-202610260353";
-import { applyZukanBatch } from "./zukan_batch.js?v=46842be-202610260353";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=a324442-202610260456";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=a324442-202610260456";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=a324442-202610260456";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=a324442-202610260456";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=a324442-202610260456";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=a324442-202610260456";
+import { storedResultMatches, storedList } from "./stored_result.js?v=a324442-202610260456";
+import { clearPrefixedStorage } from "./storage_clear.js?v=a324442-202610260456";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=a324442-202610260456";
+import { applyZukanBatch } from "./zukan_batch.js?v=a324442-202610260456";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=46842be-202610260353")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=a324442-202610260456")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1308,7 +1308,7 @@ function renderResult(mode, code) {
       <div class="duo"><div><img class="tile" src="${avatar(n)}" alt="" style="${themeVars(fig(n).type)}"><div class="lbl">ふだんは</div><div class="nm">${esc(fig(n).name)}</div></div>
         <div class="x">${n === l ? "＝" : "×"}</div>
         <div><img class="tile" src="${avatar(l)}" alt="" style="${themeVars(fig(l).type)}"><div class="lbl">恋をすると</div><div class="nm">${esc(fig(l).name)}</div></div></div>
-      <p class="social-note">投稿する結果リンクには、12問の答えが入っています。リンクを知る人は答えを読み取れます。</p>
+      <p class="social-note">Xではふだんと恋愛の偉人名を紹介します。リンクで開けるのは、いま表示中の${mode === "normal" ? "性格" : "恋愛"}診断の結果だけです。リンクを知る人は、その12問の答えを読み取れます。</p>
       <button class="btn sub" style="margin-top:12px" data-duo="${n},${l}">${n === l ? "同じ偉人だったとXに投稿" : "偉人の組み合わせをXに投稿"}</button></section>`;
   })() : `<section class="card"><h2>${mode === "normal" ? "恋愛バージョン" : "性格バージョン"}</h2>
       <p style="margin:0 0 12px">${mode === "normal" ? "恋をしたら、あなたは別の偉人かも？" : "ふだんのあなたは、どの偉人？"}（約1分半）</p>
@@ -1384,7 +1384,7 @@ function renderResult(mode, code) {
     b.setAttribute("aria-label", `${b.textContent.trim()}。結果リンクを知る人は12問の答えを読み取れます`);
   });
   const duoShareButton = $("[data-duo]");
-  duoShareButton?.setAttribute("aria-label", `${duoShareButton.textContent.trim()}。投稿する結果リンクを知る人は12問の答えを読み取れます`);
+  duoShareButton?.setAttribute("aria-label", `${duoShareButton.textContent.trim()}。リンクで開けるのは、いま表示中の${mode === "normal" ? "性格" : "恋愛"}診断の結果だけです。リンクを知る人は12問の答えを読み取れます`);
   // シェア
   const url = shareUrl(mode, f.id, code), text = shareText(r, mode, fate);
   const currentResultView = capturedSelfResultViewGuard(mode, code, mine?.code === code);
@@ -1433,7 +1433,7 @@ function renderResult(mode, code) {
     if (!currentResultView()) { route(); return; }
     const [n, l] = $("[data-duo]").dataset.duo.split(",");
     track("share_click", { channel: "duo", figure: f.id });
-    const t = `ふだんの私は「${fig(n).name}」、恋をすると「${fig(l).name}」でした。\nあなたの表の顔と恋の顔は？👇\n#偉人性格診断`;
+    const t = `ふだんの私は「${fig(n).name}」、恋をすると「${fig(l).name}」でした。\nリンクで見られるのは${mode === "normal" ? "ふだん" : "恋愛"}の結果だけ。あなたは？👇\n#偉人性格診断`;
     open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(t)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
   });
   // スクロールしても消えないシェアボタン
