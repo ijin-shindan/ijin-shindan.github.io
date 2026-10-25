@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=742dc05-202610251814";
-import { mountMotion } from "./motion.js?v=742dc05-202610251814";
-import { mountGuide } from "./guide.js?v=742dc05-202610251814";
+import { AXES, Shindan, loadData } from "./shindan.js?v=7b1111e-202610251819";
+import { mountMotion } from "./motion.js?v=7b1111e-202610251819";
+import { mountGuide } from "./guide.js?v=7b1111e-202610251819";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=742dc05-202610251814";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=742dc05-202610251814";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=742dc05-202610251814";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=742dc05-202610251814";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=742dc05-202610251814";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=742dc05-202610251814";
-import { storedResultMatches, storedList } from "./stored_result.js?v=742dc05-202610251814";
-import { clearPrefixedStorage } from "./storage_clear.js?v=742dc05-202610251814";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=742dc05-202610251814";
-import { applyZukanBatch } from "./zukan_batch.js?v=742dc05-202610251814";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=7b1111e-202610251819";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7b1111e-202610251819";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7b1111e-202610251819";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7b1111e-202610251819";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=7b1111e-202610251819";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7b1111e-202610251819";
+import { storedResultMatches, storedList } from "./stored_result.js?v=7b1111e-202610251819";
+import { clearPrefixedStorage } from "./storage_clear.js?v=7b1111e-202610251819";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=7b1111e-202610251819";
+import { applyZukanBatch } from "./zukan_batch.js?v=7b1111e-202610251819";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=742dc05-202610251814")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7b1111e-202610251819")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -2550,6 +2550,10 @@ function selfOverviewMeSignature(snapshot) {
   if (snapshot.status !== "ok") return null;
   const state = snapshot.state;
   const zukan = readZukanStorage();
+  const personCardSnapshot = readPersonCardStorage();
+  const personCardDisplay = personCardSnapshot.status === "ok"
+    ? ["ok", personCardsFromRaw(personCardSnapshot.cards).cards.length]
+    : [personCardSnapshot.status];
   const counts = [0, 0];
   for (const [id, entry] of Object.entries(zukan.zukan)) {
     if (!SD.figures[id] || !isFree(id)) continue;
@@ -2566,6 +2570,7 @@ function selfOverviewMeSignature(snapshot) {
     state.pendingZukan.length,
     zukan.status,
     counts,
+    personCardDisplay,
   ]);
 }
 function captureSelfOverview(snapshot = selfStateSnapshot()) {
@@ -2804,7 +2809,8 @@ function refreshSelfAfterExternalChange() {
 }
 addEventListener("storage", (event) => {
   if (event.key === null || event.key === SELF_KEY || event.key === "ijin-clear-epoch"
-    || event.key === "ijin-self-migration-gate" || event.key === "ijin.zukan" || event.key?.startsWith("ijin.me.")
+    || event.key === "ijin-self-migration-gate" || event.key === "ijin.zukan"
+    || event.key === "ijin.people.cards" || event.key?.startsWith("ijin.me.")
     || ["ijin.diagLedger", "ijin.diagCount", "ijin.seen_results"].includes(event.key)) {
     if (location.hash === "#/me" && activeSelfOverview?.status !== "ok"
       && event.key?.startsWith("ijin.me.")) deferUnverifiedMeRefresh();
