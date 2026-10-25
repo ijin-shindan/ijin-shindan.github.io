@@ -1,27 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=333a72f-202610260826";
-import { mountMotion } from "./motion.js?v=333a72f-202610260826";
-import { mountGuide } from "./guide.js?v=333a72f-202610260826";
+import { AXES, Shindan, loadData } from "./shindan.js?v=8ed3b55-202610260854";
+import { mountMotion } from "./motion.js?v=8ed3b55-202610260854";
+import { mountGuide } from "./guide.js?v=8ed3b55-202610260854";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=333a72f-202610260826";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=333a72f-202610260826";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=333a72f-202610260826";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=333a72f-202610260826";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=333a72f-202610260826";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=333a72f-202610260826";
-import { storedResultMatches, storedList } from "./stored_result.js?v=333a72f-202610260826";
-import { clearPrefixedStorage } from "./storage_clear.js?v=333a72f-202610260826";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=333a72f-202610260826";
-import { applyZukanBatch } from "./zukan_batch.js?v=333a72f-202610260826";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=8ed3b55-202610260854";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=8ed3b55-202610260854";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=8ed3b55-202610260854";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=8ed3b55-202610260854";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=8ed3b55-202610260854";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=8ed3b55-202610260854";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=8ed3b55-202610260854";
+import { storedResultMatches, storedList } from "./stored_result.js?v=8ed3b55-202610260854";
+import { clearPrefixedStorage } from "./storage_clear.js?v=8ed3b55-202610260854";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=8ed3b55-202610260854";
+import { applyZukanBatch } from "./zukan_batch.js?v=8ed3b55-202610260854";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=333a72f-202610260826")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=8ed3b55-202610260854")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -279,6 +280,14 @@ function quizUnsavedWarning(activeQuiz) {
   activeQuiz.unsavedWarningShown = true;
   return `<p class="quiz-save-warning"${role}>回答の途中保存ができません。診断を途中でやめる・再読み込みすると、保存できなかった回答は消えます。結果は見られますが、端末には残りません。</p>`;
 }
+function quizSharedReturnWarning(activeQuiz) {
+  if (activeQuiz.source !== "friend"
+    || readSharedReturn(() => sessionStorage, activeQuiz.mode,
+      currentClearEpoch(), activeQuiz.attemptId)) return "";
+  const role = activeQuiz.sharedReturnWarningShown ? "" : ' role="alert"';
+  activeQuiz.sharedReturnWarningShown = true;
+  return `<p class="quiz-save-warning"${role}>元の結果への戻り先をこのタブで確認できません。診断を終えたあと、元の結果に戻るボタンが出ないことがあります。</p>`;
+}
 function clearQuizCursor(mode) {
   try { sessionStorage.removeItem(quizCursorKey(mode)); } catch {}
 }
@@ -367,6 +376,8 @@ function bindFreshQuizLinks() {
       clearQuizCursor(mode);
       quiz = null;
       nextSrc = link.dataset.src ?? null;
+      // Only an explicit start from a shared result keeps the return link
+      // through a reload. Viewing the result alone never stores its answers.
       if (location.hash === link.getAttribute?.("href")) renderQuiz(mode);
       else location.hash = link.getAttribute?.("href") || `#/q/${mode}`;
     });
@@ -814,6 +825,15 @@ function renderQuiz(mode, anim = false) {
     }
     if (resumed) { quiz.answers = saved.answers; quiz.i = resumeQuizIndex(mode, saved, qs.length); }
     quiz.source = resumed ? saved.source ?? "resume" : nextSrc ?? "top";
+    if (!resumed && quiz.source === "friend") {
+      // Bind the temporary return link to this exact quiz. A failed write for
+      // a later quiz must never reuse an earlier friend's answer code.
+      const origin = lastSharedInMemory[mode];
+      if (origin?.epoch && clearEpochMatches(origin.epoch)) {
+        rememberSharedReturn(() => sessionStorage, mode, origin,
+          origin.epoch, quiz.attemptId);
+      }
+    }
     nextSrc = null;
     if (!resumed) track("quiz_start", { mode, source: quiz.source });
   }
@@ -835,6 +855,7 @@ function renderQuiz(mode, anim = false) {
       ${intro}
       <h1 class="qtext" id="current-question" tabindex="-1" aria-label="${i + 1}問目、全${qs.length}問。${esc(q.text)}">${esc(q.text)}</h1>
       ${quizUnsavedWarning(quiz)}
+      ${quizSharedReturnWarning(quiz)}
       <p class="qhint">いちばん近いものを1つ選んでね。押すと次へ進みます。</p>
       <div class="scale5" role="group" aria-labelledby="current-question">
         ${[1, 2, 3, 4, 5].map((v) => `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-v="${v}" aria-label="${esc(sd.data.questions.scale[v - 1])}${answers[i] === v ? "（前の回答）" : ""}"><i aria-hidden="true"></i><span>${esc(sd.data.questions.scale[v - 1])}</span></button>`).join("")}
@@ -1082,6 +1103,7 @@ async function finishQuiz(mode) {
   }
   clearQuizCursor(mode);
   justFinished = { mode, code, source: activeQuiz.source, epoch: captured,
+    attemptId: activeQuiz.attemptId,
     saveStatus: status, wasSeen: !!activeQuiz.wasSeen,
     progressDeleteUnconfirmed: status === "saved_progress_uncleared" || !!activeQuiz.progressDeleteUnconfirmed };
   quiz = null;
@@ -1286,7 +1308,14 @@ function renderResult(mode, code) {
   const weakId = ms.weak.find((id) => id !== fate?.other && id !== strongId);
   // 新規結果の保存は診断完了時の site → quiz ロック内で確定済み。表示時は読み取り専用。
   const localSaveOk = !fresh || ["saved", "saved_progress_uncleared"].includes(freshSaveStatus);
-  const friend = lastSharedInMemory[mode] || store.get("lastFriend." + mode);
+  const resultAttemptId = pendingFresh?.attemptId
+    || (pendingSnapshot.status === "ok" && pendingSnapshot.state.done[mode]?.code === code
+      ? pendingSnapshot.state.done[mode].attemptId : null);
+  const startedFromShared = readSharedReturn(() => sessionStorage, mode,
+    currentClearEpoch(), resultAttemptId);
+  const memoryFriend = lastSharedInMemory[mode];
+  const friend = startedFromShared || (memoryFriend?.epoch && viewEpochMatches(memoryFriend.epoch)
+    ? memoryFriend : null);
   const validFriend = friend && typeof friend.code === "string" && typeof friend.fig === "string"
     && SD.figures[friend.fig] && validCode(sd, friend.code)
     && sd.diagnose(answersOf(sd, friend.code)).figure.id === friend.fig;
@@ -1332,7 +1361,7 @@ function renderResult(mode, code) {
     : `<span class="tag good">高め：${esc(pole(hi, 1))}</span><span class="tag weak">低め：${esc(axisById[lo].name)}</span>`;
   const returnSharedHtml = validFriend ? `<div class="recent-shared-return ${reveal ? "reveal-hide" : ""}">
       <a class="btn sub" href="${esc(sharedResultViewPath(mode, friend.code))}">共有リンクの結果を見る：${esc(fig(friend.fig).name)}</a>
-      <p class="social-note">以前にこのブラウザーで開いた共有結果です。自分のリンクも含み、送り主は確認できません。友達のカードはリンク先で手動で追加できます。</p></div>` : "";
+      <p class="social-note">${startedFromShared ? "このタブで診断を始めたときの共有結果です。" : "以前にこのブラウザーで開いた共有結果です。"}自分のリンクも含み、送り主は確認できません。友達のカードはリンク先で手動で追加できます。</p></div>` : "";
   const otherHtml = other && validCode(engines[OTHER[mode]], other.code) ? (() => {
     const [n, l] = mode === "normal" ? [f.id, other.fig] : [other.fig, f.id];
     return `<section class="card"><h2>${n === l ? "ふだんも恋も同じ偉人" : "表の顔 × 恋の顔"}</h2>
@@ -1491,7 +1520,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
   const past = !personCard && !fromSharedPage && (own || (prevHere && !prevLink)); // 以前のあなた自身の結果
   if (fromSharedPage && !personCard) {
     // 共有ページ経由の往復だけタブ内に保持。直URLや過去結果を受信扱いしない。
-    lastSharedInMemory[mode] = { code, fig: f.id };
+    lastSharedInMemory[mode] = { code, fig: f.id, epoch: currentClearEpoch() };
   }
   const tx = texts[f.id];
   app.style.cssText = themeVars(r.type.id);
