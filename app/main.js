@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=a324442-202610260456";
-import { mountMotion } from "./motion.js?v=a324442-202610260456";
-import { mountGuide } from "./guide.js?v=a324442-202610260456";
+import { AXES, Shindan, loadData } from "./shindan.js?v=6ad2e46-202610260557";
+import { mountMotion } from "./motion.js?v=6ad2e46-202610260557";
+import { mountGuide } from "./guide.js?v=6ad2e46-202610260557";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=a324442-202610260456";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=a324442-202610260456";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=a324442-202610260456";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=a324442-202610260456";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=a324442-202610260456";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=a324442-202610260456";
-import { storedResultMatches, storedList } from "./stored_result.js?v=a324442-202610260456";
-import { clearPrefixedStorage } from "./storage_clear.js?v=a324442-202610260456";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=a324442-202610260456";
-import { applyZukanBatch } from "./zukan_batch.js?v=a324442-202610260456";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=6ad2e46-202610260557";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=6ad2e46-202610260557";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=6ad2e46-202610260557";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=6ad2e46-202610260557";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=6ad2e46-202610260557";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=6ad2e46-202610260557";
+import { storedResultMatches, storedList } from "./stored_result.js?v=6ad2e46-202610260557";
+import { clearPrefixedStorage } from "./storage_clear.js?v=6ad2e46-202610260557";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=6ad2e46-202610260557";
+import { applyZukanBatch } from "./zukan_batch.js?v=6ad2e46-202610260557";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=a324442-202610260456")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=6ad2e46-202610260557")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -272,6 +272,12 @@ function saveQuizProgress(mode, activeQuiz, progress, expectedRaw = activeQuiz.p
   catch { return "unavailable"; }
   activeQuiz.progressRaw = raw;
   return "saved";
+}
+function quizUnsavedWarning(activeQuiz) {
+  if (!activeQuiz.persistenceUnavailable) return "";
+  const role = activeQuiz.unsavedWarningShown ? "" : ' role="alert"';
+  activeQuiz.unsavedWarningShown = true;
+  return `<p class="quiz-save-warning"${role}>回答の途中保存ができません。診断を途中でやめる・再読み込みすると、保存できなかった回答は消えます。結果は見られますが、端末には残りません。</p>`;
 }
 function clearQuizCursor(mode) {
   try { sessionStorage.removeItem(quizCursorKey(mode)); } catch {}
@@ -804,6 +810,7 @@ function renderQuiz(mode, anim = false) {
     <div class="qbox ${anim ? "in" : ""}">
       ${intro}
       <h1 class="qtext" id="current-question" tabindex="-1" aria-label="${i + 1}問目、全${qs.length}問。${esc(q.text)}">${esc(q.text)}</h1>
+      ${quizUnsavedWarning(quiz)}
       <p class="qhint">いちばん近いものを1つ選んでね。押すと次へ進みます。</p>
       <div class="scale5" role="group" aria-labelledby="current-question">
         ${[1, 2, 3, 4, 5].map((v) => `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-v="${v}" aria-label="${esc(sd.data.questions.scale[v - 1])}${answers[i] === v ? "（前の回答）" : ""}"><i aria-hidden="true"></i><span>${esc(sd.data.questions.scale[v - 1])}</span></button>`).join("")}
@@ -895,7 +902,7 @@ function renderCheckpoint(mode, n) {
       <div class="sils">${three.map((t) => `<div><img class="tile" src="${avatar(t.figures[0].id, true)}" alt="" style="${themeVars(t.id)}">
         <div class="note" style="margin-top:4px">${esc(typeLabel(t, mode).name)}</div></div>`).join("")}</div>`;
   }
-  app.innerHTML = `<div class="checkpoint">${body}<button class="btn start" type="button">続ける（あと${quiz.qs.length - n}問）</button></div>`;
+  app.innerHTML = `<div class="checkpoint">${body}${quizUnsavedWarning(quiz)}<button class="btn start" type="button">続ける（あと${quiz.qs.length - n}問）</button></div>`;
   window.scrollTo(0, 0);
   $(".checkpoint h2").tabIndex = -1;
   $(".checkpoint h2").focus({ preventScroll: true });
