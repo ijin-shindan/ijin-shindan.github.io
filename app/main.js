@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=28a4773-202610252253";
-import { mountMotion } from "./motion.js?v=28a4773-202610252253";
-import { mountGuide } from "./guide.js?v=28a4773-202610252253";
+import { AXES, Shindan, loadData } from "./shindan.js?v=7ab8f4b-202610252351";
+import { mountMotion } from "./motion.js?v=7ab8f4b-202610252351";
+import { mountGuide } from "./guide.js?v=7ab8f4b-202610252351";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=28a4773-202610252253";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=28a4773-202610252253";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=28a4773-202610252253";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=28a4773-202610252253";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=28a4773-202610252253";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=28a4773-202610252253";
-import { storedResultMatches, storedList } from "./stored_result.js?v=28a4773-202610252253";
-import { clearPrefixedStorage } from "./storage_clear.js?v=28a4773-202610252253";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=28a4773-202610252253";
-import { applyZukanBatch } from "./zukan_batch.js?v=28a4773-202610252253";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=7ab8f4b-202610252351";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7ab8f4b-202610252351";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=7ab8f4b-202610252351";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=7ab8f4b-202610252351";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=7ab8f4b-202610252351";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7ab8f4b-202610252351";
+import { storedResultMatches, storedList } from "./stored_result.js?v=7ab8f4b-202610252351";
+import { clearPrefixedStorage } from "./storage_clear.js?v=7ab8f4b-202610252351";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=7ab8f4b-202610252351";
+import { applyZukanBatch } from "./zukan_batch.js?v=7ab8f4b-202610252351";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=28a4773-202610252253")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=7ab8f4b-202610252351")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -2013,9 +2013,15 @@ function renderUnavailable() {
 // 旧 #/invite は別仕様のため再利用しない。新しいURLは #/ask/<token> と #/reply/<token>/<code>。
 function copyLink(url, okText = "リンクをコピーしました", stillValid = () => true) {
   if (!stillValid()) return;
-  navigator.clipboard?.writeText(url).then(() => { if (stillValid()) toast(okText); })
-    .catch(() => { if (stillValid()) prompt("このリンクをコピーしてください", url); });
-  if (!navigator.clipboard?.writeText && stillValid()) prompt("このリンクをコピーしてください", url);
+  try {
+    const clipboard = navigator.clipboard;
+    const pending = typeof clipboard?.writeText === "function" ? clipboard.writeText(url) : null;
+    if (!pending || typeof pending.then !== "function") throw new Error("Clipboard unavailable");
+    pending.then(() => { if (stillValid()) toast(okText); })
+      .catch(() => { if (stillValid()) prompt("このリンクをコピーしてください", url); });
+  } catch {
+    if (stillValid()) prompt("このリンクをコピーしてください", url);
+  }
 }
 function shareLink(url, text, stillValid = () => true) {
   if (!stillValid()) return;
