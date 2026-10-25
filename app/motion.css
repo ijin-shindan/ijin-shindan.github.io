@@ -1,5 +1,6 @@
 /* Full-body stage and quiet editorial styling. */
-.rcard {background:var(--card); border-radius:12px; box-shadow:0 8px 28px #28221a08; border:1px solid var(--line); padding-top:24px;}
+.rcard {background:var(--t-bg3); color:#26221d; border-radius:12px; box-shadow:0 8px 28px #28221a08; border:1px solid var(--line); padding-top:24px;}
+.rcard .anata,.rcard .note,.rcard .rig-reduce,.rcard .rig-status {color:#596054;}
 .rcard .stage {width:min(100%,320px);aspect-ratio:320/440;border-radius:3px;background:#f5f2eb;box-shadow:none;}
 .rcard .stage .avatar {object-fit:contain;}
 .rig-art {position:absolute;inset:0;width:100%;height:100%;display:block;}
