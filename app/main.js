@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=2109db0-202610260252";
-import { mountMotion } from "./motion.js?v=2109db0-202610260252";
-import { mountGuide } from "./guide.js?v=2109db0-202610260252";
+import { AXES, Shindan, loadData } from "./shindan.js?v=46842be-202610260353";
+import { mountMotion } from "./motion.js?v=46842be-202610260353";
+import { mountGuide } from "./guide.js?v=46842be-202610260353";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=2109db0-202610260252";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=2109db0-202610260252";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=2109db0-202610260252";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=2109db0-202610260252";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=2109db0-202610260252";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=2109db0-202610260252";
-import { storedResultMatches, storedList } from "./stored_result.js?v=2109db0-202610260252";
-import { clearPrefixedStorage } from "./storage_clear.js?v=2109db0-202610260252";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=2109db0-202610260252";
-import { applyZukanBatch } from "./zukan_batch.js?v=2109db0-202610260252";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=46842be-202610260353";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=46842be-202610260353";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=46842be-202610260353";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=46842be-202610260353";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=46842be-202610260353";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=46842be-202610260353";
+import { storedResultMatches, storedList } from "./stored_result.js?v=46842be-202610260353";
+import { clearPrefixedStorage } from "./storage_clear.js?v=46842be-202610260353";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=46842be-202610260353";
+import { applyZukanBatch } from "./zukan_batch.js?v=46842be-202610260353";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2109db0-202610260252")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=46842be-202610260353")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -369,6 +369,12 @@ function resumeQuizIndex(mode, progress, questionCount) {
       && Number.isInteger(cursor.index) && cursor.index >= 0 && cursor.index <= fallback) return cursor.index;
   } catch {}
   return fallback;
+}
+function checkpointPending(activeQuiz) {
+  const n = activeQuiz?.i;
+  return (n === 4 || n === 8) && activeQuiz.answers.length === n
+    && (activeQuiz.checkpointConfirmed || 0) < n
+    && (activeQuiz.checkpointRequired === n || !store.get("seen_checkpoint", false));
 }
 const friendAnswerCode = (code) => validFriendCode(code);
 const inviteToken = () => { const token = store.get("other.invite"); return validInviteToken(token) ? token : null; };
@@ -761,7 +767,14 @@ function renderQuiz(mode, anim = false) {
     const saved = snapshot.progress;
     const qs = ordered(sd);
     const resumed = validProgress(saved) && saved.answers.length > 0 && Date.now() - saved.t < 864e5;
+    const confirmed = resumed && [4, 8].includes(saved.checkpointConfirmed)
+      && saved.checkpointConfirmed <= saved.answers.length ? saved.checkpointConfirmed : 0;
+    // 旧途中記録は確認欄がないため、ちょうど境界で止まった試行を未確認として扱う。
+    const required = resumed && [4, 8].includes(saved.answers.length) && saved.checkpointConfirmed === undefined
+      ? saved.answers.length : resumed && [4, 8].includes(saved.checkpointRequired)
+        && saved.checkpointRequired <= saved.answers.length ? saved.checkpointRequired : 0;
     quiz = { mode, qs, answers: [], i: 0, progressRaw: snapshot.raw,
+      checkpointConfirmed: confirmed, checkpointRequired: required,
       epoch, attemptId: quizAttemptId(mode, resumed ? saved : null) };
     // 旧版には試行 ID がない。12回答と保存済みの自分の結果が一致する場合、
     // 旧版で完了後に進行記録だけ消せなかった可能性があり、二重加算できない。
@@ -775,6 +788,8 @@ function renderQuiz(mode, anim = false) {
     if (!resumed) track("quiz_start", { mode, source: quiz.source });
   }
   quiz.busy = false;
+  // 回答保存後に再読込・画面移動しても、未確認の中間画面を飛ばさない。
+  if (checkpointPending(quiz)) return renderCheckpoint(mode, quiz.i);
   const { qs, answers, i } = quiz;
   const q = qs[i];
   document.title = `質問 ${i + 1}｜${sd.modeConf.name}`;
@@ -818,7 +833,10 @@ function renderQuiz(mode, anim = false) {
     b.classList.add("sel");
     b.setAttribute("aria-label", `${b.querySelector("span").textContent}（選択中）`);
     navigator.vibrate?.(8);
-    const progress = { answers: nextAnswers, t: Date.now(), source: quiz.source, attemptId: quiz.attemptId };
+    const nextCheckpoint = (i + 1 === 4 || i + 1 === 8) && !store.get("seen_checkpoint", false)
+      ? i + 1 : quiz.checkpointRequired;
+    const progress = { answers: nextAnswers, t: Date.now(), source: quiz.source, attemptId: quiz.attemptId,
+      checkpointConfirmed: quiz.checkpointConfirmed, checkpointRequired: nextCheckpoint };
     const expectedRaw = activeQuiz.progressRaw;
     const generation = activeQuiz.saveGeneration = (activeQuiz.saveGeneration || 0) + 1;
     const captured = await capturedQuizEpoch(activeQuiz);
@@ -841,6 +859,7 @@ function renderQuiz(mode, anim = false) {
       return;
     }
     activeQuiz.answers = nextAnswers;
+    activeQuiz.checkpointRequired = nextCheckpoint;
     if (saveStatus === "unavailable") activeQuiz.persistenceUnavailable = true;
     if (saveStatus === "saved") rememberQuizCursor(mode, progress, Math.min(i + 1, qs.length - 1));
     later(120, () => { if (quiz === activeQuiz && quiz.i === i && location.hash === `#/q/${mode}`) $(".qbox")?.classList.add("out"); });
@@ -849,8 +868,7 @@ function renderQuiz(mode, anim = false) {
       if (i + 1 >= qs.length) return finishQuiz(mode);
       quiz.busy = false;
       quiz.i++;
-      const seen = store.get("seen_checkpoint", false);
-      if (!seen && (i + 1 === 4 || i + 1 === 8)) return renderCheckpoint(mode, i + 1);
+      if (checkpointPending(quiz)) return renderCheckpoint(mode, i + 1);
       renderQuiz(mode, true);
     }, 300);
   }));
@@ -881,16 +899,40 @@ function renderCheckpoint(mode, n) {
   window.scrollTo(0, 0);
   $(".checkpoint h2").tabIndex = -1;
   $(".checkpoint h2").focus({ preventScroll: true });
-  $(".checkpoint button").onclick = async () => {
+  const continueButton = $(".checkpoint button");
+  continueButton.onclick = async () => {
+    if (continueButton.disabled) return;
+    continueButton.disabled = true;
     const activeQuiz = quiz;
     const captured = await capturedQuizEpoch(activeQuiz);
+    const status = await withSiteQuizLock(mode, () => {
+      if (quiz !== activeQuiz || activeQuiz.i !== n || continueButton.isConnected === false
+        || location.hash !== `#/q/${mode}`) return "cancelled";
+      const epochStatus = personCardEpochStatus(captured);
+      if (epochStatus === "stale_epoch") return "changed";
+      if (epochStatus !== "current" || activeQuiz.persistenceUnavailable) return "unavailable";
+      const latest = readQuizProgress(mode);
+      const progress = { answers: activeQuiz.answers, t: latest.progress?.t ?? Date.now(),
+        source: activeQuiz.source, attemptId: activeQuiz.attemptId,
+        checkpointConfirmed: n, checkpointRequired: activeQuiz.checkpointRequired };
+      return saveQuizProgress(mode, activeQuiz, progress);
+    });
+    if (quiz !== activeQuiz || continueButton.isConnected === false || location.hash !== `#/q/${mode}`) return;
+    if (status === "cancelled") { continueButton.disabled = false; return; }
+    if (status === "changed") return showQuizProgressConflict(mode);
+    if (status === "lock_error") {
+      continueButton.disabled = false;
+      return toast("途中の記録を保存できませんでした。もう一度押してください");
+    }
+    if (status === "unavailable") activeQuiz.persistenceUnavailable = true;
+    activeQuiz.checkpointConfirmed = n;
     if (n === 8 && !activeQuiz.persistenceUnavailable) {
-      const status = await withSiteRecordsLock(() => {
+      const seenStatus = await withSiteRecordsLock(() => {
         if (quiz !== activeQuiz || location.hash !== `#/q/${mode}`) return "cancelled";
         return personCardEpochStatus(captured) === "current" && store.set("seen_checkpoint", true)
           ? "saved" : "unavailable";
       });
-      if (status === "cancelled") return;
+      if (seenStatus === "cancelled") return;
       if (personCardEpochStatus(captured) === "stale_epoch") return showQuizProgressConflict(mode);
     }
     if (quiz === activeQuiz && location.hash === `#/q/${mode}`) renderQuiz(mode, true);
