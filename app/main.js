@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=40757a5-202610251350";
-import { mountMotion } from "./motion.js?v=40757a5-202610251350";
-import { mountGuide } from "./guide.js?v=40757a5-202610251350";
+import { AXES, Shindan, loadData } from "./shindan.js?v=8d3b38c-202610251405";
+import { mountMotion } from "./motion.js?v=8d3b38c-202610251405";
+import { mountGuide } from "./guide.js?v=8d3b38c-202610251405";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=40757a5-202610251350";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=40757a5-202610251350";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=40757a5-202610251350";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=40757a5-202610251350";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=40757a5-202610251350";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=40757a5-202610251350";
-import { storedResultMatches, storedList } from "./stored_result.js?v=40757a5-202610251350";
-import { clearPrefixedStorage } from "./storage_clear.js?v=40757a5-202610251350";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=40757a5-202610251350";
-import { applyZukanBatch } from "./zukan_batch.js?v=40757a5-202610251350";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=8d3b38c-202610251405";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=8d3b38c-202610251405";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=8d3b38c-202610251405";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=8d3b38c-202610251405";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=8d3b38c-202610251405";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=8d3b38c-202610251405";
+import { storedResultMatches, storedList } from "./stored_result.js?v=8d3b38c-202610251405";
+import { clearPrefixedStorage } from "./storage_clear.js?v=8d3b38c-202610251405";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=8d3b38c-202610251405";
+import { applyZukanBatch } from "./zukan_batch.js?v=8d3b38c-202610251405";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=40757a5-202610251350")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=8d3b38c-202610251405")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -650,8 +650,21 @@ function topQuizCtas() {
   }).join("");
   return resumeLinks + freshLinks;
 }
+function topCurrentResultsHtml(me) {
+  if (!me.normal && !me.love) return "";
+  return `<div class="again">
+      ${["normal", "love"].filter((m) => me[m]).map((m) => `
+        <a class="row" href="#/r/${m}/${me[m].code}" style="text-decoration:none;color:inherit">
+          <img class="tile" src="${avatar(me[m].fig)}" alt="" style="${themeVars(fig(me[m].fig).type)}">
+          <div><div class="lbl">いまの${m === "love" ? "恋愛診断" : "性格診断"}の結果${me[m].via === "link" ? "（リンクから保存）" : ""}</div><div class="nm">${esc(fig(me[m].fig).name)}</div></div>
+        </a>`).join("")}
+      <a class="btn sub" href="#/zukan">図鑑を見る（${zukanCount()} / ${FREE.length}）</a>
+      <a class="btn sub" href="#/me">この端末の記録（自分・受け取った結果）</a>
+    </div>`;
+}
 function renderTop() {
   document.title = "世界の偉人性格診断";
+  captureSelfOverview();
   const staticParade = firstTop ? $(".parade")?.innerHTML : null;
   firstTop = false;
   const me = { normal: savedResult("normal"), love: savedResult("love") };
@@ -664,16 +677,6 @@ function renderTop() {
   const faces = parade.slice(0, 4).map((id, i) =>
     `<img class="face f${i}" src="${avatar(id)}" alt="" style="--t-bg:${THEMES[fig(id).type].bg}">`).join("")
     + `<img class="face f4" src="${avatar(lockedOne, true)}" alt="" style="--t-bg:${THEMES[fig(lockedOne).type].bg}">`;
-  const againCard = me.normal || me.love ? `
-    <div class="again">
-      ${["normal", "love"].filter((m) => me[m]).map((m) => `
-        <a class="row" href="#/r/${m}/${me[m].code}" style="text-decoration:none;color:inherit">
-          <img class="tile" src="${avatar(me[m].fig)}" alt="" style="${themeVars(fig(me[m].fig).type)}">
-          <div><div class="lbl">いまの${m === "love" ? "恋愛診断" : "性格診断"}の結果${me[m].via === "link" ? "（リンクから保存）" : ""}</div><div class="nm">${esc(fig(me[m].fig).name)}</div></div>
-        </a>`).join("")}
-      <a class="btn sub" href="#/zukan">図鑑を見る（${zukanCount()} / ${FREE.length}）</a>
-      <a class="btn sub" href="#/me">この端末の記録（自分・受け取った結果）</a>
-    </div>` : "";
   app.innerHTML = `
     <section class="hero">
       <div class="seal">偉</div>
@@ -692,7 +695,7 @@ function renderTop() {
       ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達に12問答えてもらう（試作）</a>' : '<span class="dev-badge">他己分析　※開発中</span>'}
       <a class="btn sub" href="#/people">人物カードを見る</a>
     </section>
-    ${againCard}
+    <div data-self-overview>${topCurrentResultsHtml(me)}</div>
     <div class="teaser"></div>
     <button class="btn-text teaser-toggle" type="button" data-teaser-toggle>一言を止める</button>
     <div class="type-strip" aria-hidden="true">${SD.types.map((t) => `<i style="background:${THEMES[t.id].bg2}"></i>`).join("")}</div>
@@ -1751,6 +1754,7 @@ function renderMe() {
       <img class="tile" src="${face ?? avatar(e.fig)}" alt="" style="${themeVars(fig(e.fig).type)}">
       <span><span class="lbl">${esc(lbl)}</span><span class="nm">${esc(fig(e.fig).name)}</span></span><span class="go">›</span></a>`;
   const selfSnapshot = selfStateSnapshot();
+  captureSelfOverview(selfSnapshot);
   // 自分の結果：いま・前の結果・この端末で診断した過去の結果（seen_results から計算し直す）
   const selfReadable = ["ok", "legacy_changed", "legacy_unverified"].includes(selfSnapshot.status);
   const mineHtml = !selfReadable
@@ -2213,8 +2217,46 @@ function renderOtherReply(token, code) {
 
 // 人物カードは、他人が自分自身について答えた共有結果から本人が明示的に追加する。
 // 既存の friends 履歴や「友達から見た自分」とは別の端末内コレクション。
+function ownSelfShares(snapshot) {
+  if (snapshot.status !== "ok") return [];
+  return [["normal", snapshot.state.current.normal], ["love", snapshot.state.current.love]]
+    .filter(([, result]) => result && result.via !== "link")
+    .map(([mode, result]) => ({ mode, code: result.code }));
+}
+function peopleOwnSharesHtml(ownShares) {
+  return ownShares.length ? `<p class="social-note">送るリンクを知る人は、あなたの12問の答えを読み取れます。友達はそのリンクから自分自身を診断できます。他己分析は ※開発中。</p>
+        ${ownShares.map(({ mode }, i) => { const label = mode === "love" ? "恋愛版" : "性格版"; return `
+          <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${label}の結果を友達に送る</button>
+          <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}`
+    : '<a class="btn start" href="#/q/normal">まず自分を診断する</a>';
+}
+function bindPeopleOwnShares(ownShares) {
+  ownShares.forEach(({ mode, code }) => {
+    const result = engines[mode].diagnose(answersOf(engines[mode], code));
+    const url = shareUrl(mode, result.figure.id, code);
+    const label = mode === "love" ? "恋愛版" : "性格版";
+    const shareView = capturedSelfViewGuard();
+    const inviteButton = $(`[data-invite-self="${mode}"]`);
+    const copyButton = $(`[data-copy-self="${mode}"]`);
+    const stillCurrent = (button) => {
+      const latest = savedResult(mode);
+      return shareView() && button?.isConnected && latest?.code === code && latest.via !== "link";
+    };
+    inviteButton?.setAttribute("aria-label", `${label}の結果を友達に送る。リンクを知る人は12問の答えを読み取れます`);
+    copyButton?.setAttribute("aria-label", `${label}の結果リンクをコピー。リンクを知る人は12問の答えを読み取れます`);
+    inviteButton?.addEventListener("click", () => {
+      if (!stillCurrent(inviteButton)) { refreshSelfAfterExternalChange(); return; }
+      shareLink(url, `${label}では私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`, () => stillCurrent(inviteButton));
+    });
+    copyButton?.addEventListener("click", () => {
+      if (!stillCurrent(copyButton)) { refreshSelfAfterExternalChange(); return; }
+      copyLink(url, `${label}の結果リンクをコピーしました`, () => stillCurrent(copyButton));
+    });
+  });
+}
 function renderPeople() {
   document.title = "人物カード｜世界の偉人性格診断";
+  captureSelfOverview();
   app.style.cssText = "";
   const capturedEpoch = capturePersonCardEpoch();
   const snapshot = readPersonCardStorage();
@@ -2258,19 +2300,12 @@ function renderPeople() {
     return id ? `<div class="variety-slot"><img src="${avatar(id)}" alt=""><span>${esc(fig(id).name)}</span></div>`
       : '<div class="variety-slot empty" role="img" aria-label="空いている枠"><span aria-hidden="true">？</span></div>';
   }).join("");
-  const ownNormal = savedResult("normal"), ownLove = savedResult("love");
-  const ownShares = [["normal", ownNormal], ["love", ownLove]]
-    .filter(([, result]) => result && result.via !== "link")
-    .map(([mode, result]) => ({ mode, code: result.code }));
+  const ownShares = ownSelfShares(selfStateSnapshot());
   app.innerHTML = `<div class="zhead"><h1>人物カード</h1><span class="cnt">${cards.length}枚</span></div>
     <section class="social-entry"><div class="social-badge">人が増えるコレクション</div>
       <h2>友達の偉人を集めよう</h2><p>① あなたの結果を送る。<br>② 友達が自分自身を診断し、結果リンクを返す。<br>③ 届いたリンクで「人物カードに追加する」を押す。</p>
       <p class="social-note">ここで集めるのは、友達から届いた自己診断結果です。リンクの持ち主は確認できません。友達があなたについて答える「他己分析」とは別です。図鑑の「発見」とも別です。</p>
-      ${ownShares.length ? `<p class="social-note">送るリンクを知る人は、あなたの12問の答えを読み取れます。友達はそのリンクから自分自身を診断できます。他己分析は ※開発中。</p>
-        ${ownShares.map(({ mode }, i) => { const label = mode === "love" ? "恋愛版" : "性格版"; return `
-          <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${label}の結果を友達に送る</button>
-          <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}`
-        : '<a class="btn start" href="#/q/normal">まず自分を診断する</a>'}</section>
+      <div data-self-overview style="display:grid;gap:10px">${peopleOwnSharesHtml(ownShares)}</div></section>
     <section class="social-entry variety-entry" aria-labelledby="variety-title"><div class="social-badge">${varietyCount < 3 ? `${varietyCount}/3種類` : `${varietyCount}種類`}</div>
       <h2 id="variety-title">キャラの顔ぶれ</h2><p>${varietyMessage}</p>
       <div class="variety-slots">${varietySlots}</div>
@@ -2294,25 +2329,7 @@ function renderPeople() {
     </section>`; }).join("")}</div>` : '<section class="card"><p>カードはまだありません。友達から自己診断の結果リンクが届いたら、そのページで追加できます。</p></section>'}
     <p class="social-note">カードはこの端末に最大50枚保存。同じ回答の友達も別カードにできます。リンクの持ち主は確認できません。図鑑の「発見」数は増えません。</p>
     ${OTHER_PILOT ? '<a class="btn sub" href="#/ask">友達から見た自分を聞く（試作）</a>' : '<p class="social-note">他己分析（友達があなたについて答える機能）は ※開発中</p>'}<a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a>`;
-  ownShares.forEach(({ mode, code }) => {
-    const result = engines[mode].diagnose(answersOf(engines[mode], code));
-    const url = shareUrl(mode, result.figure.id, code);
-    const label = mode === "love" ? "恋愛版" : "性格版";
-    const shareView = capturedSelfViewGuard();
-    const inviteButton = $("[data-invite-self=\"" + mode + "\"]");
-    const copyButton = $("[data-copy-self=\"" + mode + "\"]");
-    const stillCurrent = (button) => shareView() && button?.isConnected && savedResult(mode)?.code === code;
-    $(`[data-invite-self="${mode}"]`)?.setAttribute("aria-label", `${label}の結果を友達に送る。リンクを知る人は12問の答えを読み取れます`);
-    $(`[data-copy-self="${mode}"]`)?.setAttribute("aria-label", `${label}の結果リンクをコピー。リンクを知る人は12問の答えを読み取れます`);
-    inviteButton?.addEventListener("click", () => {
-      if (!stillCurrent(inviteButton)) { route(); return; }
-      shareLink(url, `${label}では私は${result.figure.name}タイプだった！ あなたも12問で診断して、結果リンクを送り返してね。`, () => stillCurrent(inviteButton));
-    });
-    copyButton?.addEventListener("click", () => {
-      if (!stillCurrent(copyButton)) { route(); return; }
-      copyLink(url, `${label}の結果リンクをコピーしました`, () => stillCurrent(copyButton));
-    });
-  });
+  bindPeopleOwnShares(ownShares);
   app.querySelectorAll("[data-remove-person]").forEach((b) => b.onclick = async () => {
     if (b.disabled) return;
     const hash = location.hash;
@@ -2520,7 +2537,39 @@ let trustedEpoch = null;
 let lastRevokedState = null;
 let selfViewGeneration = 0;
 let activeSelfResult = null;
+let activeSelfOverview = null;
 let externalSessionClearFailed = false;
+function selfOverviewCurrentSignature(snapshot) {
+  if (snapshot.status !== "ok") return null;
+  return JSON.stringify(["normal", "love"].map((mode) => {
+    const result = snapshot.state.current[mode];
+    return result ? [result.code, result.via ?? null] : null;
+  }));
+}
+function captureSelfOverview(snapshot = selfStateSnapshot()) {
+  activeSelfOverview = { hash: location.hash, status: snapshot.status,
+    current: selfOverviewCurrentSignature(snapshot) };
+}
+function deferUnverifiedMeRefresh() {
+  if (app.querySelector("[data-self-overview-pending]")) return;
+  const notice = document.createElement("p");
+  notice.className = "note";
+  notice.dataset.selfOverviewPending = "";
+  notice.setAttribute("role", "alert");
+  notice.textContent = "別のタブで端末記録の状態が変わりました。入力中の確認を残すため、この画面はまだ更新していません。";
+  const button = document.createElement("button");
+  button.className = "btn sub";
+  button.type = "button";
+  button.textContent = "端末記録を更新して表示";
+  button.addEventListener("click", () => {
+    if (location.hash !== "#/me") return;
+    const scrollY = window.scrollY;
+    renderMe();
+    window.scrollTo(0, scrollY);
+  });
+  notice.append(button);
+  app.prepend(notice);
+}
 function revokeStaleSelfView() {
   const status = selfStateSnapshot().status;
   const currentEpoch = currentClearEpoch();
@@ -2573,6 +2622,7 @@ function route() {
   // before rendering a result, without acknowledging an unseen deletion.
   revokeStaleSelfView();
   activeSelfResult = null;
+  activeSelfOverview = null;
   queueMicrotask(showGlobalSelfWarning);
   disposeGuide();
   disposeGuide = () => {};
@@ -2673,13 +2723,47 @@ function refreshSelfAfterExternalChange() {
       return;
     }
   }
+  if (activeSelfOverview && activeSelfOverview.hash === location.hash) {
+    const snapshot = selfStateSnapshot();
+    const current = selfOverviewCurrentSignature(snapshot);
+    if (snapshot.status !== activeSelfOverview.status || current !== activeSelfOverview.current) {
+      if (location.hash === "#/me") {
+        // A recovery checkbox or export confirmation may be in progress on an
+        // unverified record page. Leave it intact until the person refreshes.
+        if (activeSelfOverview.status !== "ok") deferUnverifiedMeRefresh();
+        else {
+          const scrollY = window.scrollY;
+          renderMe();
+          window.scrollTo(0, scrollY);
+        }
+      } else if (location.hash === "#/people") {
+        const ownShares = ownSelfShares(snapshot);
+        const container = app.querySelector("[data-self-overview]");
+        if (container) {
+          container.innerHTML = peopleOwnSharesHtml(ownShares);
+          bindPeopleOwnShares(ownShares);
+        }
+        captureSelfOverview(snapshot);
+      } else {
+        const me = snapshot.status === "ok" ? snapshot.state.current : { normal: null, love: null };
+        const container = app.querySelector("[data-self-overview]");
+        if (container) container.innerHTML = topCurrentResultsHtml(me);
+        captureSelfOverview(snapshot);
+      }
+      showGlobalSelfWarning();
+      return;
+    }
+  }
   showGlobalSelfWarning();
 }
 addEventListener("storage", (event) => {
   if (event.key === null || event.key === SELF_KEY || event.key === "ijin-clear-epoch"
     || event.key === "ijin-self-migration-gate" || event.key?.startsWith("ijin.me.")
-    || ["ijin.diagLedger", "ijin.diagCount", "ijin.seen_results"].includes(event.key))
+    || ["ijin.diagLedger", "ijin.diagCount", "ijin.seen_results"].includes(event.key)) {
+    if (location.hash === "#/me" && activeSelfOverview?.status !== "ok"
+      && event.key?.startsWith("ijin.me.")) deferUnverifiedMeRefresh();
     refreshSelfAfterExternalChange();
+  }
 });
 addEventListener("pageshow", refreshSelfAfterExternalChange);
 addEventListener("visibilitychange", () => {
