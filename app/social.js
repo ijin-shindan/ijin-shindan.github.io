@@ -7,7 +7,7 @@ const FRIEND_CODE_VERSION = '1';
 
 export function otherPilotAllowed(hostname) {
   // 個別回答を含む試作リンクは公開前にLANへ配らない。
-  return /^(?:localhost|127\.0\.0\.1)$/.test(hostname);
+  return false; // 配布版では旧OTHER試作を開かない
 }
 
 export function validInviteToken(token) {
