@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=92e07ce-202610260053";
-import { mountMotion } from "./motion.js?v=92e07ce-202610260053";
-import { mountGuide } from "./guide.js?v=92e07ce-202610260053";
+import { AXES, Shindan, loadData } from "./shindan.js?v=2109db0-202610260252";
+import { mountMotion } from "./motion.js?v=2109db0-202610260252";
+import { mountGuide } from "./guide.js?v=2109db0-202610260252";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=92e07ce-202610260053";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=92e07ce-202610260053";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=92e07ce-202610260053";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=92e07ce-202610260053";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=92e07ce-202610260053";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=92e07ce-202610260053";
-import { storedResultMatches, storedList } from "./stored_result.js?v=92e07ce-202610260053";
-import { clearPrefixedStorage } from "./storage_clear.js?v=92e07ce-202610260053";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=92e07ce-202610260053";
-import { applyZukanBatch } from "./zukan_batch.js?v=92e07ce-202610260053";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=2109db0-202610260252";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=2109db0-202610260252";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=2109db0-202610260252";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=2109db0-202610260252";
+import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=2109db0-202610260252";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=2109db0-202610260252";
+import { storedResultMatches, storedList } from "./stored_result.js?v=2109db0-202610260252";
+import { clearPrefixedStorage } from "./storage_clear.js?v=2109db0-202610260252";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=2109db0-202610260252";
+import { applyZukanBatch } from "./zukan_batch.js?v=2109db0-202610260252";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=92e07ce-202610260053")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2109db0-202610260252")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1359,7 +1359,7 @@ function renderResult(mode, code) {
     const ch = b.dataset.share;
     track("share_click", { channel: ch, mode, figure: f.id });
     if (ch === "friend") shareLink(url, `私は「${f.name}」タイプだった！あなたも診断して、結果リンクを返してね。`, currentShareView);
-    if (ch === "copy") { try { await navigator.clipboard.writeText(url); if (currentShareView()) toast("リンクをコピーしました"); } catch { if (currentShareView()) prompt("このリンクをコピーしてください", url); } }
+    if (ch === "copy") copyLink(url, "リンクをコピーしました", currentShareView);
     if (ch === "image") shareImage(r, mode, b, currentShareView);
     if (ch === "x") open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
     if (ch === "line") open(`https://line.me/R/share?text=${encodeURIComponent(`${f.name}タイプだった😂 あなたは誰？ ${url}`)}`, "_blank", "noopener");
@@ -2218,8 +2218,12 @@ function renderOtherReply(token, code) {
     renderOtherReply(token, code);
     toast("回答を保存しました");
   });
-  $("[data-share-reply]")?.addEventListener("click", () => shareLink(url, "あなたについて答えました。返信リンクを開いて、12問の回答を見てね。"));
-  $("[data-copy-reply]")?.addEventListener("click", () => copyLink(url));
+  const replyHash = location.hash;
+  const shareReplyButton = $("[data-share-reply]");
+  const copyReplyButton = $("[data-copy-reply]");
+  const replyStillCurrent = (button) => button?.isConnected && location.hash === replyHash;
+  shareReplyButton?.addEventListener("click", () => shareLink(url, "あなたについて答えました。返信リンクを開いて、12問の回答を見てね。", () => replyStillCurrent(shareReplyButton)));
+  copyReplyButton?.addEventListener("click", () => copyLink(url, "リンクをコピーしました", () => replyStillCurrent(copyReplyButton)));
   $("[data-revise-other]")?.addEventListener("click", () => {
     otherQuiz = { token, qs: otherQuestions, answers: values.slice(), i: Math.max(0, values.indexOf(0)), busy: false };
     // 返信URLは転送され得る。見直す人も回答対象を再確認する。
