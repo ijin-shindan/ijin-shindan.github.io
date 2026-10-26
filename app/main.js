@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=5d3642e-202610262205";
-import { mountMotion } from "./motion.js?v=5d3642e-202610262205";
-import { mountGuide } from "./guide.js?v=5d3642e-202610262205";
+import { AXES, Shindan, loadData } from "./shindan.js?v=512f7f5-202610262211";
+import { mountMotion } from "./motion.js?v=512f7f5-202610262211";
+import { mountGuide } from "./guide.js?v=512f7f5-202610262211";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5d3642e-202610262205";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5d3642e-202610262205";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5d3642e-202610262205";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5d3642e-202610262205";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5d3642e-202610262205";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5d3642e-202610262205";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5d3642e-202610262205";
-import { storedResultMatches, storedList } from "./stored_result.js?v=5d3642e-202610262205";
-import { clearPrefixedStorage } from "./storage_clear.js?v=5d3642e-202610262205";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5d3642e-202610262205";
-import { applyZukanBatch } from "./zukan_batch.js?v=5d3642e-202610262205";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=512f7f5-202610262211";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=512f7f5-202610262211";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=512f7f5-202610262211";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=512f7f5-202610262211";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=512f7f5-202610262211";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=512f7f5-202610262211";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=512f7f5-202610262211";
+import { storedResultMatches, storedList } from "./stored_result.js?v=512f7f5-202610262211";
+import { clearPrefixedStorage } from "./storage_clear.js?v=512f7f5-202610262211";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=512f7f5-202610262211";
+import { applyZukanBatch } from "./zukan_batch.js?v=512f7f5-202610262211";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5d3642e-202610262205")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=512f7f5-202610262211")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1422,9 +1422,9 @@ function renderResult(mode, code) {
       <p>友達に12問答えてもらい、その答えを受け取る試作です。人物への当てはめはまだ行いません。</p>
       <a class="btn sub" href="#/ask">友達に12問答えてもらう（試作）</a></section>` : ""}
     <details class="card social-entry"><summary>友達から同じ結果リンクが届いた？</summary>
-      <p>自分の共有リンクを開いた場合もこの画面になります。実際に別の人から届いた結果のときだけ、人物カードへ追加してください。追加すると、この端末にカード名と回答入りの結果リンクが保存されます。返事を送りたい場合は自分の結果リンクをコピーできます。</p>
+      <p>自分の共有リンクを開いた場合もこの画面になります。実際に別の人から届いた結果のときだけ、人物カードへ追加してください。追加すると、この端末にカード名と回答入りの結果リンクが保存されます。返事を送りたい場合は、自分の結果リンクをコピーして会話に貼り付けて送ってください。</p>
       <button class="btn sub" data-add-same-person>友達の人物カードに追加</button>
-      <button class="btn sub" data-share="copy">自分の結果リンクを返す</button></details>
+      <button class="btn sub" data-share="copy">自分の結果リンクをコピー</button></details>
     <section class="card"><h2>図鑑</h2>${zukanStorageAlert()}
       <div class="progress-line"><span><b>${zukanCount()}</b> / ${FREE.length}人を発見</span><div class="bar"><i style="width:${(zukanCount() / FREE.length) * 100}%"></i></div></div>
       <a class="btn sub" style="margin-top:12px" href="#/zukan">図鑑を見る</a>
@@ -1571,7 +1571,8 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     ${fromSharedPage && !personCard && !past && !prevLink && ownReply ? `<section class="card social-entry"><h2>自分の結果を友達に返す</h2>
       <p>友達から届いたリンクなら、最初にリンクを送った友達を選んで、自分の結果リンクを返してください。結果は自動では届きません。自分で開いたリンクなら操作は不要です。</p>
       <p class="social-note">送る結果リンクを知る人は、あなたの12問の答えを読み取れます。</p>
-      <button class="btn start" data-return-self>自分の結果リンクを送る</button></section>` : ""}
+      <button class="btn start" data-return-self>${typeof navigator.share === "function" ? "自分の結果リンクを送る" : "返す文章とリンクをコピー"}</button>
+      ${typeof navigator.share !== "function" ? '<p class="social-note">コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。</p>' : ""}</section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
       ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら自分の結果リンクを共有できます。友達から届いたなら、その友達へ返せます。</p>`}
@@ -1581,7 +1582,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       ? `<button class="btn sub" data-restore-self>以前の自己診断結果を、現在の自分の結果に戻す</button>`
       : `<p class="note">${personCard ? "人物カードに保存した結果です。自分の診断結果は上書きしません。" : prevLink ? "以前リンクから保存した結果です。自分の診断結果は上書きしません。" : "結果リンクを見ています。この回答は、見るだけでは端末の結果記録へ追加せず、自分の診断結果も上書きしません。"}</p>`}</div>`;
   bindFreshQuizLinks();
-  $("[data-return-self]")?.setAttribute("aria-label", "自分の結果リンクを送る。リンクを知る人は12問の答えを読み取れます");
+  $("[data-return-self]")?.setAttribute("aria-label", `${typeof navigator.share === "function" ? "自分の結果リンクを送る" : "返す文章とリンクをコピー"}。リンクを知る人は12問の答えを読み取れます`);
   const returnSelfButton = $("[data-return-self]");
   const returnSelfView = capturedSelfViewGuard();
   const returnSelfHash = location.hash;
@@ -2374,8 +2375,9 @@ function ownSelfShares(snapshot) {
 function peopleOwnSharesHtml(ownShares) {
   return ownShares.length ? `<p class="social-note">送るリンクを知る人は、あなたの12問の答えを読み取れます。友達はそのリンクから自分自身を診断できます。他己分析は ※開発中。</p>
         ${ownShares.map(({ mode }, i) => { const label = mode === "love" ? "恋愛版" : "性格版"; return `
-          <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${label}の結果を友達に送る</button>
-          <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}`
+          <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${typeof navigator.share === "function" ? `${label}の結果を友達に送る` : `${label}の共有文とリンクをコピー`}</button>
+          <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}
+        ${typeof navigator.share !== "function" ? '<p class="social-note">コピーした共有文とリンクは、LINEなどの会話に貼り付けて送ってください。</p>' : ""}`
     : '<a class="btn start" href="#/q/normal">まず自分を診断する</a>';
 }
 function bindPeopleOwnShares(ownShares) {
@@ -2392,7 +2394,7 @@ function bindPeopleOwnShares(ownShares) {
       return shareView() && location.hash === shareHash && button?.isConnected
         && latest?.code === code && latest.via !== "link";
     };
-    inviteButton?.setAttribute("aria-label", `${label}の結果を友達に送る。リンクを知る人は12問の答えを読み取れます`);
+    inviteButton?.setAttribute("aria-label", `${typeof navigator.share === "function" ? `${label}の結果を友達に送る` : `${label}の共有文とリンクをコピー`}。リンクを知る人は12問の答えを読み取れます`);
     copyButton?.setAttribute("aria-label", `${label}の結果リンクをコピー。リンクを知る人は12問の答えを読み取れます`);
     inviteButton?.addEventListener("click", () => {
       if (!stillCurrent(inviteButton)) { refreshSelfAfterExternalChange(); return; }
