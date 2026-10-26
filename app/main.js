@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=ae6297f-202610262156";
-import { mountMotion } from "./motion.js?v=ae6297f-202610262156";
-import { mountGuide } from "./guide.js?v=ae6297f-202610262156";
+import { AXES, Shindan, loadData } from "./shindan.js?v=5d3642e-202610262205";
+import { mountMotion } from "./motion.js?v=5d3642e-202610262205";
+import { mountGuide } from "./guide.js?v=5d3642e-202610262205";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ae6297f-202610262156";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ae6297f-202610262156";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ae6297f-202610262156";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ae6297f-202610262156";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ae6297f-202610262156";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ae6297f-202610262156";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ae6297f-202610262156";
-import { storedResultMatches, storedList } from "./stored_result.js?v=ae6297f-202610262156";
-import { clearPrefixedStorage } from "./storage_clear.js?v=ae6297f-202610262156";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ae6297f-202610262156";
-import { applyZukanBatch } from "./zukan_batch.js?v=ae6297f-202610262156";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5d3642e-202610262205";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5d3642e-202610262205";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5d3642e-202610262205";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5d3642e-202610262205";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5d3642e-202610262205";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5d3642e-202610262205";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5d3642e-202610262205";
+import { storedResultMatches, storedList } from "./stored_result.js?v=5d3642e-202610262205";
+import { clearPrefixedStorage } from "./storage_clear.js?v=5d3642e-202610262205";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5d3642e-202610262205";
+import { applyZukanBatch } from "./zukan_batch.js?v=5d3642e-202610262205";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ae6297f-202610262156")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5d3642e-202610262205")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1389,13 +1389,15 @@ function renderResult(mode, code) {
     ${freshSource === "friend" ? returnSharedHtml : ""}
     <p class="note share-warning ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
-      <button class="btn primary wide" data-share="friend">${freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る"}</button>
+      <button class="btn primary wide" data-share="friend">${typeof navigator.share === "function"
+        ? (freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る")
+        : "送る文章とリンクをコピー"}</button>
       <button class="btn sub" data-share="line">LINEで送る</button>
       <button class="btn sub" data-share="x">Xでポスト</button>
       <button class="btn sub" data-share="image">画像を保存</button>
       <button class="btn sub" data-share="copy">リンクをコピー</button>
     </div>
-    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${freshSource === "friend" ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}</p>
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${freshSource === "friend" ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}${typeof navigator.share !== "function" ? "コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。" : ""}</p>
     ${!localSaveOk && freshSaveStatus !== "saved_zukan_pending" ? '<p class="note" role="alert">このブラウザでは結果または図鑑の登録を確認できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
     ${freshSource !== "friend" ? returnSharedHtml : ""}
     ${(() => { const prev = previousResult(mode); return verifiedResult(mode, prev) && prev.code !== code
@@ -1436,7 +1438,7 @@ function renderResult(mode, code) {
       <a class="btn sub" href="#/me">この端末の記録</a>
       <a class="btn sub" href="#/">トップへ</a></div>
     <p class="note" style="margin-top:16px"><a href="#/about">このサイトについて</a></p>
-    <button class="fab" data-share="friend" hidden>結果リンクを送る</button>`;
+    <button class="fab" data-share="friend" hidden>${typeof navigator.share === "function" ? "結果リンクを送る" : "送る文章とリンクをコピー"}</button>`;
 
   // ボタンだけを拾う読み上げ操作でも、回答コードを含むリンクの注意が伝わるようにする。
   app.querySelectorAll('[data-share="friend"], [data-share="line"], [data-share="x"], [data-share="copy"]').forEach((b) => {
@@ -2126,33 +2128,37 @@ function renderUnavailable() {
 
 // ---------------- 友達から見た自分（端末内・手動で往復） ----------------
 // 旧 #/invite は別仕様のため再利用しない。新しいURLは #/ask/<token> と #/reply/<token>/<code>。
-function copyLink(url, okText = "リンクをコピーしました", stillValid = () => true) {
+function copyLink(url, okText = "リンクをコピーしました", stillValid = () => true,
+  manualText = "このリンクをコピーしてください") {
   if (!stillValid()) return;
   try {
     const clipboard = navigator.clipboard;
     const pending = typeof clipboard?.writeText === "function" ? clipboard.writeText(url) : null;
     if (!pending || typeof pending.then !== "function") throw new Error("Clipboard unavailable");
     pending.then(() => { if (stillValid()) toast(okText); })
-      .catch(() => { if (stillValid()) prompt("このリンクをコピーしてください", url); });
+      .catch(() => { if (stillValid()) prompt(manualText, url); });
   } catch {
-    if (stillValid()) prompt("このリンクをコピーしてください", url);
+    if (stillValid()) prompt(manualText, url);
   }
 }
 function shareLink(url, text, stillValid = () => true) {
   if (!stillValid()) return;
+  const copyForSending = () => copyLink(`${text}\n${url}`,
+    "文章とリンクをコピーしました。LINEなどの会話に貼り付けて送ってください", stillValid,
+    "この文章とリンクをコピーし、LINEなどの会話に貼り付けて送ってください");
   try {
     const pending = typeof navigator.share === "function"
       ? navigator.share({ title: "世界の偉人性格診断", text, url }) : null;
     if (pending && typeof pending.then === "function") {
       pending.then(undefined, (e) => {
-        if (e?.name !== "AbortError" && stillValid()) copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
+        if (e?.name !== "AbortError" && stillValid()) copyForSending();
       });
       return;
     }
   } catch (e) {
     if (e?.name === "AbortError") return;
   }
-  if (stillValid()) copyLink(`${text}\n${url}`, "送る文章とリンクをコピーしました", stillValid);
+  if (stillValid()) copyForSending();
 }
 function renderAskHome() {
   document.title = "友達に聞く｜世界の偉人性格診断";
