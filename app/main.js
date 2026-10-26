@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=8ed3b55-202610260854";
-import { mountMotion } from "./motion.js?v=8ed3b55-202610260854";
-import { mountGuide } from "./guide.js?v=8ed3b55-202610260854";
+import { AXES, Shindan, loadData } from "./shindan.js?v=318bc16-202610260903";
+import { mountMotion } from "./motion.js?v=318bc16-202610260903";
+import { mountGuide } from "./guide.js?v=318bc16-202610260903";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=8ed3b55-202610260854";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=8ed3b55-202610260854";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=8ed3b55-202610260854";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=8ed3b55-202610260854";
-import { prependPersonCard, distinctCardFigures, figureSetProgress } from "./people.js?v=8ed3b55-202610260854";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=8ed3b55-202610260854";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=8ed3b55-202610260854";
-import { storedResultMatches, storedList } from "./stored_result.js?v=8ed3b55-202610260854";
-import { clearPrefixedStorage } from "./storage_clear.js?v=8ed3b55-202610260854";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=8ed3b55-202610260854";
-import { applyZukanBatch } from "./zukan_batch.js?v=8ed3b55-202610260854";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=318bc16-202610260903";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=318bc16-202610260903";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=318bc16-202610260903";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=318bc16-202610260903";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=318bc16-202610260903";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=318bc16-202610260903";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=318bc16-202610260903";
+import { storedResultMatches, storedList } from "./stored_result.js?v=318bc16-202610260903";
+import { clearPrefixedStorage } from "./storage_clear.js?v=318bc16-202610260903";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=318bc16-202610260903";
+import { applyZukanBatch } from "./zukan_batch.js?v=318bc16-202610260903";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=8ed3b55-202610260854")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=318bc16-202610260903")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -453,7 +453,7 @@ const personDeleteConfirmMessage = (card, displayIndex, verifiedFigureName = "")
   const label = typeof card.label === "string"
     ? [...card.label.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, " ").trim()].slice(0, 20).join("")
     : "";
-  const name = label || `友達カード ${displayIndex + 1}`;
+  const name = label || personCardDisplayName({ ...card, label: "" }, displayIndex);
   const mode = card.mode === "love" ? "恋愛版" : "性格版";
   const result = verifiedFigureName || "結果を確認できないカード";
   return `「${name}」（${displayIndex + 1}枚目・${result}・${mode}）をこの端末から削除しますか？`;
@@ -1631,7 +1631,7 @@ function renderPersonCard(id) {
   const index = cards.findIndex((x) => x.id === id);
   const card = cards[index];
   if (!card) return renderUnavailable();
-  const displayCard = { ...card, label: card.label || `友達カード ${index + 1}` };
+  const displayCard = { ...card, label: personCardDisplayName(card, index) };
   const sd = engines[card.mode];
   const r = sd.diagnose(answersOf(sd, card.code));
   if (r.figure.id !== card.fig) return renderUnavailable();
@@ -2524,11 +2524,12 @@ function renderPeople() {
         <p>${heroes.missing.length ? `あと${heroes.missing.length}キャラで、信長・秀吉・家康の3種類。` : "信長・秀吉・家康の3種類がそろいました！"}</p>
         <div class="theme-set-names">${THREE_HEROES.map((id) => `<span class="${heroes.found.includes(id) ? "found" : ""}">${esc(fig(id).name)}</span>`).join("")}</div></div>` : ""}
       <p class="variety-note">この端末に保存した結果のキャラの種類です。人の数や本人確認を示すものではありません。</p></section>
+    ${cards.some(personCardNeedsLabel) ? '<p class="social-note">名前の横の目印でカードを区別できます。誰の結果かはリンクから確認できません。必要なら「呼び名」を付けてください。本名や連絡先は入れないでください。</p>' : ""}
     ${cards.length ? `<div class="social-list">${cards.map((x, i) => { const verified = isVerifiedCard(x);
-      const actionName = x.label || (verified ? fig(x.fig).name : `友達カード ${i + 1}`);
+      const actionName = personCardDisplayName(x, i);
       return `<section class="social-card">
       ${verified ? `<img class="tile" src="${avatar(x.fig)}" alt="">` : '<div class="person-broken-icon" aria-hidden="true">？</div>'}
-      <div class="person-card-info"><b>${esc(x.label || `友達カード ${i + 1}`)}</b>${verified
+      <div class="person-card-info"><b>${esc(personCardDisplayName(x, i))}</b>${verified
         ? `<div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small>`
         : '<small>保存データの回答とキャラが一致しません。このカードの結果は開けません。</small>'}</div>
       ${verified ? `<a href="#/person/${encodeURIComponent(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目の結果を見る">見る</a>` : '<span class="person-unavailable">確認不可</span>'}

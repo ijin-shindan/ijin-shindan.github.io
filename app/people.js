@@ -1,9 +1,22 @@
 // 回答コードは人物の識別子ではない。同じ回答の別人もカード化できる。
-import { validInviteToken } from "./social.js?v=8ed3b55-202610260854";
+import { validInviteToken } from "./social.js?v=318bc16-202610260903";
 
 export function prependPersonCard(cards, card, maxCards = 50, isUsable = () => true) {
   if (!Array.isArray(cards) || cards.filter(isUsable).length >= maxCards) return null;
   return [card, ...cards];
+}
+
+// The visible fallback must not change when a newer card is inserted ahead of
+// this one. Old cards without a unique persisted ID retain the old index label.
+export function personCardNeedsLabel(card) {
+  return typeof card?.label !== "string" || !card.label.trim();
+}
+
+export function personCardDisplayName(card, displayIndex) {
+  if (!personCardNeedsLabel(card)) return card.label;
+  return validInviteToken(card?.id)
+    ? `友達カード #${card.id.slice(0, 8).toUpperCase()}`
+    : `友達カード ${displayIndex + 1}`;
 }
 
 // 人物カードに保存された偉人の「種類」だけを取り出す。
