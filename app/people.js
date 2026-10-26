@@ -1,5 +1,5 @@
 // 回答コードは人物の識別子ではない。同じ回答の別人もカード化できる。
-import { validInviteToken } from "./social.js?v=331c152-202610260907";
+import { validInviteToken } from "./social.js?v=064f4ea-202610261233";
 
 export function prependPersonCard(cards, card, maxCards = 50, isUsable = () => true) {
   if (!Array.isArray(cards) || cards.filter(isUsable).length >= maxCards) return null;
@@ -8,12 +8,27 @@ export function prependPersonCard(cards, card, maxCards = 50, isUsable = () => t
 
 // The visible fallback must not change when a newer card is inserted ahead of
 // this one. Old cards without a unique persisted ID retain the old index label.
+// Old or damaged saved labels can contain invisible formatting characters that
+// make a non-empty label appear blank (or reverse the visible card name).
+const HIDDEN_LABEL_CHARS = /[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u061c\u115f\u1160\u180e\u200b\u200c\u200e\u200f\u2028-\u202e\u2060-\u206f\u2800\u3164\ufeFF\uffa0]/g;
+// Keep joiners and emoji variation selectors in a visible name, but do not
+// accept a label made only of those otherwise invisible characters.
+const VISIBLE_LABEL_CHAR = /[^\u200d\ufe00-\ufe0f\u{e0100}-\u{e01ef}\s]/u;
+
+export function cleanPersonCardLabel(value) {
+  if (typeof value !== "string") return "";
+  const label = value.replace(HIDDEN_LABEL_CHARS, "").trim();
+  const shortened = Array.from(label).slice(0, 20).join("");
+  return VISIBLE_LABEL_CHAR.test(shortened) ? shortened : "";
+}
+
 export function personCardNeedsLabel(card) {
-  return typeof card?.label !== "string" || !card.label.trim();
+  return !cleanPersonCardLabel(card?.label);
 }
 
 export function personCardDisplayName(card, displayIndex) {
-  if (!personCardNeedsLabel(card)) return card.label;
+  const label = cleanPersonCardLabel(card?.label);
+  if (label) return label;
   return validInviteToken(card?.id)
     ? `友達カード #${card.id.slice(0, 8).toUpperCase()}`
     : `友達カード ${displayIndex + 1}`;
