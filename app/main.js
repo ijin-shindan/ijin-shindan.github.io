@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=512f7f5-202610262211";
-import { mountMotion } from "./motion.js?v=512f7f5-202610262211";
-import { mountGuide } from "./guide.js?v=512f7f5-202610262211";
+import { AXES, Shindan, loadData } from "./shindan.js?v=06a9f8e-202610262318";
+import { mountMotion } from "./motion.js?v=06a9f8e-202610262318";
+import { mountGuide } from "./guide.js?v=06a9f8e-202610262318";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=512f7f5-202610262211";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=512f7f5-202610262211";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=512f7f5-202610262211";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=512f7f5-202610262211";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=512f7f5-202610262211";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=512f7f5-202610262211";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=512f7f5-202610262211";
-import { storedResultMatches, storedList } from "./stored_result.js?v=512f7f5-202610262211";
-import { clearPrefixedStorage } from "./storage_clear.js?v=512f7f5-202610262211";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=512f7f5-202610262211";
-import { applyZukanBatch } from "./zukan_batch.js?v=512f7f5-202610262211";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=06a9f8e-202610262318";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=06a9f8e-202610262318";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=06a9f8e-202610262318";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=06a9f8e-202610262318";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=06a9f8e-202610262318";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=06a9f8e-202610262318";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=06a9f8e-202610262318";
+import { storedResultMatches, storedList } from "./stored_result.js?v=06a9f8e-202610262318";
+import { clearPrefixedStorage } from "./storage_clear.js?v=06a9f8e-202610262318";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=06a9f8e-202610262318";
+import { applyZukanBatch } from "./zukan_batch.js?v=06a9f8e-202610262318";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=512f7f5-202610262211")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=06a9f8e-202610262318")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -2051,7 +2051,8 @@ function renderAbout() {
     <p>「世界の偉人性格診断」は、12問で100人の偉人のうち誰に近いかを楽しむ無料のサイトです。性格版と恋愛版があります。登録や購入は不要です。</p>
     <p>結果は娯楽であり、心理検査や医学的診断ではありません。人物の台詞やイラストは創作を含み、史実や本人の発言そのものとは限りません。</p>
     <h2>保存と共有</h2>
-    <p>回答途中の記録、結果、図鑑、受け取った共有リンクの結果、人物カード${OTHER_PILOT ? "、試作中の招待リンクと他己回答" : ""}は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
+    <p>回答途中の記録、自分の診断結果、図鑑、自分で追加した人物カード${OTHER_PILOT ? "、試作中の招待リンクと他己回答" : ""}は、このブラウザ内に保存されます。別の端末には自動で引き継がれません。ブラウザのデータを消すと失われます。</p>
+    <p>受け取った結果リンクは、開くだけでは「この端末の記録」に追加されません。共有結果から診断を始めた場合、元の結果へ戻るための情報をそのタブに一時的に記録します。開いたリンク自体はブラウザの履歴に残る場合があります。</p>
     <p>結果の共有リンクには、12問の回答から作られたコードが含まれ、リンクを知る人は答えを読み取れます。リンクを相手に送ると、受信者や共有先のサービスに結果とコードが伝わります。受信者がリンクを開くと、配信元のGitHub Pagesにもコード付きURLが届きます。画像を端末に保存するだけなら、このコードは送信されません。共有操作をしなければ、アプリから回答や結果を運営者へ送信しません。</p>
     ${OTHER_PILOT ? '<p>試作中の友達への招待と返信は、利用者がリンクをコピー・共有して行います。回答は自動送信されません。返信リンクの「#」以降には回答コードが含まれるため、送った相手や共有先サービスにはその情報が伝わります。リンクを知る人は12問の答えを開けます。名前はリンクに含めません。招待した人が別ブラウザーや別のサイトアドレスで返信を開いても、招待の記録とは自動でつながりません。</p>' : ""}
     <p>この版ではアクセス解析、広告、ログイン、クラウド保存、購入は行いません。ページの表示に必要なファイルはGitHub Pagesから読み込まれ、配信元には通常の閲覧ログが残る場合があります。Wikipediaなど外部サイトへのリンクは、押したときだけ開きます。</p>
