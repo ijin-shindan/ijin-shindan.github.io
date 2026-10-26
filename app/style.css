@@ -182,13 +182,14 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 .checkpoint .tap { font-size: 13px; color: var(--ink-soft); }
 
 /* ---------------- 鑑定中（結果の演出の前半） ---------------- */
-#overlay { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: #1d2433; color: #fff; text-align: center; transition: background .35s; }
+#overlay { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-rows: minmax(0, 1fr) auto; place-items: center; gap: 12px; padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); background: #1d2433; color: #fff; text-align: center; transition: background .35s; }
+#overlay > div { max-height: 100%; overflow-y: auto; }
 #overlay .msg { font-family: var(--serif); font-weight: 900; font-size: 20px; margin-bottom: 18px; letter-spacing: .1em; }
 #overlay .radar { width: 220px; }
 #overlay .radar text { fill: #cfd6e6; }
 #overlay .roulette { display: grid; place-items: center; width: 92px; height: 92px; margin: 18px auto 0; border-radius: 50%; font-family: var(--serif); font-weight: 900; font-size: 40px; background: #fff; color: #1d2433; }
 #overlay .tname { margin-top: 10px; font-weight: 800; font-size: 18px; min-height: 1.6em; }
-#overlay .skip { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 32px); padding: 10px 14px; border: 1px solid currentColor; border-radius: 8px; background: transparent; font: inherit; font-size: 12px; color: inherit; cursor: pointer; }
+#overlay .skip { width: max-content; max-width: 100%; min-height: 44px; padding: 10px 14px; border: 1px solid currentColor; border-radius: 8px; background: transparent; font: inherit; font-size: 12px; color: inherit; cursor: pointer; }
 #overlay.spread { background: var(--t-bg); color: #26221d; }
 #overlay.spread .radar text { fill: #6b6358; }
 #overlay.spread .roulette { background: var(--t-accent); color: #fff; }
