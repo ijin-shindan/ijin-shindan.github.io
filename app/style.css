@@ -464,6 +464,7 @@ details p { font-size: 14px; margin: 8px 0; }
 .social-card > .person-card-info b { display: block; font-size: 14px; line-height: 1.4; }
 .social-card > .person-card-info .nm { font-family: var(--serif); font-size: 18px; font-weight: 900; line-height: 1.35; }
 .social-card > .person-card-info small { display: block; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
+.social-card > .person-card-info .person-card-position { font-size: 12px; font-weight: 800; letter-spacing: .04em; }
 .social-card > .person-broken-icon { grid-column: 1; grid-row: 1; display: grid; place-items: center;
   width: min(100%, 112px); aspect-ratio: 1; border: 2px dashed var(--world-edge);
   border-radius: var(--r-tile); background: var(--paper); color: var(--ink-soft); font-size: 42px; }
