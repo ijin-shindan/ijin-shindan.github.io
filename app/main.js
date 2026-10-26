@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=21e574c-202610261843";
-import { mountMotion } from "./motion.js?v=21e574c-202610261843";
-import { mountGuide } from "./guide.js?v=21e574c-202610261843";
+import { AXES, Shindan, loadData } from "./shindan.js?v=ae6297f-202610262156";
+import { mountMotion } from "./motion.js?v=ae6297f-202610262156";
+import { mountGuide } from "./guide.js?v=ae6297f-202610262156";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=21e574c-202610261843";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=21e574c-202610261843";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=21e574c-202610261843";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=21e574c-202610261843";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=21e574c-202610261843";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=21e574c-202610261843";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=21e574c-202610261843";
-import { storedResultMatches, storedList } from "./stored_result.js?v=21e574c-202610261843";
-import { clearPrefixedStorage } from "./storage_clear.js?v=21e574c-202610261843";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=21e574c-202610261843";
-import { applyZukanBatch } from "./zukan_batch.js?v=21e574c-202610261843";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ae6297f-202610262156";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ae6297f-202610262156";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ae6297f-202610262156";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ae6297f-202610262156";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ae6297f-202610262156";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ae6297f-202610262156";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ae6297f-202610262156";
+import { storedResultMatches, storedList } from "./stored_result.js?v=ae6297f-202610262156";
+import { clearPrefixedStorage } from "./storage_clear.js?v=ae6297f-202610262156";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ae6297f-202610262156";
+import { applyZukanBatch } from "./zukan_batch.js?v=ae6297f-202610262156";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=21e574c-202610261843")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ae6297f-202610262156")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1359,7 +1359,9 @@ function renderResult(mode, code) {
   const returnSharedHtml = validFriend ? `<div class="recent-shared-return ${reveal ? "reveal-hide" : ""}">
       <a class="btn sub" href="${esc(sharedResultViewPath(mode, friend.code))}">共有リンクの結果を見る：${esc(fig(friend.fig).name)}</a>
       <p class="social-note">${startedFromShared ? "このタブで診断を始めたときの共有結果です。" : "以前にこのブラウザーで開いた共有結果です。"}自分のリンクも含み、送り主は確認できません。友達のカードはリンク先で手動で追加できます。</p></div>` : "";
-  const otherHtml = other && validCode(engines[OTHER[mode]], other.code) ? (() => {
+  // An unsaved fresh result cannot be reconstructed as SELF after a re-render;
+  // do not pair it with the other saved mode as if it were the current result.
+  const otherHtml = mine?.code === code && other && validCode(engines[OTHER[mode]], other.code) ? (() => {
     const [n, l] = mode === "normal" ? [f.id, other.fig] : [other.fig, f.id];
     return `<section class="card"><h2>${n === l ? "ふだんも恋も同じ偉人" : "表の顔 × 恋の顔"}</h2>
       <div class="duo"><div><img class="tile" src="${avatar(n)}" alt="" style="${themeVars(fig(n).type)}"><div class="lbl">ふだんは</div><div class="nm">${esc(fig(n).name)}</div></div>
@@ -1445,6 +1447,12 @@ function renderResult(mode, code) {
   // シェア
   const url = shareUrl(mode, f.id, code), text = shareText(r, mode, fate);
   const currentResultView = capturedSelfResultViewGuard(mode, code, mine?.code === code);
+  const otherFigureAtRender = other?.fig ?? null;
+  const currentDuoView = () => {
+    const snapshot = selfStateSnapshot();
+    return currentResultView() && snapshot.status === "ok"
+      && (snapshot.state.current[OTHER[mode]]?.fig ?? null) === otherFigureAtRender;
+  };
   const resultHashAtRender = location.hash;
   app.querySelectorAll("[data-share]").forEach((b) => b.addEventListener("click", async (e) => {
     e.preventDefault();
@@ -1486,9 +1494,13 @@ function renderResult(mode, code) {
     if (status !== "saved") return showPersonCardAddFailure(button, status);
     toast("友達の人物カードを1枚追加しました");
   });
-  $("[data-duo]")?.addEventListener("click", () => {
-    if (!currentResultView()) { route(); return; }
-    const [n, l] = $("[data-duo]").dataset.duo.split(",");
+  const duoButton = $("[data-duo]");
+  duoButton?.addEventListener("click", () => {
+    if (duoButton.isConnected === false || location.hash !== resultHashAtRender || !currentDuoView()) {
+      route();
+      return;
+    }
+    const [n, l] = duoButton.dataset.duo.split(",");
     track("share_click", { channel: "duo", figure: f.id });
     const t = `ふだんの私は「${fig(n).name}」、恋をすると「${fig(l).name}」でした。\nリンクで見られるのは${mode === "normal" ? "ふだん" : "恋愛"}の結果だけ。あなたは？👇\n#偉人性格診断`;
     open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(t)}&url=${encodeURIComponent(url)}`, "_blank", "noopener");
@@ -1507,7 +1519,7 @@ function renderResult(mode, code) {
   attachMotion(f.name);
   // The label and controls on this page describe the current saved SELF only
   // while the same-mode authority still points to this answer code.
-  activeSelfResult = mine?.code === code ? { mode, code, unverified: false } : null;
+  activeSelfResult = mine?.code === code ? { mode, code, otherFigure: otherFigureAtRender, unverified: false } : null;
 }
 
 // 結果リンクの表示。URLだけでは送り主が友達か本人か判断できない。
@@ -2970,7 +2982,8 @@ function refreshSelfAfterExternalChange() {
       return;
     }
     if (activeSelfResult.unverified
-      || snapshot.state.current[activeSelfResult.mode]?.code !== activeSelfResult.code) {
+      || snapshot.state.current[activeSelfResult.mode]?.code !== activeSelfResult.code
+      || (snapshot.state.current[OTHER[activeSelfResult.mode]]?.fig ?? null) !== activeSelfResult.otherFigure) {
       route();
       focusPageHeading();
       return;
