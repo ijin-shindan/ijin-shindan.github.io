@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=c542cdb-202610261439";
-import { mountMotion } from "./motion.js?v=c542cdb-202610261439";
-import { mountGuide } from "./guide.js?v=c542cdb-202610261439";
+import { AXES, Shindan, loadData } from "./shindan.js?v=c77e1ce-202610261549";
+import { mountMotion } from "./motion.js?v=c77e1ce-202610261549";
+import { mountGuide } from "./guide.js?v=c77e1ce-202610261549";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=c542cdb-202610261439";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=c542cdb-202610261439";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=c542cdb-202610261439";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=c542cdb-202610261439";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=c542cdb-202610261439";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=c542cdb-202610261439";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=c542cdb-202610261439";
-import { storedResultMatches, storedList } from "./stored_result.js?v=c542cdb-202610261439";
-import { clearPrefixedStorage } from "./storage_clear.js?v=c542cdb-202610261439";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=c542cdb-202610261439";
-import { applyZukanBatch } from "./zukan_batch.js?v=c542cdb-202610261439";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=c77e1ce-202610261549";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=c77e1ce-202610261549";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=c77e1ce-202610261549";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=c77e1ce-202610261549";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=c77e1ce-202610261549";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=c77e1ce-202610261549";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=c77e1ce-202610261549";
+import { storedResultMatches, storedList } from "./stored_result.js?v=c77e1ce-202610261549";
+import { clearPrefixedStorage } from "./storage_clear.js?v=c77e1ce-202610261549";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=c77e1ce-202610261549";
+import { applyZukanBatch } from "./zukan_batch.js?v=c77e1ce-202610261549";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=c542cdb-202610261439")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=c77e1ce-202610261549")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1759,10 +1759,10 @@ async function shareImage(r, mode, trigger = null, stillValid = () => true) {
     return;
   }
   const a = document.createElement("a");
-  a.href = src; a.download = `ijin-${r.figure.id}.png`; a.click();
+  a.href = src; a.download = `ijin-${mode}-${r.figure.id}-lv${r.lv}.png`; a.click();
   setTimeout(() => URL.revokeObjectURL(src), 60_000);
   track("share_image_done", { method: "download" });
-  toast("画像を保存しました");
+  toast("画像の保存を開始しました。端末のダウンロード先を確認してください");
 }
 
 function capturedSelfViewGuard() {
