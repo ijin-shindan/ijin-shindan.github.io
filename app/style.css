@@ -320,6 +320,16 @@ details p { font-size: 14px; margin: 8px 0; }
 .duo .x { font-family: var(--serif); font-weight: 900; font-size: 22px; color: var(--shu); }
 .duo .lbl { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
 .duo .nm { font-family: var(--serif); font-weight: 900; font-size: 16px; }
+@media (max-width: 400px) {
+  .duo { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .duo > div:first-child, .duo > div:last-child {
+    display: grid; grid-template-columns: clamp(48px, 20vw, 72px) minmax(0, 1fr);
+    grid-template-rows: auto auto; column-gap: 8px; text-align: left; align-items: center;
+  }
+  .duo img { grid-row: 1 / span 2; width: 100%; max-width: none; margin: 0; border-radius: 12px; }
+  .duo .lbl { margin-top: 0; align-self: end; }
+  .duo .nm { align-self: start; overflow-wrap: anywhere; }
+}
 .progress-line { display: flex; align-items: center; gap: 10px; }
 .progress-line .bar { flex: 1; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .progress-line .bar i { display: block; height: 100%; background: var(--kin); }
