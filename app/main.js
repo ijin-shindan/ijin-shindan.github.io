@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=70e045e-202610280000";
-import { mountMotion } from "./motion.js?v=70e045e-202610280000";
-import { mountGuide } from "./guide.js?v=70e045e-202610280000";
+import { AXES, Shindan, loadData } from "./shindan.js?v=5602ce1-202610280239";
+import { mountMotion } from "./motion.js?v=5602ce1-202610280239";
+import { mountGuide } from "./guide.js?v=5602ce1-202610280239";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=70e045e-202610280000";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=70e045e-202610280000";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=70e045e-202610280000";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=70e045e-202610280000";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=70e045e-202610280000";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=70e045e-202610280000";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=70e045e-202610280000";
-import { storedResultMatches, storedList } from "./stored_result.js?v=70e045e-202610280000";
-import { clearPrefixedStorage } from "./storage_clear.js?v=70e045e-202610280000";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=70e045e-202610280000";
-import { applyZukanBatch } from "./zukan_batch.js?v=70e045e-202610280000";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5602ce1-202610280239";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5602ce1-202610280239";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5602ce1-202610280239";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5602ce1-202610280239";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5602ce1-202610280239";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5602ce1-202610280239";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5602ce1-202610280239";
+import { storedResultMatches, storedList } from "./stored_result.js?v=5602ce1-202610280239";
+import { clearPrefixedStorage } from "./storage_clear.js?v=5602ce1-202610280239";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5602ce1-202610280239";
+import { applyZukanBatch } from "./zukan_batch.js?v=5602ce1-202610280239";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=70e045e-202610280000")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5602ce1-202610280239")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -93,6 +93,9 @@ function closeSheet(restoreFocus = true) {
   // draft intact until the dialog closes, then reconcile the visible list.
   if (location.hash === "#/people" && activePeopleCardsView?.pending) {
     queueMicrotask(refreshPeopleCardsAfterExternalChange);
+  }
+  if (activePersonCardView?.pending && location.hash === activePersonCardView.hash) {
+    queueMicrotask(refreshPersonCardAfterExternalChange);
   }
 }
 function openSheet(html, trigger, objectUrl = null) {
@@ -1788,17 +1791,43 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
 }
 
 // 人物カード固有IDから開く。回答コードが自分と同じでも、友達の表示文脈を保つ。
-function renderPersonCard(id) {
-  const cards = peopleCards();
+function renderPersonCard(id, snapshot = readPersonCardStorage()) {
+  activePersonCardView = { hash: location.hash, id, status: snapshot.status,
+    raw: snapshot.raw ?? null, pending: false };
+  if (snapshot.status !== "ok") return renderPersonCardUnreadable(snapshot.status);
+  const cards = personCardsFromRaw(snapshot.cards).cards;
   const index = cards.findIndex((x) => x.id === id);
   const card = cards[index];
-  if (!card) return renderUnavailable();
+  if (!card) {
+    activePersonCardView.invalidated = true;
+    return renderUnavailable();
+  }
+  activePersonCardView.identity = { mode: card.mode, code: card.code, fig: card.fig, at: card.at };
   const displayCard = { ...card, label: personCardDisplayName(card, index) };
   const sd = engines[card.mode];
-  const r = sd.diagnose(answersOf(sd, card.code));
-  if (r.figure.id !== card.fig) return renderUnavailable();
+  let r;
+  try { r = sd.diagnose(answersOf(sd, card.code)); }
+  catch {
+    activePersonCardView.invalidated = true;
+    return renderUnavailable();
+  }
+  if (r.figure.id !== card.fig) {
+    activePersonCardView.invalidated = true;
+    return renderUnavailable();
+  }
   document.title = `${displayCard.label}｜${r.figure.name}タイプ`;
   renderFriend(sd, card.mode, card.code, r, displayCard);
+}
+
+function renderPersonCardUnreadable(status) {
+  document.title = "人物カードを確認できません｜世界の偉人性格診断";
+  app.style.cssText = "";
+  app.innerHTML = `<section class="card"><h1>人物カードを確認できません</h1>
+    <p role="alert">${status === "damaged"
+      ? "この端末の人物カード記録が壊れているため、このカードが消えたとは判断できません。サイトデータを消さずに保管してください。"
+      : "この端末の保存領域を読み込めません。このカードが消えたとは判断できません。"}</p>
+    <a class="btn sub" href="#/people">人物カード一覧へ</a></section>`;
+  window.scrollTo(0, 0);
 }
 
 // 結果が出る瞬間の演出（約5秒。どこをタップしても最後まで飛ぶ）
@@ -2555,6 +2584,85 @@ function bindPeopleOwnShares(ownShares) {
   });
 }
 let activePeopleCardsView = null;
+let activePersonCardView = null;
+function personDetailControlKey(node) {
+  if (!node || !app.contains(node)) return null;
+  if (node.tagName === "A") {
+    const href = node.getAttribute("href");
+    return href ? `link:${href}:${node.getAttribute("data-src") ?? ""}` : null;
+  }
+  if (node.tagName === "SUMMARY") return `summary:${node.textContent.trim()}`;
+  if (node.tagName === "BUTTON") {
+    for (const action of ["data-return-self", "data-restore-self", "data-add-person",
+      "data-share", "data-duo", "data-fresh"]) {
+      if (node.hasAttribute(action)) return `button:${action}:${node.getAttribute(action) ?? ""}`;
+    }
+  }
+  return null;
+}
+function refreshPersonCardAfterExternalChange() {
+  const view = activePersonCardView;
+  if (!view || location.hash !== view.hash) return;
+  const latest = readPersonCardStorage();
+  if (latest.status === view.status && (latest.raw ?? null) === view.raw) {
+    if (view.pending) {
+      sheet.querySelector("[data-person-card-sheet-pending]")?.remove();
+      view.pending = false;
+    }
+    return;
+  }
+  if (!sheet.hidden) {
+    view.pending = true;
+    if (!sheet.querySelector("[data-person-card-sheet-pending]")) {
+      const notice = document.createElement("p");
+      notice.className = "note";
+      notice.dataset.personCardSheetPending = "";
+      notice.setAttribute("role", "alert");
+      notice.textContent = "別のタブで人物カードが変わりました。今の入力は残しています。閉じると表示を更新します。";
+      sheet.querySelector(".panel")?.append(notice);
+    }
+    return;
+  }
+  const scrollY = window.scrollY;
+  const focused = document.activeElement;
+  const hadAppFocus = app.contains(focused);
+  const focusKey = personDetailControlKey(focused);
+  const openDetails = [...app.querySelectorAll("details")].filter((node) => node.open)
+    .map((node) => node.querySelector("summary")?.textContent.trim()).filter(Boolean);
+  view.status = latest.status;
+  view.raw = latest.raw ?? null;
+  view.pending = false;
+  if (latest.status !== "ok") renderPersonCardUnreadable(latest.status);
+  else {
+    const card = personCardsFromRaw(latest.cards).cards.find((item) => item.id === view.id);
+    const identity = view.identity;
+    if (view.invalidated || !card || (identity && (card.mode !== identity.mode
+      || card.code !== identity.code || card.fig !== identity.fig || card.at !== identity.at))) {
+      view.invalidated = true;
+      renderUnavailable();
+    } else renderPersonCard(view.id, latest);
+  }
+  window.scrollTo(0, scrollY);
+  if (latest.status === "ok" && activePersonCardView?.identity && !activePersonCardView.invalidated) {
+    const details = [...app.querySelectorAll("details")];
+    details.forEach((node) => {
+      const name = node.querySelector("summary")?.textContent.trim();
+      if (name && openDetails.filter((oldName) => oldName === name).length === 1
+        && details.filter((other) => other.querySelector("summary")?.textContent.trim() === name).length === 1)
+        node.open = true;
+    });
+  }
+  if (!hadAppFocus) return;
+  const matches = focusKey ? [...app.querySelectorAll("a[href], button, summary")]
+    .filter((node) => personDetailControlKey(node) === focusKey) : [];
+  const candidate = matches.length === 1 ? matches[0] : null;
+  const target = latest.status === "ok" && activePersonCardView?.identity && !activePersonCardView.invalidated
+    && candidate && !candidate.hidden && !candidate.disabled ? candidate : app.querySelector("h1");
+  if (target) {
+    if (target !== candidate) target.tabIndex = -1;
+    try { target.focus({ preventScroll: true }); } catch { /* Keep the refreshed page visible. */ }
+  }
+}
 function capturePeopleCardsView(snapshot) {
   activePeopleCardsView = { hash: location.hash, status: snapshot.status,
     raw: snapshot.raw ?? null, pending: false };
@@ -3043,6 +3151,7 @@ function route() {
   activeSelfResult = null;
   activeSelfOverview = null;
   activePeopleCardsView = null;
+  activePersonCardView = null;
   queueMicrotask(showGlobalSelfWarning);
   disposeGuide();
   disposeGuide = () => {};
@@ -3124,6 +3233,7 @@ function refreshSelfAfterExternalChange() {
     return;
   }
   refreshPeopleCardsAfterExternalChange();
+  refreshPersonCardAfterExternalChange();
   if (activeSelfResult) {
     const snapshot = selfStateSnapshot();
     if (snapshot.status !== "ok") {
