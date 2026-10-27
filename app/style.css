@@ -87,9 +87,9 @@ img { display: block; }
 .parade .f2 { width: 124px; height: 124px; border-radius: 7px; z-index: 3; }
 .parade .f0 { transform: rotate(-6deg); } .parade .f4 { transform: rotate(6deg); }
 .parade .f1 { transform: rotate(-3deg); } .parade .f3 { transform: rotate(3deg); }
-.hero h1 { display: inline-block; font-family: var(--serif); font-weight: 900; font-size: 28px; line-height: 1.4; margin: 0 0 6px;
+.hero h1 { display: inline-block; font-family: var(--serif); font-weight: 900; font-size: clamp(18px, 6.25vw, 28px); line-height: 1.4; margin: 0 0 6px;
   padding: 6px 12px; background: var(--card); border: 2px solid var(--world-edge); border-radius: 6px; box-shadow: 4px 4px 0 var(--world-shadow); }
-@media (max-width: 360px) { .hero h1 { font-size: 23px; padding-inline: 8px; } }
+@media (max-width: 360px) { .hero h1 { padding-inline: 8px; } }
 .hero .sub { display: inline-block; color: var(--ink-soft); margin: 0 0 18px; padding: 2px 10px; font-size: 14px;
   background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
 @media (max-width: 360px) and (max-height: 700px) {

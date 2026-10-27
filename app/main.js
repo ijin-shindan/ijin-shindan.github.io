@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=3f28daf-202610272120";
-import { mountMotion } from "./motion.js?v=3f28daf-202610272120";
-import { mountGuide } from "./guide.js?v=3f28daf-202610272120";
+import { AXES, Shindan, loadData } from "./shindan.js?v=5db9052-202610272202";
+import { mountMotion } from "./motion.js?v=5db9052-202610272202";
+import { mountGuide } from "./guide.js?v=5db9052-202610272202";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=3f28daf-202610272120";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=3f28daf-202610272120";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=3f28daf-202610272120";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=3f28daf-202610272120";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=3f28daf-202610272120";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=3f28daf-202610272120";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=3f28daf-202610272120";
-import { storedResultMatches, storedList } from "./stored_result.js?v=3f28daf-202610272120";
-import { clearPrefixedStorage } from "./storage_clear.js?v=3f28daf-202610272120";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=3f28daf-202610272120";
-import { applyZukanBatch } from "./zukan_batch.js?v=3f28daf-202610272120";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5db9052-202610272202";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5db9052-202610272202";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5db9052-202610272202";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5db9052-202610272202";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5db9052-202610272202";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5db9052-202610272202";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5db9052-202610272202";
+import { storedResultMatches, storedList } from "./stored_result.js?v=5db9052-202610272202";
+import { clearPrefixedStorage } from "./storage_clear.js?v=5db9052-202610272202";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5db9052-202610272202";
+import { applyZukanBatch } from "./zukan_batch.js?v=5db9052-202610272202";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=3f28daf-202610272120")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5db9052-202610272202")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
