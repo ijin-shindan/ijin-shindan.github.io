@@ -279,7 +279,7 @@ details p { font-size: 14px; margin: 8px 0; }
 .match .tp { font-size: 11px; color: var(--ink-soft); }
 .match .why { grid-column: 1 / -1; font-size: 12px; color: var(--ink-soft); margin-top: 6px; line-height: 1.5; }
 @media (max-width: 400px) { .match { grid-template-columns: 1fr; } }
-/* 相性の関係図：左＝あなた、矢印の向き＝どちらが得意か */
+/* 相性の関係図：広い画面では左、狭い画面では上があなた。矢印の向きで関係を示す */
 .rel-note { margin: -4px 0 10px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
 .rels { display: grid; gap: 10px; }
 .rel { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; column-gap: 4px; padding: 8px 10px 10px; border-radius: var(--r-md); background: var(--paper); }
@@ -296,6 +296,10 @@ details p { font-size: 14px; margin: 8px 0; }
 .rel-verb { font-size: 12px; font-weight: 900; }
 .rel-ar { font-size: 24px; line-height: 1; font-weight: 900; }
 .rel-why { grid-column: 1 / -1; margin: 6px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+@media (max-width: 400px) {
+  .rel { grid-template-columns: minmax(0, 1fr); row-gap: 3px; }
+  .rel-ar { transform: rotate(90deg); }
+}
 .fate-wrap { margin-top: 12px; }
 .levelup p { margin: 0; }
 .hint-axis { color: var(--shu); font-weight: 800; }
