@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=5db9052-202610272202";
-import { mountMotion } from "./motion.js?v=5db9052-202610272202";
-import { mountGuide } from "./guide.js?v=5db9052-202610272202";
+import { AXES, Shindan, loadData } from "./shindan.js?v=4242c01-202610272303";
+import { mountMotion } from "./motion.js?v=4242c01-202610272303";
+import { mountGuide } from "./guide.js?v=4242c01-202610272303";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5db9052-202610272202";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5db9052-202610272202";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5db9052-202610272202";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5db9052-202610272202";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5db9052-202610272202";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5db9052-202610272202";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5db9052-202610272202";
-import { storedResultMatches, storedList } from "./stored_result.js?v=5db9052-202610272202";
-import { clearPrefixedStorage } from "./storage_clear.js?v=5db9052-202610272202";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5db9052-202610272202";
-import { applyZukanBatch } from "./zukan_batch.js?v=5db9052-202610272202";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=4242c01-202610272303";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=4242c01-202610272303";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=4242c01-202610272303";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=4242c01-202610272303";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=4242c01-202610272303";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=4242c01-202610272303";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=4242c01-202610272303";
+import { storedResultMatches, storedList } from "./stored_result.js?v=4242c01-202610272303";
+import { clearPrefixedStorage } from "./storage_clear.js?v=4242c01-202610272303";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=4242c01-202610272303";
+import { applyZukanBatch } from "./zukan_batch.js?v=4242c01-202610272303";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5db9052-202610272202")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=4242c01-202610272303")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -352,7 +352,20 @@ function showFreshQuizClearFailure(link) {
   warning.setAttribute("role", "alert");
 }
 function bindFreshQuizLinks() {
-  app.querySelectorAll("[data-fresh]").forEach((link) => {
+  app.querySelectorAll("[data-fresh]").forEach((entry) => {
+    // Starting over may delete saved answers. Make it an action instead of a
+    // navigable link so a new tab cannot bypass the same-tab clear guard.
+    const destination = entry.getAttribute?.("href") || `#/q/${entry.dataset.fresh}`;
+    let link = entry;
+    if (entry.tagName === "A") {
+      link = document.createElement("button");
+      link.type = "button";
+      for (const { name, value } of entry.attributes) {
+        if (name !== "href") link.setAttribute(name, value);
+      }
+      link.innerHTML = entry.innerHTML;
+      entry.replaceWith(link);
+    }
     const mode = link.dataset.fresh;
     const epochAtView = capturePersonCardEpoch();
     const snapshot = readQuizProgress(mode);
@@ -362,7 +375,9 @@ function bindFreshQuizLinks() {
     }
     link.addEventListener("click", async (event) => {
       if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        event.preventDefault();
         nextSrc = null;
+        toast("最初から始めるには、キーを押さずにボタンを押してください");
         return;
       }
       event.preventDefault();
@@ -391,8 +406,8 @@ function bindFreshQuizLinks() {
       nextSrc = link.dataset.src ?? null;
       // Only an explicit start from a shared result keeps the return link
       // through a reload. Viewing the result alone never stores its answers.
-      if (location.hash === link.getAttribute?.("href")) renderQuiz(mode);
-      else location.hash = link.getAttribute?.("href") || `#/q/${mode}`;
+      if (location.hash === destination) renderQuiz(mode);
+      else location.hash = destination;
     });
   });
 }
@@ -682,7 +697,6 @@ const relFace = (id) => avatar(id, !isDiscovered(id));
 const undiscTag = (id) => (isDiscovered(id) ? "" : `<span class="undisc">🔒 未発見</span>`);
 
 // ---------------- トップ ----------------
-let firstTop = true;
 function completedQuizProgress(mode, saved, snapshot) {
   if (saved.answers.length !== 12 || typeof saved.attemptId !== "string"
     || !/^[a-zA-Z0-9:._-]{1,100}$/.test(saved.attemptId) || snapshot?.status !== "ok") return false;
@@ -756,18 +770,7 @@ function topCurrentResultsHtml(me) {
 function renderTop() {
   document.title = "世界の偉人性格診断";
   captureSelfOverview();
-  const staticParade = firstTop ? $(".parade")?.innerHTML : null;
-  firstTop = false;
   const me = { normal: savedResult("normal"), love: savedResult("love") };
-  const types = pick(SD.types.filter((t) => t.unit), 4);
-  const parade = types.map((t) => pick(t.figures.slice(0, MAX_TIER + 1), 1)[0].id);
-  parade.splice(2, 0, pick(FREE, 1)[0].id);
-  // 5人目は「まだ見ぬ誰か」のシルエット（鍵つきがいなければ、無料のうち出会っていない人から）
-  const unseen = FREE.filter((f) => !parade.includes(f.id) && !zukanData()[f.id]);
-  const lockedOne = pick(LOCKED.length ? LOCKED : unseen.length ? unseen : FREE, 1)[0].id;
-  const faces = parade.slice(0, 4).map((id, i) =>
-    `<img class="face f${i}" src="${avatar(id)}" alt="" style="--t-bg:${THEMES[fig(id).type].bg}">`).join("")
-    + `<img class="face f4" src="${avatar(lockedOne, true)}" alt="" style="--t-bg:${THEMES[fig(lockedOne).type].bg}">`;
   app.innerHTML = `
     <section class="hero">
       <div class="seal">偉</div>
@@ -1707,7 +1710,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
     <div class="friend-head">${personCard
       ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
       : past || prevLink
-      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
+      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">この端末にも同じ答えがあります。送り主は分かりません。</p>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
       : `<h1>結果リンクの偉人は<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。送り主は確認できず、あなた自身の結果と同じになることもあります。</p>`}
       <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="${esc(fromSharedPage && mine.code === code ? withoutSharedResultParam(location.href) : `#/r/${mode}/${mine.code}`)}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">この端末の記録</a></p></div>
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
@@ -3161,14 +3164,18 @@ function refreshSelfAfterExternalChange() {
             const href = focused.tagName === "A" ? focused.getAttribute("href") : null;
             const marker = focused.tagName === "BUTTON"
               ? ["data-export-self", "data-retry-all-self-zukan"].find((name) => focused.hasAttribute(name)) : null;
-            focusTarget = href ? { kind: "link", href } : marker ? { kind: "button", marker } : { kind: "heading" };
+            focusTarget = href ? { kind: "link", href }
+              : focused.tagName === "BUTTON" && focused.hasAttribute("data-fresh")
+                ? { kind: "fresh", mode: focused.dataset.fresh }
+                : marker ? { kind: "button", marker } : { kind: "heading" };
           }
           renderMe();
           window.scrollTo(0, scrollY);
           if (focusTarget) {
             const match = focusTarget.kind === "link"
               ? [...app.querySelectorAll("a[href]")].find((link) => link.getAttribute("href") === focusTarget.href)
-              : focusTarget.kind === "button" ? app.querySelector(`[${focusTarget.marker}]`) : null;
+              : focusTarget.kind === "fresh" ? app.querySelector(`button[data-fresh="${focusTarget.mode}"]`)
+                : focusTarget.kind === "button" ? app.querySelector(`[${focusTarget.marker}]`) : null;
             const destination = match && !match.hidden && !match.disabled ? match : app.querySelector("h1");
             if (typeof destination?.focus === "function") {
               if (destination !== match) destination.tabIndex = -1;
