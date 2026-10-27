@@ -307,8 +307,13 @@ details p { font-size: 14px; margin: 8px 0; }
 .next-tile { position: relative; flex: none; width: 84px; height: 84px; border-radius: 20px; overflow: hidden; background: var(--t-bg); box-shadow: var(--tile-edge); }
 .next-tile img { width: 100%; height: 100%; }
 .next-tile .lock { position: absolute; right: 4px; bottom: 4px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--card); box-shadow: var(--pop); }
-.next .qq { font-family: var(--serif); font-weight: 900; font-size: 20px; }
+.next .qq { font-family: var(--serif); font-weight: 900; font-size: 20px; word-break: keep-all; overflow-wrap: anywhere; }
 .next .hint { font-size: 13px; color: var(--ink-soft); }
+@media (max-width: 360px) {
+  .next { flex-direction: column; gap: 10px; text-align: center; }
+  .next > div:last-child { min-width: 0; width: 100%; }
+  .next .qq { line-height: 1.25; }
+}
 .radar { display: block; width: 100%; max-width: 300px; margin: 0 auto; }
 .radar text { font-size: 12px; fill: var(--ink-soft); font-family: var(--sans); }
 .radar .val { font-size: 11px; fill: var(--ink); font-weight: 800; }
