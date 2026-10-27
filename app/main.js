@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=760f3ed-202610280336";
-import { mountMotion } from "./motion.js?v=760f3ed-202610280336";
-import { mountGuide } from "./guide.js?v=760f3ed-202610280336";
+import { AXES, Shindan, loadData } from "./shindan.js?v=542a4e8-202610280748";
+import { mountMotion } from "./motion.js?v=542a4e8-202610280748";
+import { mountGuide } from "./guide.js?v=542a4e8-202610280748";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=760f3ed-202610280336";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=760f3ed-202610280336";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=760f3ed-202610280336";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=760f3ed-202610280336";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=760f3ed-202610280336";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=760f3ed-202610280336";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=760f3ed-202610280336";
-import { storedResultMatches, storedList } from "./stored_result.js?v=760f3ed-202610280336";
-import { clearPrefixedStorage } from "./storage_clear.js?v=760f3ed-202610280336";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=760f3ed-202610280336";
-import { applyZukanBatch } from "./zukan_batch.js?v=760f3ed-202610280336";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=542a4e8-202610280748";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=542a4e8-202610280748";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=542a4e8-202610280748";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=542a4e8-202610280748";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=542a4e8-202610280748";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=542a4e8-202610280748";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=542a4e8-202610280748";
+import { storedResultMatches, storedList } from "./stored_result.js?v=542a4e8-202610280748";
+import { clearPrefixedStorage } from "./storage_clear.js?v=542a4e8-202610280748";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=542a4e8-202610280748";
+import { applyZukanBatch } from "./zukan_batch.js?v=542a4e8-202610280748";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=760f3ed-202610280336")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=542a4e8-202610280748")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -918,10 +918,9 @@ function renderQuiz(mode, anim = false) {
   document.title = `質問 ${i + 1}｜${sd.modeConf.name}`;
   const intro = mode === "love" && i === 0 ? `<div class="intro">${esc(data.questions_love.intro)}</div>` : "";
   app.innerHTML = `
-    <div class="qhead">
+    <div class="qhead self-qhead">
       ${i === 0 ? '<a class="back" href="#/">← トップへ</a>' : '<button class="back">← 戻る</button>'}
-      <span class="count" aria-hidden="true"><b>${i + 1}</b> / ${qs.length}</span>
-      <span class="mystery" style="--p:${(i / qs.length) * 100}%" aria-hidden="true">?</span>
+      <span class="self-qhead-meta"><span class="count" aria-hidden="true"><b>${i + 1}</b> / ${qs.length}</span><span class="mystery" style="--p:${(i / qs.length) * 100}%" aria-hidden="true">?</span></span>
     </div>
     <div class="segs">${qs.map((_, k) => `<i class="${k < i ? "done" : k === i ? "now" : ""} ${[3, 7, 11].includes(k) ? "chest" : ""}"></i>`).join("")}</div>
     <div class="qbox ${anim ? "in" : ""}">

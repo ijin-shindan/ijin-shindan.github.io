@@ -114,6 +114,15 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 .back:disabled { visibility: hidden; }
 .mystery { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--serif);
   font-weight: 900; font-size: 22px; color: #fff; background: linear-gradient(to top, var(--shu) var(--p), var(--ink-soft) var(--p)); }
+.self-qhead-meta { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
+@media (max-width: 360px) {
+  .self-qhead { flex-wrap: wrap; }
+  .self-qhead .back, .self-qhead-meta { flex-shrink: 0; }
+  .self-qhead .back, .self-qhead .count { white-space: nowrap; }
+}
+@media (max-width: 260px) {
+  .self-qhead, .self-qhead-meta { gap: 6px; }
+}
 .segs { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin: 10px 0 30px; align-items: center; }
 .segs i { height: 9px; border-radius: 2px; background: var(--line); position: relative; }
 .segs i.done, .segs i.now { background: var(--shu); }
