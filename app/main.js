@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=53cfa3b-202610271953";
-import { mountMotion } from "./motion.js?v=53cfa3b-202610271953";
-import { mountGuide } from "./guide.js?v=53cfa3b-202610271953";
+import { AXES, Shindan, loadData } from "./shindan.js?v=dbb3839-202610272007";
+import { mountMotion } from "./motion.js?v=dbb3839-202610272007";
+import { mountGuide } from "./guide.js?v=dbb3839-202610272007";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=53cfa3b-202610271953";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=53cfa3b-202610271953";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=53cfa3b-202610271953";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=53cfa3b-202610271953";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=53cfa3b-202610271953";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=53cfa3b-202610271953";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=53cfa3b-202610271953";
-import { storedResultMatches, storedList } from "./stored_result.js?v=53cfa3b-202610271953";
-import { clearPrefixedStorage } from "./storage_clear.js?v=53cfa3b-202610271953";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=53cfa3b-202610271953";
-import { applyZukanBatch } from "./zukan_batch.js?v=53cfa3b-202610271953";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=dbb3839-202610272007";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=dbb3839-202610272007";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=dbb3839-202610272007";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=dbb3839-202610272007";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=dbb3839-202610272007";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=dbb3839-202610272007";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=dbb3839-202610272007";
+import { storedResultMatches, storedList } from "./stored_result.js?v=dbb3839-202610272007";
+import { clearPrefixedStorage } from "./storage_clear.js?v=dbb3839-202610272007";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=dbb3839-202610272007";
+import { applyZukanBatch } from "./zukan_batch.js?v=dbb3839-202610272007";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=53cfa3b-202610271953")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=dbb3839-202610272007")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -686,9 +686,12 @@ function completedQuizProgress(mode, saved, snapshot) {
   return done?.attemptId === saved.attemptId && done.code === makeCode(saved.answers)
     && snapshot.state.current[mode]?.code === done.code;
 }
+let topResumeSnapshots = {};
 function topQuizCtas() {
+  topResumeSnapshots = Object.fromEntries(["normal", "love"].map((mode) => [mode, readQuizProgress(mode)]));
   const savedProgress = Object.fromEntries(["normal", "love"].map((mode) => {
-    const saved = store.get("progress." + mode);
+    const snapshot = topResumeSnapshots[mode];
+    const saved = snapshot.status === "ok" ? snapshot.progress : null;
     return [mode, validProgress(saved) && Date.now() - saved.t < 864e5 && saved.answers.length > 0 ? saved : null];
   }));
   const completedSnapshot = ["normal", "love"].some((mode) => savedProgress[mode]?.answers.length === 12)
@@ -699,7 +702,7 @@ function topQuizCtas() {
     [mode, completed[mode] ? null : savedProgress[mode]]));
   const resumable = ["normal", "love"].filter((mode) => progress[mode]);
   const primary = resumable[0] ?? "normal";
-  const resumeLinks = resumable.map((mode) => `<a class="btn ${mode === primary ? "start" : "sub"}" data-src="resume" href="#/q/${mode}">${mode === "love" ? "恋愛診断" : "性格診断"}${progress[mode].answers.length === 12 ? "の回答を見直す" : "の続きから"}（${progress[mode].answers.length} / 12）</a>`).join("");
+  const resumeLinks = resumable.map((mode) => `<button class="btn ${mode === primary ? "start" : "sub"}" type="button" data-resume-top="${mode}">${mode === "love" ? "恋愛診断" : "性格診断"}${progress[mode].answers.length === 12 ? "の回答を見直す" : "の続きから"}（${progress[mode].answers.length} / 12）</button>`).join("");
   const freshLinks = ["normal", "love"].map((mode) => {
     const label = mode === "love" ? "恋愛診断" : "性格診断";
     const text = `${mode === "love" && !progress[mode] ? "💘 " : ""}${label}を${progress[mode] ? "最初から" : ""}始める`;
@@ -760,6 +763,7 @@ function renderTop() {
     <p class="note">${LOCKED.length ? `無料で出会えるのは${FREE.length}人。ほか${LOCKED.length}人はシルエットで待機中。` : `${FREE.length}人すべてに、無料で出会えます。`}<br>逸話には伝承や諸説あるものを含みます。</p>
     <p class="note"><a href="#/how">使い方</a>　・　<a href="#/me">この端末の記録</a>　・　<a href="#/about">このサイトについて</a></p>`;
   bindFreshQuizLinks();
+  bindResultErrorResumeLinks("[data-resume-top]", topResumeSnapshots);
   disposeGuide = mountGuide($("#guide"));
   window.scrollTo(0, 0);
   // 決め台詞は読み切れる間隔で切り替える。動きを抑える設定では静止。
@@ -790,6 +794,22 @@ function renderTop() {
 // ---------------- 質問 ----------------
 let quiz = null;
 let justFinished = null;  // 演出を出すのは、いま答え終えた結果だけ
+let pendingGuardedResume = null;
+
+function showGuardedResumeReadFailure() {
+  app.innerHTML = `<section class="card"><h1>途中の記録を今は読み込めません</h1><p>この操作では答えを消していません。トップに戻り、端末の保存設定を確認してからもう一度試してください。</p><a class="btn start" href="#/">トップへ戻る</a></section>`;
+  window.scrollTo(0, 0);
+  const heading = app.querySelector(".card h1");
+  heading.tabIndex = -1;
+  heading.focus({ preventScroll: true });
+}
+function showGuardedResumeExpired() {
+  app.innerHTML = `<section class="card"><h1>この途中記録からは再開できません</h1><p>途中記録の期限が切れたか、結果が保存済みです。この操作では答えを消していません。トップに戻り、端末の記録を確認してください。</p><a class="btn start" href="#/">トップへ戻る</a></section>`;
+  window.scrollTo(0, 0);
+  const heading = app.querySelector(".card h1");
+  heading.tabIndex = -1;
+  heading.focus({ preventScroll: true });
+}
 
 function partialU(sd, answers) {  // 途中までの回答で軸スコアを出す（未回答の軸は0）
   return AXES.map((a) => {
@@ -810,6 +830,17 @@ function renderQuiz(mode, anim = false) {
     // 世代を進行記録より先に捕捉する。初期化待ちでも旧画面が新世代を再捕捉しない。
     const epoch = capturePersonCardEpoch();
     const snapshot = readQuizProgress(mode);
+    const expectedResume = pendingGuardedResume;
+    pendingGuardedResume = null;
+    if (expectedResume?.mode === mode) {
+      if (snapshot.status === "unavailable") return showGuardedResumeReadFailure();
+      if (snapshot.status !== "ok" || snapshot.raw !== expectedResume.raw)
+        return showQuizProgressConflict(mode, snapshot.status === "invalid", epoch);
+      const savedForGuard = snapshot.progress;
+      if (!validProgress(savedForGuard) || savedForGuard.answers.length === 0 || Date.now() - savedForGuard.t >= 864e5
+        || (savedForGuard.answers.length === 12 && completedQuizProgress(mode, savedForGuard, selfStateSnapshot())))
+        return showGuardedResumeExpired();
+    }
     if (snapshot.status === "invalid") return showQuizProgressConflict(mode, true, epoch);
     const saved = snapshot.progress;
     const qs = ordered(sd);
@@ -1259,10 +1290,10 @@ function showResultResumeUnavailable(link, reason = "expired") {
     : "途中の記録の期限が切れたか、結果が保存済みです。続きは開かず、最初から診断するかトップで記録を確認してください。";
   warning.setAttribute("role", "alert");
 }
-function bindResultErrorResumeLinks() {
-  app.querySelectorAll("[data-resume-result-error]").forEach((link) => {
-    const mode = link.dataset.resumeResultError;
-    const snapshotAtView = readQuizProgress(mode);
+function bindResultErrorResumeLinks(selector = "[data-resume-result-error]", snapshots = null) {
+  app.querySelectorAll(selector).forEach((link) => {
+    const mode = link.dataset.resumeTop ?? link.dataset.resumeResultError;
+    const snapshotAtView = snapshots?.[mode] ?? readQuizProgress(mode);
     link.addEventListener("click", (event) => {
       if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (link.isConnected === false) return;
@@ -1294,6 +1325,7 @@ function bindResultErrorResumeLinks() {
       quiz = null;
       nextSrc = null;
       clearQuizCursor(mode);
+      pendingGuardedResume = { mode, raw: latest.raw };
       location.hash = `#/q/${mode}`;
     });
   });
@@ -2995,6 +3027,7 @@ function route() {
   overlay.hidden = true; app.inert = false; closeSheet(false);
   app.style.cssText = "";
   const [, page, mode, code] = location.hash.split("/");
+  if (pendingGuardedResume && (page !== "q" || mode !== pendingGuardedResume.mode)) pendingGuardedResume = null;
   if ((page === "legacy" || page === "saved-readonly") && (mode === "normal" || mode === "love"))
     return renderSelfReadOnly(mode, code, page);
   if (!OTHER_PILOT && ["ask", "answer", "reply"].includes(page)) return renderUnavailable();
