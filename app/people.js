@@ -1,5 +1,5 @@
 // 回答コードは人物の識別子ではない。同じ回答の別人もカード化できる。
-import { validInviteToken } from "./social.js?v=e70c2de-202610271901";
+import { validInviteToken } from "./social.js?v=8395f62-202610271944";
 
 export function prependPersonCard(cards, card, maxCards = 50, isUsable = () => true) {
   if (!Array.isArray(cards) || cards.filter(isUsable).length >= maxCards) return null;

@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=e70c2de-202610271901";
-import { mountMotion } from "./motion.js?v=e70c2de-202610271901";
-import { mountGuide } from "./guide.js?v=e70c2de-202610271901";
+import { AXES, Shindan, loadData } from "./shindan.js?v=8395f62-202610271944";
+import { mountMotion } from "./motion.js?v=8395f62-202610271944";
+import { mountGuide } from "./guide.js?v=8395f62-202610271944";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=e70c2de-202610271901";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=e70c2de-202610271901";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=e70c2de-202610271901";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=e70c2de-202610271901";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=e70c2de-202610271901";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=e70c2de-202610271901";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=e70c2de-202610271901";
-import { storedResultMatches, storedList } from "./stored_result.js?v=e70c2de-202610271901";
-import { clearPrefixedStorage } from "./storage_clear.js?v=e70c2de-202610271901";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=e70c2de-202610271901";
-import { applyZukanBatch } from "./zukan_batch.js?v=e70c2de-202610271901";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=8395f62-202610271944";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=8395f62-202610271944";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=8395f62-202610271944";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=8395f62-202610271944";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=8395f62-202610271944";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=8395f62-202610271944";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=8395f62-202610271944";
+import { storedResultMatches, storedList } from "./stored_result.js?v=8395f62-202610271944";
+import { clearPrefixedStorage } from "./storage_clear.js?v=8395f62-202610271944";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=8395f62-202610271944";
+import { applyZukanBatch } from "./zukan_batch.js?v=8395f62-202610271944";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=e70c2de-202610271901")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=8395f62-202610271944")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1232,13 +1232,66 @@ function fateOf(id) {
   return o ? { ...o, win: o.winner === id, other: o.winner === id ? o.loser : o.winner } : null;
 }
 
+function resultErrorQuizLinks(mode, freshText) {
+  const snapshot = readQuizProgress(mode);
+  const saved = snapshot.status === "ok" && validProgress(snapshot.progress) ? snapshot.progress : null;
+  const hasAnswers = !!saved?.answers.length;
+  const resumable = hasAnswers && Date.now() - saved.t < 864e5
+    && !(saved.answers.length === 12 && completedQuizProgress(mode, saved, selfStateSnapshot()));
+  const label = mode === "love" ? "恋愛診断" : "性格診断";
+  const resumeText = resumable ? `${label}の${saved.answers.length === 12 ? "回答を見直す" : "続きから"}（${saved.answers.length} / 12）` : "";
+  const freshLink = `<a class="btn ${resumable ? "sub" : "start"}" href="#/q/${mode}" data-fresh="${mode}">${hasAnswers ? "途中の答えを消して最初から診断する" : freshText}</a>`;
+  const resumeLink = resumable ? `<a class="btn start" href="#/q/${mode}" data-resume-result-error="${mode}">${resumeText}</a>` : "";
+  return resumeLink + freshLink;
+}
+function showResultResumeUnavailable(link) {
+  let warning = link.nextElementSibling;
+  if (!warning?.matches("[data-result-resume-warning]")) {
+    warning = document.createElement("p");
+    warning.className = "quiz-save-warning";
+    warning.dataset.resultResumeWarning = "";
+    link.insertAdjacentElement("afterend", warning);
+  }
+  warning.textContent = "途中の記録の期限が切れたか、結果が保存済みです。続きは開かず、最初から診断するかトップで記録を確認してください。";
+  warning.setAttribute("role", "alert");
+}
+function bindResultErrorResumeLinks() {
+  app.querySelectorAll("[data-resume-result-error]").forEach((link) => {
+    const mode = link.dataset.resumeResultError;
+    const snapshotAtView = readQuizProgress(mode);
+    link.addEventListener("click", (event) => {
+      if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.isConnected === false) return;
+      const latest = readQuizProgress(mode);
+      if (latest.status !== "ok" || latest.raw !== snapshotAtView.raw) {
+        event.preventDefault();
+        showQuizProgressConflict(mode, latest.status === "invalid");
+        return;
+      }
+      const saved = latest.progress;
+      if (!validProgress(saved) || saved.answers.length === 0 || Date.now() - saved.t >= 864e5
+        || (saved.answers.length === 12 && completedQuizProgress(mode, saved, selfStateSnapshot()))) {
+        event.preventDefault();
+        showResultResumeUnavailable(link);
+        return;
+      }
+      // Result routes can leave an older in-memory quiz alive. Load the latest
+      // saved answers, including after another tab changed them.
+      quiz = null;
+      nextSrc = null;
+      clearQuizCursor(mode);
+    });
+  });
+}
+
 function renderResult(mode, code) {
   const sd = engines[mode];
   if (!validCode(sd, code)) {
     document.title = "結果リンクを開けません｜世界の偉人性格診断";
     app.style.cssText = "";
-    app.innerHTML = `<section class="card"><h1>この結果リンクは開けませんでした</h1><p>リンクが途中で切れているか、対応していない形式です。</p><a class="btn start" href="#/q/${mode}" data-fresh="${mode}">新しく診断する</a><a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+    app.innerHTML = `<section class="card"><h1>この結果リンクは開けませんでした</h1><p>リンクが途中で切れているか、対応していない形式です。</p>${resultErrorQuizLinks(mode, "新しく診断する")}<a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
     bindFreshQuizLinks();
+    bindResultErrorResumeLinks();
     return;
   }
   const r = sd.diagnose(answersOf(sd, code));
@@ -1261,8 +1314,9 @@ function renderResult(mode, code) {
     justFinished = null;
     document.title = "共有結果を確認できません｜世界の偉人性格診断";
     app.style.cssText = "";
-    app.innerHTML = `<section class="card"><h1>この共有結果は確認できません</h1><p>カードの人物か診断の種類が、回答結果と一致しません。送った人にリンクを作り直してもらってください。</p><a class="btn start" href="#/q/${mode}" data-fresh="${mode}">自分を診断する</a><a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+    app.innerHTML = `<section class="card"><h1>この共有結果は確認できません</h1><p>カードの人物か診断の種類が、回答結果と一致しません。送った人にリンクを作り直してもらってください。</p>${resultErrorQuizLinks(mode, "自分を診断する")}<a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
     bindFreshQuizLinks();
+    bindResultErrorResumeLinks();
     return;
   }
   const pendingFresh = justFinished && justFinished.mode === mode && justFinished.code === code ? justFinished : null;
@@ -1272,8 +1326,9 @@ function renderResult(mode, code) {
     justFinished = null;
     document.title = "診断の記録が変わりました｜世界の偉人性格診断";
     app.style.cssText = "";
-    app.innerHTML = `<section class="card"><h1>別のタブで端末の記録が変わりました</h1><p>この画面の診断結果は、保存済みの自分の結果として表示しません。新しく診断するか、この端末の記録を開き直してください。</p><a class="btn start" href="#/q/${mode}" data-fresh="${mode}">新しく診断する</a><a class="btn sub" href="#/me">この端末の記録を見る</a></section>`;
+    app.innerHTML = `<section class="card"><h1>別のタブで端末の記録が変わりました</h1><p>この画面の診断結果は、保存済みの自分の結果として表示しません。途中の答えがあれば続きから開くか、新しく診断するか、この端末の記録を開き直してください。</p>${resultErrorQuizLinks(mode, "新しく診断する")}<a class="btn sub" href="#/me">この端末の記録を見る</a></section>`;
     bindFreshQuizLinks();
+    bindResultErrorResumeLinks();
     return;
   }
   // Q12 の保存後でも、画面遷移までに別タブが以前の結果を戻せる。
