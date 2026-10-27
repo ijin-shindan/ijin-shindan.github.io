@@ -135,7 +135,7 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 .segs i.chest.done::after { filter: none; opacity: 1; }
 .qbox { padding: 20px 16px 22px; border: 3px solid var(--world-edge); border-radius: 9px; background: var(--card);
   box-shadow: 5px 5px 0 var(--world-shadow); }
-.qbox.in { animation: slidein .18s ease-out both; }
+.qbox.in { animation: slidein .18s ease-out; }
 .qbox.out { animation: slideout .18s ease-in both; }
 .intro { background: var(--ai-soft); color: var(--ai); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 18px; }
 .qtext { font-family: var(--sans); font-weight: 800; font-size: clamp(19px, 5vw, 22px); line-height: 1.5; margin: 0 0 14px; text-align: left; }
@@ -394,7 +394,7 @@ details p { font-size: 14px; margin: 8px 0; }
 @keyframes fadeup { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes toastup { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes resulttoastup { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@keyframes slidein { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes slidein { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
 @keyframes slideout { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(-24px); } }
 @keyframes sheetup { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
