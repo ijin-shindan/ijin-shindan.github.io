@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 3ec839d-202610282117
+版番号: 0a1c830-202610282124
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
 合計サイズ: 31.51 MB
@@ -447,7 +447,7 @@
   app/og/love/bismarck.png  132725
   app/og/love/chopin.png  133499
   app/og/love/cleopatra.png  131900
-  app/og/love/da-vinci.png  136016
+  app/og/love/da-vinci.png  135954
   app/og/love/darwin.png  141837
   app/og/love/date-masamune.png  139969
   app/og/love/dumas.png  136753
@@ -459,7 +459,7 @@
   app/og/love/fukushima-masanori.png  148020
   app/og/love/garibaldi.png  130367
   app/og/love/gutenberg.png  134467
-  app/og/love/helen-keller.png  120853
+  app/og/love/helen-keller.png  120985
   app/og/love/higuchi-ichiyo.png  142426
   app/og/love/hijikata-toshizo.png  128474
   app/og/love/himiko.png  127259
@@ -480,7 +480,7 @@
   app/og/love/katsu-kaishu.png  133350
   app/og/love/katsushika-hokusai.png  140354
   app/og/love/kuroda-kanbei.png  131678
-  app/og/love/kusunoki-masashige.png  144646
+  app/og/love/kusunoki-masashige.png  145725
   app/og/love/lincoln.png  119251
   app/og/love/liszt.png  140165
   app/og/love/liu-bei.png  132744
