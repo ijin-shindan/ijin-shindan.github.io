@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 97a73cb-202610282214
+版番号: 5f31fc9-202610282308
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
 合計サイズ: 31.52 MB
@@ -432,7 +432,7 @@
   app/icons/apple-touch-icon.png  3502
   app/icons/favicon-32.png  1269
   app/icons/favicon.svg  1412
-  app/index.html  3419
+  app/index.html  3810
   app/legacy_data.js  1933
   app/main.js  232478
   app/meta.json  7869
