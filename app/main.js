@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=1b625ae-202610290220";
-import { mountMotion } from "./motion.js?v=1b625ae-202610290220";
-import { mountGuide } from "./guide.js?v=1b625ae-202610290220";
+import { AXES, Shindan, loadData } from "./shindan.js?v=45ec90a-202610290318";
+import { mountMotion } from "./motion.js?v=45ec90a-202610290318";
+import { mountGuide } from "./guide.js?v=45ec90a-202610290318";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1b625ae-202610290220";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1b625ae-202610290220";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1b625ae-202610290220";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1b625ae-202610290220";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1b625ae-202610290220";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1b625ae-202610290220";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1b625ae-202610290220";
-import { storedResultMatches, storedList } from "./stored_result.js?v=1b625ae-202610290220";
-import { clearPrefixedStorage } from "./storage_clear.js?v=1b625ae-202610290220";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1b625ae-202610290220";
-import { applyZukanBatch } from "./zukan_batch.js?v=1b625ae-202610290220";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=45ec90a-202610290318";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=45ec90a-202610290318";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=45ec90a-202610290318";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=45ec90a-202610290318";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=45ec90a-202610290318";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=45ec90a-202610290318";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=45ec90a-202610290318";
+import { storedResultMatches, storedList } from "./stored_result.js?v=45ec90a-202610290318";
+import { clearPrefixedStorage } from "./storage_clear.js?v=45ec90a-202610290318";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=45ec90a-202610290318";
+import { applyZukanBatch } from "./zukan_batch.js?v=45ec90a-202610290318";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1b625ae-202610290220")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=45ec90a-202610290318")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -135,13 +135,13 @@ const onAccent = (hex) => ((lum(hex) + 0.05) / 0.05 > 1.05 / (lum(hex) + 0.05) ?
 const themeVars = (typeId) => { const t = THEMES[typeId]; return `--t-bg:${t.bg};--t-bg2:${t.bg2};--t-bg3:${t.bg3};--t-accent:${t.accent};--t-on:${onAccent(t.accent)}`; };
 const typeLabel = (t, mode) => (mode === "love" ? { name: t.love_name, catch: t.love_catch } : { name: t.name, catch: t.catch });
 const mainLine = (id, mode) => (mode === "love" ? texts[id]?.love?.line : texts[id]?.serif) ?? "";
-function toast(msg) {
+function toast(msg, duration = 2400) {
   const el = document.createElement("div");
   el.className = "toast"; el.setAttribute("role", "status"); el.textContent = msg;
   const resultStack = document.querySelector(".result-float-stack");
   resultStack?.querySelector(".toast")?.remove();
   (resultStack || document.body).append(el);
-  setTimeout(() => el.remove(), 2400);
+  setTimeout(() => el.remove(), duration);
 }
 function ordered(sd) {  // 軸が偏らないよう、各軸の質問を交互に並べる
   const byAxis = AXES.map((a) => sd.questions.filter((q) => q.axis === a));
@@ -1955,7 +1955,12 @@ function countUp(el, to, ms) {
 // ---------------- シェア画像（1080×1350、端末の中で作る） ----------------
 let shareCache = { key: null, blob: null, pending: null };
 const shareKey = (r, mode) => `${mode}:${r.figure.id}:${r.lv}`;
-const loadImg = (src) => new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = src; });
+const loadImg = (src) => new Promise((ok, ng) => {
+  const im = new Image();
+  im.onload = () => ok(im);
+  im.onerror = () => { const error = new Error("share portrait unavailable"); error.code = "share_avatar_unavailable"; ng(error); };
+  im.src = src;
+});
 function shareQuoteRows(line, x, figureId, mode) {
   const chars = [...line], width = 940, memo = new Map();
   x.font = '900 48px "Noto Serif JP", serif';
@@ -2061,10 +2066,12 @@ async function shareImage(r, mode, trigger = null, stillValid = () => true) {
     try {
       blob = await renderShareBlob(r, mode);
       if (!blob) throw new Error("画像の生成に失敗しました");
-    } catch {
+    } catch (error) {
       if (!stillValid()) return;
       track("share_image_done", { method: "fail" });
-      return toast("画像を作れませんでした。スクショで保存してください");
+      return error?.code === "share_avatar_unavailable"
+        ? toast("人物の絵を読み込めませんでした。通信を確認して、もう一度押してください", 5000)
+        : toast("画像を作れませんでした。スクショで保存してください");
     }
     // Image/font loading can finish after another tab has deleted this result.
     // Never present a stale image or start a download in that case.

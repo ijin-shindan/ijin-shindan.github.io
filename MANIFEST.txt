@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 1b625ae-202610290220
+版番号: 45ec90a-202610290318
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
 合計サイズ: 31.55 MB
@@ -434,7 +434,7 @@
   app/icons/favicon.svg  1412
   app/index.html  3810
   app/legacy_data.js  1933
-  app/main.js  233697
+  app/main.js  234032
   app/meta.json  7869
   app/motion.css  2239
   app/motion.js  10614
