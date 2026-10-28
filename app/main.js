@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=5f31fc9-202610282308";
-import { mountMotion } from "./motion.js?v=5f31fc9-202610282308";
-import { mountGuide } from "./guide.js?v=5f31fc9-202610282308";
+import { AXES, Shindan, loadData } from "./shindan.js?v=644254b-202610290027";
+import { mountMotion } from "./motion.js?v=644254b-202610290027";
+import { mountGuide } from "./guide.js?v=644254b-202610290027";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5f31fc9-202610282308";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5f31fc9-202610282308";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5f31fc9-202610282308";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5f31fc9-202610282308";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5f31fc9-202610282308";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5f31fc9-202610282308";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5f31fc9-202610282308";
-import { storedResultMatches, storedList } from "./stored_result.js?v=5f31fc9-202610282308";
-import { clearPrefixedStorage } from "./storage_clear.js?v=5f31fc9-202610282308";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5f31fc9-202610282308";
-import { applyZukanBatch } from "./zukan_batch.js?v=5f31fc9-202610282308";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=644254b-202610290027";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=644254b-202610290027";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=644254b-202610290027";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=644254b-202610290027";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=644254b-202610290027";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=644254b-202610290027";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=644254b-202610290027";
+import { storedResultMatches, storedList } from "./stored_result.js?v=644254b-202610290027";
+import { clearPrefixedStorage } from "./storage_clear.js?v=644254b-202610290027";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=644254b-202610290027";
+import { applyZukanBatch } from "./zukan_batch.js?v=644254b-202610290027";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5f31fc9-202610282308")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=644254b-202610290027")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -851,7 +851,7 @@ function renderTop() {
     const f = pool[k++ % pool.length];
     teaser.classList.remove("fade"); void teaser.offsetWidth; teaser.classList.add("fade");
     teaser.innerHTML = `<img class="tile" src="${avatar(f.id)}" alt="" style="${themeVars(f.type)}">
-      <div><div class="who">${esc(f.name)}タイプの人は</div><div class="line">「${esc(texts[f.id].serif)}」</div></div>`;
+      <div><div class="who">${esc(f.name)}タイプの人は</div><div class="line">「${esc(texts[f.id].serif)}」</div><small>演出の一言・本人の発言とは限りません</small></div>`;
     if (!paused) { teaserTimer = setTimeout(show, 5000); timers.push(teaserTimer); }
   };
   const syncToggle = () => { toggle.textContent = paused ? "一言を動かす" : "一言を止める"; toggle.setAttribute("aria-pressed", String(paused)); };
@@ -1324,6 +1324,7 @@ function resultCard(r, mode, who, reveal) {
     <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
     <p class="type-catch">${esc(tl.catch)}</p>
     <p class="serif-quote">${esc(mainLine(f.id, mode))}</p>
+    <p class="note">※ 診断用の演出です。本人の発言とは限りません</p>
     <div class="meta-row">${stars(r.tier)}<span class="lv ${r.capped ? "capped" : ""}">Lv.<b>${reveal ? 1 : r.lv}</b></span></div>
     <div class="brand"><i>偉</i>世界の偉人性格診断　${esc(location.host)}</div>
   </section>`;
@@ -1347,7 +1348,7 @@ function shareUrl(mode, id, code) {
 }
 function shareText(r, mode, fate) {
   const f = r.figure;
-  return `${mode === "love" ? "恋をした私は" : "私は"}「${f.name}」タイプだった\n「${mainLine(f.id, mode)}」\n`
+  return `${mode === "love" ? "恋をした私は" : "私は"}「${f.name}」タイプだった\n「${mainLine(f.id, mode)}」\n※ 本人の発言とは限りません\n`
     + (mode === "love" && f.id === "natsume-soseki" ? "※漱石訳という出典は未確認\n" : "")
     + (f.id === "mori-motonari" ? "※三本の矢は後世の伝説イメージ\n" : "")
     + (fate ? `因縁の相手：${fig(fate.other).name}（${fate.label}）\n` : "")
@@ -2910,7 +2911,7 @@ function renderPeople() {
       return `<section class="social-card">
       ${verified ? `<img class="tile" src="${avatar(x.fig)}" alt="">` : '<div class="person-broken-icon" aria-hidden="true">？</div>'}
       <div class="person-card-info"><small class="person-card-position">一覧の${i + 1}枚目</small><b>${esc(personCardDisplayName(x, i))}</b>${verified
-        ? `<div class="nm">${esc(fig(x.fig).name)}</div><small>「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small>`
+        ? `<div class="nm">${esc(fig(x.fig).name)}</div><small>演出の一言「${esc(mainLine(x.fig, x.mode))}」</small><small>${x.mode === "love" ? "恋愛版" : "性格版"}の共有結果</small>`
         : '<small>保存データの回答とキャラが一致しません。このカードの結果は開けません。</small>'}</div>
       ${verified ? `<a href="#/person/${encodeURIComponent(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目の結果を見る">見る</a>` : '<span class="person-unavailable">確認不可</span>'}
       <button type="button" data-label-person="${i}" data-person-id="${esc(x.id)}" aria-label="${esc(actionName)}・${i + 1}枚目の呼び名を変更">呼び名</button>
@@ -3073,6 +3074,7 @@ function renderFigure(mode, id) {
       <h1 class="fig-name" style="--len:${[...f.name].length}">${esc(f.name)}</h1>
       <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
       <p class="serif-quote">${esc(mainLine(id, mode))}</p>
+      <p class="note">※ 診断用の演出です。本人の発言とは限りません</p>
     </section>
     <div style="display:grid;gap:8px;margin:16px 0">
       <a class="btn start" data-fresh="${mode}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a></div>
