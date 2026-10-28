@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=644254b-202610290027";
-import { mountMotion } from "./motion.js?v=644254b-202610290027";
-import { mountGuide } from "./guide.js?v=644254b-202610290027";
+import { AXES, Shindan, loadData } from "./shindan.js?v=1cab626-202610290116";
+import { mountMotion } from "./motion.js?v=1cab626-202610290116";
+import { mountGuide } from "./guide.js?v=1cab626-202610290116";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=644254b-202610290027";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=644254b-202610290027";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=644254b-202610290027";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=644254b-202610290027";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=644254b-202610290027";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=644254b-202610290027";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=644254b-202610290027";
-import { storedResultMatches, storedList } from "./stored_result.js?v=644254b-202610290027";
-import { clearPrefixedStorage } from "./storage_clear.js?v=644254b-202610290027";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=644254b-202610290027";
-import { applyZukanBatch } from "./zukan_batch.js?v=644254b-202610290027";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1cab626-202610290116";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1cab626-202610290116";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1cab626-202610290116";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1cab626-202610290116";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1cab626-202610290116";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1cab626-202610290116";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1cab626-202610290116";
+import { storedResultMatches, storedList } from "./stored_result.js?v=1cab626-202610290116";
+import { clearPrefixedStorage } from "./storage_clear.js?v=1cab626-202610290116";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1cab626-202610290116";
+import { applyZukanBatch } from "./zukan_batch.js?v=1cab626-202610290116";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=644254b-202610290027")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1cab626-202610290116")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2010,7 +2010,7 @@ async function drawShare(r, mode) {
   center(mode === "love" ? "恋をした私は" : "私は", 90, '500 36px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   x.font = '700 30px "M PLUS Rounded 1c", sans-serif';
   x.fillStyle = "#6b6358"; x.textAlign = "right";
-  x.fillText("創作のひとこと", W - 52, 90);
+  x.fillText("演出のひとこと", W - 52, 90);
   const name = r.figure.name, fs = Math.min(110, Math.floor(900 / [...name].length));
   center(name, Y + S + 40 + fs, `900 ${fs}px "Noto Serif JP", serif`, "#26221d");
   const tl = typeLabel(r.type, mode);
