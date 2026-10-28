@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=971eb29-202610281401";
-import { mountMotion } from "./motion.js?v=971eb29-202610281401";
-import { mountGuide } from "./guide.js?v=971eb29-202610281401";
+import { AXES, Shindan, loadData } from "./shindan.js?v=6bb305b-202610281625";
+import { mountMotion } from "./motion.js?v=6bb305b-202610281625";
+import { mountGuide } from "./guide.js?v=6bb305b-202610281625";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=971eb29-202610281401";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=971eb29-202610281401";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=971eb29-202610281401";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=971eb29-202610281401";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=971eb29-202610281401";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=971eb29-202610281401";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=971eb29-202610281401";
-import { storedResultMatches, storedList } from "./stored_result.js?v=971eb29-202610281401";
-import { clearPrefixedStorage } from "./storage_clear.js?v=971eb29-202610281401";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=971eb29-202610281401";
-import { applyZukanBatch } from "./zukan_batch.js?v=971eb29-202610281401";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=6bb305b-202610281625";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=6bb305b-202610281625";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=6bb305b-202610281625";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=6bb305b-202610281625";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=6bb305b-202610281625";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=6bb305b-202610281625";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=6bb305b-202610281625";
+import { storedResultMatches, storedList } from "./stored_result.js?v=6bb305b-202610281625";
+import { clearPrefixedStorage } from "./storage_clear.js?v=6bb305b-202610281625";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=6bb305b-202610281625";
+import { applyZukanBatch } from "./zukan_batch.js?v=6bb305b-202610281625";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=971eb29-202610281401")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=6bb305b-202610281625")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -293,7 +293,7 @@ function quizUnsavedWarning(activeQuiz) {
   if (!activeQuiz.persistenceUnavailable) return "";
   const role = activeQuiz.unsavedWarningShown ? "" : ' role="alert"';
   activeQuiz.unsavedWarningShown = true;
-  return `<p class="quiz-save-warning"${role}>回答の途中保存ができません。診断を途中でやめる・再読み込みすると、保存できなかった回答は消えます。結果は見られますが、端末には残りません。</p>`;
+  return `<p class="quiz-save-warning"${role}>回答の途中保存ができません。診断を途中でやめる・再読み込みすると、保存できなかった回答は消えます。結果は見られますが、このサイトの端末記録には残りません。</p>`;
 }
 function quizSharedReturnWarning(activeQuiz) {
   if (activeQuiz.source !== "friend"
@@ -357,6 +357,16 @@ function showFreshQuizClearFailure(link) {
   warning.textContent = "途中の記録が消えたか確認できませんでした。新しい診断は始めていません。端末の保存設定を確認してください。";
   warning.setAttribute("role", "alert");
 }
+function showFreshQuizMemoryOnlyNotice(link) {
+  let warning = link.nextElementSibling;
+  if (!warning?.matches("[data-fresh-memory-only-warning]")) {
+    warning = document.createElement("p");
+    warning.className = "quiz-save-warning";
+    warning.dataset.freshMemoryOnlyWarning = "";
+    link.insertAdjacentElement("afterend", warning);
+  }
+  warning.textContent = "この端末の途中記録を確認できません。保存済みの答えは消さず、この1回は保存なしで診断できます。途中で閉じると回答は消え、結果はこのサイトの端末記録には残りません。";
+}
 function bindFreshQuizLinks() {
   app.querySelectorAll("[data-fresh]").forEach((entry) => {
     // Starting over may delete saved answers. Make it an action instead of a
@@ -379,6 +389,14 @@ function bindFreshQuizLinks() {
       const label = mode === "love" ? "恋愛診断" : "性格診断";
       link.textContent = `${label}の保存された答えを消して最初から診断する`;
     }
+    if (snapshot.status === "unavailable") {
+      const label = mode === "love" ? "恋愛診断" : "性格診断";
+      link.textContent = `${label}を保存なしで始める`;
+      const saveNote = link.nextElementSibling;
+      if (saveNote?.matches("[data-fresh-save-note]"))
+        saveNote.textContent = "今回はこのサイトの端末記録に保存されません。いまの自分の結果も変わりません。";
+      showFreshQuizMemoryOnlyNotice(link);
+    }
     link.addEventListener("click", async (event) => {
       if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         event.preventDefault();
@@ -392,9 +410,12 @@ function bindFreshQuizLinks() {
       const status = await withSiteQuizLock(mode, () => {
         if (location.hash !== fromHash || link.isConnected === false) return "cancelled";
         const epochStatus = personCardEpochStatus(captured);
+        if (epochStatus === "stale_epoch") return epochStatus;
+        if (snapshot.status === "unavailable") return "memory_only";
         if (epochStatus !== "current") return epochStatus;
         const freshness = quizProgressFreshness(mode, snapshot.raw);
         if (snapshot.status === "invalid" || freshness === "changed") return "changed";
+        if (freshness === "unavailable") return "unavailable";
         if (freshness === "ok") {
           try {
             localStorage.removeItem(quizProgressKey(mode));
@@ -406,14 +427,17 @@ function bindFreshQuizLinks() {
       if (location.hash !== fromHash || link.isConnected === false) { nextSrc = null; return; }
       if (status === "cancelled") { nextSrc = null; return; }
       if (status === "changed" || status === "stale_epoch") { nextSrc = null; showQuizProgressConflict(mode, readQuizProgress(mode).status === "invalid"); return; }
-      if (status !== "cleared") { nextSrc = null; showFreshQuizClearFailure(link); return; }
-      clearQuizCursor(mode);
+      if (status !== "cleared" && status !== "memory_only") { nextSrc = null; showFreshQuizClearFailure(link); return; }
+      if (status === "cleared") clearQuizCursor(mode);
       quiz = null;
       nextSrc = link.dataset.src ?? null;
       // Only an explicit start from a shared result keeps the return link
       // through a reload. Viewing the result alone never stores its answers.
-      if (location.hash === destination) renderQuiz(mode);
-      else location.hash = destination;
+      if (location.hash !== destination) location.hash = destination;
+      // Start this attempt directly in memory. There is no pending route flag
+      // that a later navigation could accidentally reuse after storage recovers.
+      if (status === "memory_only") renderQuiz(mode, false, true);
+      else if (location.hash === fromHash) renderQuiz(mode);
     });
   });
 }
@@ -863,12 +887,14 @@ function rankTypes(sd, u) {
     .sort((a, b) => b[0] - a[0]).map((p) => p[1]);
 }
 
-function renderQuiz(mode, anim = false) {
+function renderQuiz(mode, anim = false, memoryOnlyStart = false) {
   const sd = engines[mode];
   if (!quiz || quiz.mode !== mode) {
     // 世代を進行記録より先に捕捉する。初期化待ちでも旧画面が新世代を再捕捉しない。
     const epoch = capturePersonCardEpoch();
-    const snapshot = readQuizProgress(mode);
+    const snapshot = memoryOnlyStart
+      ? { status: "unavailable", raw: undefined, progress: null }
+      : readQuizProgress(mode);
     const expectedResume = pendingGuardedResume;
     pendingGuardedResume = null;
     if (expectedResume?.mode === mode) {
@@ -891,6 +917,7 @@ function renderQuiz(mode, anim = false) {
       ? saved.answers.length : resumed && [4, 8].includes(saved.checkpointRequired)
         && saved.checkpointRequired <= saved.answers.length ? saved.checkpointRequired : 0;
     quiz = { mode, qs, answers: [], i: 0, progressRaw: snapshot.raw,
+      persistenceUnavailable: memoryOnlyStart || snapshot.status === "unavailable",
       checkpointConfirmed: confirmed, checkpointRequired: required,
       epoch, attemptId: quizAttemptId(mode, resumed ? saved : null) };
     // 旧版には試行 ID がない。12回答と保存済みの自分の結果が一致する場合、
@@ -939,16 +966,18 @@ function renderQuiz(mode, anim = false) {
   window.scrollTo(0, 0);
   $(".qtext").focus({ preventScroll: true });
   if (i > 0) $(".back").onclick = () => {
-    if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
+    if (!quiz.persistenceUnavailable && quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
     clearTimers(); quiz.busy = false; quiz.i--;
-    const saved = readQuizProgress(mode).progress;
-    if (validProgress(saved) && saved.answers.length === quiz.answers.length
-      && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
+    if (!quiz.persistenceUnavailable) {
+      const saved = readQuizProgress(mode).progress;
+      if (validProgress(saved) && saved.answers.length === quiz.answers.length
+        && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
+    }
     renderQuiz(mode, true);
   };
   app.querySelectorAll(".dotbtn").forEach((b) => (b.onclick = async () => {
     if (quiz.busy) return;
-    if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
+    if (!quiz.persistenceUnavailable && quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
     quiz.busy = true;
     const activeQuiz = quiz;
     const nextAnswers = quiz.answers.slice();
@@ -1031,13 +1060,15 @@ function renderCheckpoint(mode, n) {
   backButton.onclick = () => {
     if (quiz?.mode !== mode || quiz.i !== n || backButton.isConnected === false
       || location.hash !== `#/q/${mode}`) return;
-    if (quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
+    if (!quiz.persistenceUnavailable && quizProgressFreshness(mode, quiz.progressRaw) === "changed") return showQuizProgressConflict(mode);
     clearTimers();
     quiz.busy = false;
     quiz.i = n - 1;
-    const saved = readQuizProgress(mode).progress;
-    if (validProgress(saved) && saved.answers.length === quiz.answers.length
-      && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
+    if (!quiz.persistenceUnavailable) {
+      const saved = readQuizProgress(mode).progress;
+      if (validProgress(saved) && saved.answers.length === quiz.answers.length
+        && saved.answers.every((answer, index) => answer === quiz.answers[index])) rememberQuizCursor(mode, saved, quiz.i);
+    }
     renderQuiz(mode, true);
   };
   const continueButton = $(".checkpoint .start");
@@ -1742,7 +1773,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       <button class="btn start" data-return-self>${typeof navigator.share === "function" ? "自分の結果リンクを送る" : "返す文章とリンクをコピー"}</button>
       ${typeof navigator.share !== "function" ? '<p class="social-note">コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。</p>' : ""}</section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
-      ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
+      ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" data-fresh-save-note style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら自分の結果リンクを共有できます。友達から届いたなら、その友達へ返せます。</p>`}
     </div>
     <details class="card"><summary>${esc(f.name)}タイプってどんな人？</summary><p class="body">${esc(tx.body)}</p></details>
