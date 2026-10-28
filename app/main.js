@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=fc5ac9f-202610282138";
-import { mountMotion } from "./motion.js?v=fc5ac9f-202610282138";
-import { mountGuide } from "./guide.js?v=fc5ac9f-202610282138";
+import { AXES, Shindan, loadData } from "./shindan.js?v=72e536c-202610282158";
+import { mountMotion } from "./motion.js?v=72e536c-202610282158";
+import { mountGuide } from "./guide.js?v=72e536c-202610282158";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=fc5ac9f-202610282138";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=fc5ac9f-202610282138";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=fc5ac9f-202610282138";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=fc5ac9f-202610282138";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=fc5ac9f-202610282138";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=fc5ac9f-202610282138";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=fc5ac9f-202610282138";
-import { storedResultMatches, storedList } from "./stored_result.js?v=fc5ac9f-202610282138";
-import { clearPrefixedStorage } from "./storage_clear.js?v=fc5ac9f-202610282138";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=fc5ac9f-202610282138";
-import { applyZukanBatch } from "./zukan_batch.js?v=fc5ac9f-202610282138";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=72e536c-202610282158";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=72e536c-202610282158";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=72e536c-202610282158";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=72e536c-202610282158";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=72e536c-202610282158";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=72e536c-202610282158";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=72e536c-202610282158";
+import { storedResultMatches, storedList } from "./stored_result.js?v=72e536c-202610282158";
+import { clearPrefixedStorage } from "./storage_clear.js?v=72e536c-202610282158";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=72e536c-202610282158";
+import { applyZukanBatch } from "./zukan_batch.js?v=72e536c-202610282158";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=fc5ac9f-202610282138")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=72e536c-202610282158")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1955,6 +1955,46 @@ function countUp(el, to, ms) {
 let shareCache = { key: null, blob: null };
 const shareKey = (r, mode) => `${mode}:${r.figure.id}:${r.lv}`;
 const loadImg = (src) => new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = src; });
+function shareQuoteRows(line, x, figureId, mode) {
+  const chars = [...line], width = 940, memo = new Map();
+  x.font = '900 48px "Noto Serif JP", serif';
+  const natural = {
+    "love:uesugi-kenshin": ["弱っているときに、", "つけこんだりしない。", "口説くのは、あなたが元気な日に。"],
+    "love:tesla": ["あなたとのデート、頭の中で", "もう3回シミュレーションしました。"],
+  }[`${mode}:${figureId}`];
+  if (natural && natural.join("") === line) {
+    const rows = natural.map((row, i) => `${i === 0 ? "「" : ""}${row}${i === natural.length - 1 ? "」" : ""}`);
+    if (rows.every((row) => x.measureText(row).width <= width)) return rows;
+  }
+  const solve = (start, left) => {
+    const key = `${start}:${left}`;
+    if (memo.has(key)) return memo.get(key);
+    if (start === chars.length) return left === 0 ? { cost: 0, rows: [] } : null;
+    if (left === 0) return null;
+    let best = null;
+    for (let end = start + 1; end <= chars.length - left + 1; end++) {
+      const row = chars.slice(start, end).join("");
+      const shown = `${start === 0 ? "「" : ""}${row}${end === chars.length ? "」" : ""}`;
+      const used = x.measureText(shown).width;
+      if (used > width) continue;
+      const tail = solve(end, left - 1);
+      if (!tail) continue;
+      const before = chars[end - 1], after = chars[end];
+      const breakCost = end === chars.length ? (start > 0 && row.length < 4 ? 100 : 0)
+        : (/[。！？…、）]/.test(before) ? -10 : /[はがをにでへとも]/.test(before) ? 8 : 35)
+          + (/[、。！？…）」っゃゅょぁぃぅぇぉ]/.test(after) || /[（「]/.test(before) ? 100 : 0);
+      const cost = ((width - used) / 48) ** 2 * 0.2 + breakCost + tail.cost;
+      if (!best || cost < best.cost) best = { cost, rows: [shown, ...tail.rows] };
+    }
+    memo.set(key, best);
+    return best;
+  };
+  for (let count = 1; count <= 3; count++) {
+    const rows = solve(0, count)?.rows;
+    if (rows) return rows;
+  }
+  throw Error("share quote does not fit");
+}
 async function drawShare(r, mode) {
   await document.fonts?.ready;
   const W = 1080, H = 1350, th = THEMES[r.type.id], c = document.createElement("canvas");
@@ -1967,13 +2007,16 @@ async function drawShare(r, mode) {
   x.save(); x.beginPath(); x.roundRect(X, Y, S, S, 64); x.clip(); x.fillStyle = "#F5F2EB"; x.fillRect(X, Y, S, S); const artWidth = S * im.naturalWidth / im.naturalHeight; x.drawImage(im, X + (S-artWidth)/2, Y, artWidth, S); x.restore();
   const center = (txt, y, font, color) => { x.font = font; x.fillStyle = color; x.textAlign = "center"; x.fillText(txt, W / 2, y); };
   center(mode === "love" ? "恋をした私は" : "私は", 90, '500 36px "M PLUS Rounded 1c", sans-serif', "#6b6358");
+  x.font = '700 30px "M PLUS Rounded 1c", sans-serif';
+  x.fillStyle = "#6b6358"; x.textAlign = "right";
+  x.fillText("創作のひとこと", W - 52, 90);
   const name = r.figure.name, fs = Math.min(110, Math.floor(900 / [...name].length));
   center(name, Y + S + 40 + fs, `900 ${fs}px "Noto Serif JP", serif`, "#26221d");
   const tl = typeLabel(r.type, mode);
   center(`${tl.name}｜${tl.catch}`, Y + S + 90 + fs + 20, '800 36px "M PLUS Rounded 1c", sans-serif', "#26221d");
-  const line = `「${mainLine(r.figure.id, mode)}」`;
-  const lf = Math.min(48, Math.floor(960 / [...line].length));
-  center(line, Y + S + 170 + fs + 20, `900 ${lf}px "Noto Serif JP", serif`, "#26221d");
+  const rows = shareQuoteRows(mainLine(r.figure.id, mode), x, r.figure.id, mode);
+  const firstY = rows.length === 3 ? 1020 : rows.length === 2 ? 1030 : 1040;
+  rows.forEach((row, i) => center(row, firstY + i * 50, '900 48px "Noto Serif JP", serif', "#26221d"));
   if (r.figure.id === "washington") center("※ 斧と桜は後世の伝説イメージ", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   if (r.figure.id === "mori-motonari") center("※ 三本の矢は後世の伝説イメージ", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   if (r.figure.id === "natsume-soseki" && mode === "love") center("※ 漱石訳という出典は確認されていません", H - 170, '500 27px "M PLUS Rounded 1c", sans-serif', "#6b6358");
