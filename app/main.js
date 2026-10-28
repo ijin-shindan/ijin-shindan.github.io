@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=1cab626-202610290116";
-import { mountMotion } from "./motion.js?v=1cab626-202610290116";
-import { mountGuide } from "./guide.js?v=1cab626-202610290116";
+import { AXES, Shindan, loadData } from "./shindan.js?v=1b625ae-202610290220";
+import { mountMotion } from "./motion.js?v=1b625ae-202610290220";
+import { mountGuide } from "./guide.js?v=1b625ae-202610290220";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1cab626-202610290116";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1cab626-202610290116";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1cab626-202610290116";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1cab626-202610290116";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1cab626-202610290116";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1cab626-202610290116";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1cab626-202610290116";
-import { storedResultMatches, storedList } from "./stored_result.js?v=1cab626-202610290116";
-import { clearPrefixedStorage } from "./storage_clear.js?v=1cab626-202610290116";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1cab626-202610290116";
-import { applyZukanBatch } from "./zukan_batch.js?v=1cab626-202610290116";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1b625ae-202610290220";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1b625ae-202610290220";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1b625ae-202610290220";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1b625ae-202610290220";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1b625ae-202610290220";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1b625ae-202610290220";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1b625ae-202610290220";
+import { storedResultMatches, storedList } from "./stored_result.js?v=1b625ae-202610290220";
+import { clearPrefixedStorage } from "./storage_clear.js?v=1b625ae-202610290220";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1b625ae-202610290220";
+import { applyZukanBatch } from "./zukan_batch.js?v=1b625ae-202610290220";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1cab626-202610290116")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1b625ae-202610290220")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1953,7 +1953,7 @@ function countUp(el, to, ms) {
 }
 
 // ---------------- シェア画像（1080×1350、端末の中で作る） ----------------
-let shareCache = { key: null, blob: null };
+let shareCache = { key: null, blob: null, pending: null };
 const shareKey = (r, mode) => `${mode}:${r.figure.id}:${r.lv}`;
 const loadImg = (src) => new Promise((ok, ng) => { const im = new Image(); im.onload = () => ok(im); im.onerror = ng; im.src = src; });
 function shareQuoteRows(line, x, figureId, mode) {
@@ -2025,43 +2025,72 @@ async function drawShare(r, mode) {
   center(`世界の偉人性格診断　${location.host}`, H - 44, '500 30px "M PLUS Rounded 1c", sans-serif', "#6b6358");
   return new Promise((ok) => c.toBlob(ok, "image/png"));
 }
-function prerenderShare(r, mode) {
+function renderShareBlob(r, mode) {
   const key = shareKey(r, mode);
-  shareCache = { key, blob: null };
-  drawShare(r, mode).then((blob) => { if (shareCache.key === key) shareCache.blob = blob; }).catch(() => {});
+  if (shareCache.key !== key) shareCache = { key, blob: null, pending: null };
+  const cache = shareCache;
+  if (cache.blob) return Promise.resolve(cache.blob);
+  if (!cache.pending) {
+    const pending = drawShare(r, mode).then((blob) => {
+      if (shareCache === cache) cache.blob = blob;
+      return blob;
+    }).finally(() => {
+      if (shareCache === cache && cache.pending === pending) cache.pending = null;
+    });
+    cache.pending = pending;
+  }
+  return cache.pending;
+}
+function prerenderShare(r, mode) {
+  shareCache = { key: shareKey(r, mode), blob: null, pending: null };
+  renderShareBlob(r, mode).catch(() => {});
 }
 async function shareImage(r, mode, trigger = null, stillValid = () => true) {
-  const generation = selfViewGeneration;
-  const epoch = currentClearEpoch();
-  const stateStatus = selfStateSnapshot().status;
-  let blob;
+  if (trigger?.disabled) return;
+  const previousLabel = trigger?.textContent;
+  if (trigger) {
+    trigger.disabled = true;
+    trigger.textContent = "画像を準備中…";
+    trigger.setAttribute?.("aria-busy", "true");
+  }
   try {
-    blob = shareCache.key === shareKey(r, mode) ? shareCache.blob : null;
-    blob ||= await drawShare(r, mode);
-    if (!blob) throw new Error("画像の生成に失敗しました");
-  } catch {
-    if (!stillValid()) return;
-    track("share_image_done", { method: "fail" });
-    return toast("画像を作れませんでした。スクショで保存してください");
+    const generation = selfViewGeneration;
+    const epoch = currentClearEpoch();
+    const stateStatus = selfStateSnapshot().status;
+    let blob;
+    try {
+      blob = await renderShareBlob(r, mode);
+      if (!blob) throw new Error("画像の生成に失敗しました");
+    } catch {
+      if (!stillValid()) return;
+      track("share_image_done", { method: "fail" });
+      return toast("画像を作れませんでした。スクショで保存してください");
+    }
+    // Image/font loading can finish after another tab has deleted this result.
+    // Never present a stale image or start a download in that case.
+    if (!stillValid() || generation !== selfViewGeneration || !viewEpochMatches(epoch)
+      || stateStatus === "missing_after_migration" || selfStateSnapshot().status !== stateStatus
+      || (trigger && !trigger.isConnected)) return;
+    const src = URL.createObjectURL(blob);
+    if (/Line\/|Instagram|FBAN|FBAV|Twitter|; wv\)/i.test(navigator.userAgent)) {
+      // アプリ内ブラウザはダウンロードできないので、画像を出して長押しで保存してもらう
+      openSheet(`<div class="panel"><h2 id="sheet-title">画像を長押しして保存</h2><img src="${src}" alt="保存用の結果画像" style="width:100%;border-radius:12px">
+        <button class="btn sub close" style="margin-top:12px">閉じる</button></div>`, trigger, src);
+      track("share_image_done", { method: "inapp" });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = src; a.download = `ijin-${mode}-${r.figure.id}-lv${r.lv}.png`; a.click();
+    setTimeout(() => URL.revokeObjectURL(src), 60_000);
+    track("share_image_done", { method: "download" });
+    toast("画像の保存を開始しました。端末のダウンロード先を確認してください");
+  } finally {
+    if (trigger?.isConnected) {
+      trigger.disabled = false;
+      trigger.textContent = previousLabel;
+      trigger.removeAttribute?.("aria-busy");
+    }
   }
-  // Image/font loading can finish after another tab has deleted this result.
-  // Never present a stale image or start a download in that case.
-  if (!stillValid() || generation !== selfViewGeneration || !viewEpochMatches(epoch)
-    || stateStatus === "missing_after_migration" || selfStateSnapshot().status !== stateStatus
-    || (trigger && !trigger.isConnected)) return;
-  const src = URL.createObjectURL(blob);
-  if (/Line\/|Instagram|FBAN|FBAV|Twitter|; wv\)/i.test(navigator.userAgent)) {
-    // アプリ内ブラウザはダウンロードできないので、画像を出して長押しで保存してもらう
-    openSheet(`<div class="panel"><h2 id="sheet-title">画像を長押しして保存</h2><img src="${src}" alt="保存用の結果画像" style="width:100%;border-radius:12px">
-      <button class="btn sub close" style="margin-top:12px">閉じる</button></div>`, trigger, src);
-    track("share_image_done", { method: "inapp" });
-    return;
-  }
-  const a = document.createElement("a");
-  a.href = src; a.download = `ijin-${mode}-${r.figure.id}-lv${r.lv}.png`; a.click();
-  setTimeout(() => URL.revokeObjectURL(src), 60_000);
-  track("share_image_done", { method: "download" });
-  toast("画像の保存を開始しました。端末のダウンロード先を確認してください");
 }
 
 function capturedSelfViewGuard() {
