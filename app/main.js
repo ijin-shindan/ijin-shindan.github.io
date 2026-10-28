@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=b94678c-202610281001";
-import { mountMotion } from "./motion.js?v=b94678c-202610281001";
-import { mountGuide } from "./guide.js?v=b94678c-202610281001";
+import { AXES, Shindan, loadData } from "./shindan.js?v=b4da290-202610281100";
+import { mountMotion } from "./motion.js?v=b4da290-202610281100";
+import { mountGuide } from "./guide.js?v=b4da290-202610281100";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=b94678c-202610281001";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=b94678c-202610281001";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=b94678c-202610281001";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=b94678c-202610281001";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=b94678c-202610281001";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=b94678c-202610281001";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=b94678c-202610281001";
-import { storedResultMatches, storedList } from "./stored_result.js?v=b94678c-202610281001";
-import { clearPrefixedStorage } from "./storage_clear.js?v=b94678c-202610281001";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=b94678c-202610281001";
-import { applyZukanBatch } from "./zukan_batch.js?v=b94678c-202610281001";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=b4da290-202610281100";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=b4da290-202610281100";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=b4da290-202610281100";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=b4da290-202610281100";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=b4da290-202610281100";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=b4da290-202610281100";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=b4da290-202610281100";
+import { storedResultMatches, storedList } from "./stored_result.js?v=b4da290-202610281100";
+import { clearPrefixedStorage } from "./storage_clear.js?v=b4da290-202610281100";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=b4da290-202610281100";
+import { applyZukanBatch } from "./zukan_batch.js?v=b4da290-202610281100";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 let data, meta;
 try {
-  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=b94678c-202610281001")]);
+  [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=b4da290-202610281100")]);
 } catch (e) {
   app.insertAdjacentHTML("beforeend", `<p class="note" style="margin-top:20px">読みこみに失敗しました。通信状況を確かめて、ページを再読みこみしてください。</p>`);
   throw e;
@@ -1068,14 +1068,16 @@ function renderCheckpoint(mode, n) {
     activeQuiz.checkpointConfirmed = n;
     if (n === 8 && !activeQuiz.persistenceUnavailable) {
       const seenStatus = await withSiteRecordsLock(() => {
-        if (quiz !== activeQuiz || location.hash !== `#/q/${mode}`) return "cancelled";
+        if (quiz !== activeQuiz || activeQuiz.i !== n || continueButton.isConnected === false
+          || location.hash !== `#/q/${mode}`) return "cancelled";
         return personCardEpochStatus(captured) === "current" && store.set("seen_checkpoint", true)
           ? "saved" : "unavailable";
       });
       if (seenStatus === "cancelled") return;
       if (personCardEpochStatus(captured) === "stale_epoch") return showQuizProgressConflict(mode);
     }
-    if (quiz === activeQuiz && location.hash === `#/q/${mode}`) renderQuiz(mode, true);
+    if (quiz === activeQuiz && activeQuiz.i === n && continueButton.isConnected !== false
+      && location.hash === `#/q/${mode}`) renderQuiz(mode, true);
   };
 }
 
