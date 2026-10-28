@@ -219,7 +219,7 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 .stage.art-missing .color { display: none; }
 .stage.art-missing .sil { opacity: 1; }
 .stage.art-empty .sil { display: none; }
-.stage .avatar-fallback { display: none; position: absolute; inset: 0; padding: 18px; place-items: center; text-align: center; font-weight: 800; color: var(--ink); background: var(--t-bg2); }
+.stage .avatar-fallback { display: none; position: absolute; inset: 0; padding: 18px; place-items: center; text-align: center; font-weight: 800; color: #26221d; background: var(--t-bg2); }
 .stage.art-empty .avatar-fallback { display: grid; }
 .fig-name { font-family: var(--serif); font-weight: 900; line-height: 1.2; margin: 14px 0 6px; letter-spacing: .04em;
   font-size: clamp(24px, calc(300px / var(--len)), 40px); word-break: keep-all; overflow-wrap: anywhere; color: #26221d; }
