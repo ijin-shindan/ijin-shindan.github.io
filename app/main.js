@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=72e536c-202610282158";
-import { mountMotion } from "./motion.js?v=72e536c-202610282158";
-import { mountGuide } from "./guide.js?v=72e536c-202610282158";
+import { AXES, Shindan, loadData } from "./shindan.js?v=97a73cb-202610282214";
+import { mountMotion } from "./motion.js?v=97a73cb-202610282214";
+import { mountGuide } from "./guide.js?v=97a73cb-202610282214";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=72e536c-202610282158";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=72e536c-202610282158";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=72e536c-202610282158";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=72e536c-202610282158";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=72e536c-202610282158";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=72e536c-202610282158";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=72e536c-202610282158";
-import { storedResultMatches, storedList } from "./stored_result.js?v=72e536c-202610282158";
-import { clearPrefixedStorage } from "./storage_clear.js?v=72e536c-202610282158";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=72e536c-202610282158";
-import { applyZukanBatch } from "./zukan_batch.js?v=72e536c-202610282158";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=97a73cb-202610282214";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=97a73cb-202610282214";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=97a73cb-202610282214";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=97a73cb-202610282214";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=97a73cb-202610282214";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=97a73cb-202610282214";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=97a73cb-202610282214";
+import { storedResultMatches, storedList } from "./stored_result.js?v=97a73cb-202610282214";
+import { clearPrefixedStorage } from "./storage_clear.js?v=97a73cb-202610282214";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=97a73cb-202610282214";
+import { applyZukanBatch } from "./zukan_batch.js?v=97a73cb-202610282214";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=72e536c-202610282158")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=97a73cb-202610282214")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -40,6 +40,7 @@ async function loadInitialState() {
     const LOCKED = Object.values(SD.figures).filter((f) => f.tier > MAX_TIER);
     return { data, meta, engines, otherQuestions, SD, texts, axisById, THEMES, MAX_TIER, FREE, LOCKED };
   } catch (e) {
+    window.__ijinBootErrorHandled = true;
     app.innerHTML = `<section class="card" role="alert"><h1>ページを読み込めませんでした</h1>
       <p>通信状況を確かめて、もう一度読み込んでください。この操作では答えや端末の記録を消しません。</p>
       <button class="btn start" type="button" data-retry-load>もう一度読み込む</button></section>`;
@@ -48,7 +49,6 @@ async function loadInitialState() {
   }
 }
 const { data, meta, engines, otherQuestions, SD, texts, axisById, THEMES, MAX_TIER, FREE, LOCKED } = await loadInitialState();
-window.__ijinReady = true;
 // 他己用6軸の質問品質と補正値は未検証。公開サイトには出さず、ローカル試作だけで確認する。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
 const OTHER = { normal: "love", love: "normal" };
@@ -3445,4 +3445,5 @@ if (selfLockAvailable()) await withSiteRecordsLock(() => {
 });
 route();
 if (selfStateSnapshot().status === "ok") store.set("visited", true);
+window.__ijinReady = true;
 // ローカル版では Firebase Auth に接続しない。

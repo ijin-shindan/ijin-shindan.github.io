@@ -15,7 +15,7 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=72e536c-202610282158">
+  <link rel="stylesheet" href="style.css?v=97a73cb-202610282214">
   <link rel="stylesheet" href="motion.css?v=5">
   <link rel="stylesheet" href="guide.css?v=6">
 </head>
@@ -35,6 +35,37 @@
   </main>
   <div id="overlay" hidden></div>
   <div id="sheet" hidden></div>
-  <script type="module" src="main.js?v=72e536c-202610282158"></script>
+  <script type="module" src="main.js?v=97a73cb-202610282214"></script>
+  <script>
+    let bootFailed = false;
+    function showBootFailure() {
+      if (bootFailed || window.__ijinReady || window.__ijinBootErrorHandled) return;
+      bootFailed = true;
+      const app = document.getElementById('app');
+      const alert = document.createElement('section');
+      alert.className = 'card';
+      alert.setAttribute('role', 'alert');
+      const heading = document.createElement('h1');
+      heading.textContent = 'ページを読み込めませんでした';
+      const message = document.createElement('p');
+      message.textContent = '通信状況を確かめて、もう一度読み込んでください。この操作では答えや端末の記録を消しません。';
+      const retry = document.createElement('button');
+      retry.className = 'btn start';
+      retry.type = 'button';
+      retry.textContent = 'もう一度読み込む';
+      retry.addEventListener('click', () => location.reload());
+      alert.append(heading, message, retry);
+      app.replaceChildren(alert);
+    }
+    document.querySelector('script[type="module"]').addEventListener('error', showBootFailure);
+    window.addEventListener('error', (event) => {
+      if (!event.filename || window.__ijinReady || window.__ijinBootErrorHandled) return;
+      const script = new URL(event.filename, location.href);
+      const appPath = new URL('.', location.href).pathname;
+      if (script.origin === location.origin && script.pathname.startsWith(appPath) && script.pathname.endsWith('.js')) {
+        showBootFailure();
+      }
+    });
+  </script>
 </body>
 </html>
