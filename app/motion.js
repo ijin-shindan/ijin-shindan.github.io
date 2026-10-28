@@ -72,6 +72,16 @@ export function mountMotion(stage, {name='偉人'}={}) {
   controls.innerHTML='<div class="rig-buttons"><button data-motion="pose" disabled>キメる</button><button data-motion="angry" disabled>怒る</button><button data-motion="cry" disabled>泣く</button><button data-motion="think" disabled>考える</button><button data-motion="stop" disabled>停止</button></div><label class="rig-reduce"><input type="checkbox"> 動きを抑える</label><p class="rig-status" role="status" aria-live="polite">全身イラストを準備しています。</p>';
   stage.insertAdjacentElement('afterend',controls);
   const status=controls.querySelector('.rig-status');
+  const fallbackStatus=()=>stage.classList.contains('art-empty')
+    ? '人物の絵を表示できません。通信を確認して、再読み込みしてください。'
+    : '絵の代わりにシルエットを表示しています。通信が戻ったら再読み込みしてください。';
+  if(stage.classList.contains('art-missing'))status.textContent=fallbackStatus();
+  listen(original,'error',()=>{if(!ready)status.textContent=fallbackStatus();});
+  const silhouette=stage.querySelector('.avatar.sil');
+  if(silhouette){
+    listen(silhouette,'load',()=>{if(stage.classList.contains('art-missing')&&!ready)status.textContent=fallbackStatus();});
+    listen(silhouette,'error',()=>{if(stage.classList.contains('art-missing')&&!ready)status.textContent=fallbackStatus();});
+  }
   const reduce=controls.querySelector('input');
   const stop=controls.querySelector('[data-motion="stop"]');
   reduce.checked=media.matches;
@@ -153,9 +163,11 @@ export function mountMotion(stage, {name='偉人'}={}) {
     stage.insertBefore(svg,fx);
     original.hidden=true;
     ready=true;
+    stage.classList.remove('art-missing','art-empty');
+    if(silhouette)silhouette.alt='';
     controls.querySelectorAll('[data-motion]:not([data-motion="stop"])').forEach(b=>{b.disabled=false;});
     status.textContent='表情としぐさを見てみる。音は鳴りません。';frame();
-  }).catch(()=>{if(!disposed)status.textContent='いまは止め絵で表示しています。再読み込みで動きを試せます。';});
+  }).catch(()=>{if(!disposed)status.textContent=stage.classList.contains('art-missing')?fallbackStatus():'いまは止め絵で表示しています。再読み込みで動きを試せます。';});
   function cleanup() {
     if(disposed)return;disposed=true;cancel();events.abort();svg?.remove();fx.remove();controls.remove();original.hidden=false;stage.classList.remove('rig-stage');mounted.delete(stage);
   }

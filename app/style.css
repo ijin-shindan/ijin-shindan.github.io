@@ -216,6 +216,11 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
   background: repeating-linear-gradient(90deg, var(--t-accent) 0 24px, color-mix(in srgb, var(--t-accent) 45%, white) 24px 48px); pointer-events: none; }
 .stage .avatar { position: absolute; inset: 0; width: 100%; height: 100%; }
 .stage .sil { opacity: 0; }
+.stage.art-missing .color { display: none; }
+.stage.art-missing .sil { opacity: 1; }
+.stage.art-empty .sil { display: none; }
+.stage .avatar-fallback { display: none; position: absolute; inset: 0; padding: 18px; place-items: center; text-align: center; font-weight: 800; color: var(--ink); background: var(--t-bg2); }
+.stage.art-empty .avatar-fallback { display: grid; }
 .fig-name { font-family: var(--serif); font-weight: 900; line-height: 1.2; margin: 14px 0 6px; letter-spacing: .04em;
   font-size: clamp(24px, calc(300px / var(--len)), 40px); word-break: keep-all; overflow-wrap: anywhere; color: #26221d; }
 .type-line { display: inline-flex; align-items: center; gap: 8px; color: #26221d; }

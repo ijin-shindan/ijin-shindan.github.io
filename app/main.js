@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=45ec90a-202610290318";
-import { mountMotion } from "./motion.js?v=45ec90a-202610290318";
-import { mountGuide } from "./guide.js?v=45ec90a-202610290318";
+import { AXES, Shindan, loadData } from "./shindan.js?v=1217947-202610290428";
+import { mountMotion } from "./motion.js?v=1217947-202610290428";
+import { mountGuide } from "./guide.js?v=1217947-202610290428";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=45ec90a-202610290318";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=45ec90a-202610290318";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=45ec90a-202610290318";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=45ec90a-202610290318";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=45ec90a-202610290318";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=45ec90a-202610290318";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=45ec90a-202610290318";
-import { storedResultMatches, storedList } from "./stored_result.js?v=45ec90a-202610290318";
-import { clearPrefixedStorage } from "./storage_clear.js?v=45ec90a-202610290318";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=45ec90a-202610290318";
-import { applyZukanBatch } from "./zukan_batch.js?v=45ec90a-202610290318";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1217947-202610290428";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1217947-202610290428";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1217947-202610290428";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1217947-202610290428";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1217947-202610290428";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1217947-202610290428";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1217947-202610290428";
+import { storedResultMatches, storedList } from "./stored_result.js?v=1217947-202610290428";
+import { clearPrefixedStorage } from "./storage_clear.js?v=1217947-202610290428";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1217947-202610290428";
+import { applyZukanBatch } from "./zukan_batch.js?v=1217947-202610290428";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=45ec90a-202610290318")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1217947-202610290428")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -73,6 +73,31 @@ function attachMotion(name) {
   disposeMotion();
   const stage = app.querySelector('.stage');
   if (!stage) return;
+  const portrait = stage.querySelector('.avatar.color');
+  const silhouette = stage.querySelector('.avatar.sil');
+  const showEmpty = () => {
+    if (stage.querySelector('.rig-art')) return;
+    stage.classList.add('art-missing', 'art-empty');
+    if (silhouette) silhouette.alt = '';
+  };
+  const showSilhouette = () => {
+    if (stage.querySelector('.rig-art')) return;
+    if (!silhouette || (silhouette.complete && !silhouette.naturalWidth)) return showEmpty();
+    stage.classList.add('art-missing');
+    stage.classList.remove('art-empty');
+    silhouette.alt = silhouette.complete ? `${name}のシルエット` : '';
+  };
+  const showPortrait = () => {
+    stage.classList.remove('art-missing', 'art-empty');
+    if (silhouette) silhouette.alt = '';
+  };
+  portrait?.addEventListener('error', showSilhouette);
+  portrait?.addEventListener('load', showPortrait);
+  const onSilhouetteLoad = () => { if (portrait?.complete && !portrait.naturalWidth) showSilhouette(); };
+  const onSilhouetteError = () => { if (portrait?.complete && !portrait.naturalWidth) showEmpty(); };
+  silhouette?.addEventListener('load', onSilhouetteLoad);
+  silhouette?.addEventListener('error', onSilhouetteError);
+  if (portrait?.complete && !portrait.naturalWidth) showSilhouette();
   let cleanup = () => {};
   let mounted = false;
   const observer = new MutationObserver(mountWhenReady);
@@ -84,7 +109,13 @@ function attachMotion(name) {
     }
   }
   observer.observe(stage, {attributes:true, attributeFilter:['data-state']});
-  disposeMotion = () => { observer.disconnect(); cleanup(); };
+  disposeMotion = () => {
+    observer.disconnect(); cleanup();
+    portrait?.removeEventListener('error', showSilhouette);
+    portrait?.removeEventListener('load', showPortrait);
+    silhouette?.removeEventListener('load', onSilhouetteLoad);
+    silhouette?.removeEventListener('error', onSilhouetteError);
+  };
   mountWhenReady();
 }
 let timers = [];
@@ -1317,6 +1348,7 @@ function resultCard(r, mode, who, reveal) {
     <div class="stage" data-state="${reveal ? "sil" : "done"}">
       <img class="avatar sil" src="${avatar(f.id, true)}" alt="">
       <img class="avatar color" src="${avatar(f.id)}" alt="${esc(f.name)}のイラスト（${esc(meta.alt[f.id] ?? "")}）">
+      <span class="avatar-fallback" aria-hidden="true">絵を読み込めません</span>
       <div class="burst" aria-hidden="true">${"<i></i>".repeat(8)}</div>
     </div>
     ${artNote}
@@ -3103,7 +3135,7 @@ function renderFigure(mode, id) {
   app.innerHTML = `
     <div class="friend-head"><h1>${esc(f.name)}タイプの紹介</h1><p class="note">このページには回答コードがありません。誰かの診断結果を示すものではありません。</p></div>
     <section class="rcard" style="${themeVars(t.id)}">
-      <div class="stage" data-state="done"><img class="avatar color" src="${avatar(id)}" alt="${esc(f.name)}のイラスト"></div>
+      <div class="stage" data-state="done"><img class="avatar sil" src="${avatar(id, true)}" alt=""><img class="avatar color" src="${avatar(id)}" alt="${esc(f.name)}のイラスト"><span class="avatar-fallback" aria-hidden="true">絵を読み込めません</span></div>
       ${id === "washington" ? '<p class="note">※ 斧と桜は史実ではなく、後世の伝説を図案化したものです</p>' : ""}
       ${id === "mori-motonari" ? '<p class="note">※ 三本の矢は後世の伝説を図案化したものです</p>' : ""}
       ${id === "natsume-soseki" && mode === "love" ? '<p class="note">※「月が綺麗ですね」を漱石が訳したという出典は確認されていません</p>' : ""}
