@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=57222ce-202610292037";
-import { mountMotion } from "./motion.js?v=57222ce-202610292037";
-import { mountGuide } from "./guide.js?v=57222ce-202610292037";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=dc70087-202610292136";
+import { mountMotion } from "./motion.js?v=dc70087-202610292136";
+import { mountGuide } from "./guide.js?v=dc70087-202610292136";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=57222ce-202610292037";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=57222ce-202610292037";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=57222ce-202610292037";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=57222ce-202610292037";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=57222ce-202610292037";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=57222ce-202610292037";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=57222ce-202610292037";
-import { storedResultMatches, storedList } from "./stored_result.js?v=57222ce-202610292037";
-import { clearPrefixedStorage } from "./storage_clear.js?v=57222ce-202610292037";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=57222ce-202610292037";
-import { applyZukanBatch } from "./zukan_batch.js?v=57222ce-202610292037";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=dc70087-202610292136";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=dc70087-202610292136";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=dc70087-202610292136";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=dc70087-202610292136";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=dc70087-202610292136";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=dc70087-202610292136";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=dc70087-202610292136";
+import { storedResultMatches, storedList } from "./stored_result.js?v=dc70087-202610292136";
+import { clearPrefixedStorage } from "./storage_clear.js?v=dc70087-202610292136";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=dc70087-202610292136";
+import { applyZukanBatch } from "./zukan_batch.js?v=dc70087-202610292136";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=57222ce-202610292037")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=dc70087-202610292136")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1564,9 +1564,13 @@ function renderResult(mode, code) {
     && sd.diagnose(answersOf(sd, friend.code)).figure.id === friend.fig;
   // The shared result compares real answers. Do not show that same figure a
   // second time using its generic type profile, which can point the other way.
+  // Keep the original choices for Zukan registration; do not promote an
+  // undiscovered runner-up into the visible rows.
   const comparedFriendFig = validFriend && friend.code !== code ? friend.fig : null;
-  const strongId = ms.strong.find((id) => id !== fate?.other && id !== comparedFriendFig);
-  const weakId = ms.weak.find((id) => id !== fate?.other && id !== comparedFriendFig && id !== strongId);
+  const strongId = ms.strong.find((id) => id !== fate?.other);
+  const weakId = ms.weak.find((id) => id !== fate?.other && id !== strongId);
+  const visibleStrongId = strongId === comparedFriendFig ? null : strongId;
+  const visibleWeakId = weakId === comparedFriendFig ? null : weakId;
   const other = savedResult(OTHER[mode]);
 
   const tx = texts[f.id];
@@ -1661,7 +1665,7 @@ function renderResult(mode, code) {
     </section>
     <section class="card"><h2>相性</h2>
       <p class="rel-note">回答の6つの軸で見た、遊びの相性です。史実の勝ち負けではありません。矢印の先が、押されやすい側。</p>
-      <div class="rels">${friendHtml}${matchRow("strong", strongId)}${matchRow("weak", weakId)}${!friendHtml && !strongId && !weakId ? '<p class="note">回答の6つの軸では、得意・苦手を分けられませんでした。</p>' : ""}</div>
+      <div class="rels">${friendHtml}${matchRow("strong", visibleStrongId)}${matchRow("weak", visibleWeakId)}${!friendHtml && !visibleStrongId && !visibleWeakId ? '<p class="note">回答の6つの軸では、得意・苦手を分けられませんでした。</p>' : ""}</div>
       ${fateHtml ? `<div class="fate-wrap">${fateHtml}</div>` : ""}
     </section>
     <section class="card levelup"><h2>もしも…</h2>${levelHtml}</section>
