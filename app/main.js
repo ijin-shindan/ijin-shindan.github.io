@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=20a9dbe-202610291637";
-import { mountMotion } from "./motion.js?v=20a9dbe-202610291637";
-import { mountGuide } from "./guide.js?v=20a9dbe-202610291637";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=ded76f5-202610291737";
+import { mountMotion } from "./motion.js?v=ded76f5-202610291737";
+import { mountGuide } from "./guide.js?v=ded76f5-202610291737";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=20a9dbe-202610291637";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=20a9dbe-202610291637";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=20a9dbe-202610291637";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=20a9dbe-202610291637";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=20a9dbe-202610291637";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=20a9dbe-202610291637";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=20a9dbe-202610291637";
-import { storedResultMatches, storedList } from "./stored_result.js?v=20a9dbe-202610291637";
-import { clearPrefixedStorage } from "./storage_clear.js?v=20a9dbe-202610291637";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=20a9dbe-202610291637";
-import { applyZukanBatch } from "./zukan_batch.js?v=20a9dbe-202610291637";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ded76f5-202610291737";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ded76f5-202610291737";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ded76f5-202610291737";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ded76f5-202610291737";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ded76f5-202610291737";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ded76f5-202610291737";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ded76f5-202610291737";
+import { storedResultMatches, storedList } from "./stored_result.js?v=ded76f5-202610291737";
+import { clearPrefixedStorage } from "./storage_clear.js?v=ded76f5-202610291737";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ded76f5-202610291737";
+import { applyZukanBatch } from "./zukan_batch.js?v=ded76f5-202610291737";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=20a9dbe-202610291637")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ded76f5-202610291737")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -166,6 +166,9 @@ const onAccent = (hex) => ((lum(hex) + 0.05) / 0.05 > 1.05 / (lum(hex) + 0.05) ?
 const themeVars = (typeId) => { const t = THEMES[typeId]; return `--t-bg:${t.bg};--t-bg2:${t.bg2};--t-bg3:${t.bg3};--t-accent:${t.accent};--t-on:${onAccent(t.accent)}`; };
 const typeLabel = (t, mode) => (mode === "love" ? { name: t.love_name, catch: t.love_catch } : { name: t.name, catch: t.catch });
 const mainLine = (id, mode) => (mode === "love" ? texts[id]?.love?.line : texts[id]?.serif) ?? "";
+const quoteDisclaimer = (id, mode) => id === "alexander" && mode === "normal"
+  ? "※ 伝承をもとにした創作の一言です。結び目は剣で切った説と、留め木を抜いた別伝があります。"
+  : "※ 診断用の演出です。本人の発言とは限りません";
 function toast(msg, duration = 2400) {
   const el = document.createElement("div");
   el.className = "toast"; el.setAttribute("role", "status"); el.textContent = msg;
@@ -1356,7 +1359,7 @@ function resultCard(r, mode, who, reveal) {
     <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
     <p class="type-catch">${esc(tl.catch)}</p>
     <p class="serif-quote">${esc(mainLine(f.id, mode))}</p>
-    <p class="note">※ 診断用の演出です。本人の発言とは限りません</p>
+    <p class="note">${esc(quoteDisclaimer(f.id, mode))}</p>
     <div class="meta-row">${stars(r.tier)}<span class="lv ${r.capped ? "capped" : ""}">Lv.<b>${reveal ? 1 : r.lv}</b></span></div>
     <div class="brand"><i>偉</i>世界の偉人性格診断　${esc(location.host)}</div>
   </section>`;
@@ -3150,7 +3153,7 @@ function renderFigure(mode, id) {
       <div class="type-line"><span class="emblem">${esc(t.name[0])}</span><span class="type-name">${esc(tl.name)}</span></div>
       <p class="serif-quote">${esc(mainLine(id, mode))}</p>
       ${mode === "love" && tx.love.note ? `<p class="love-note">※${esc(tx.love.note)}</p>` : ""}
-      <p class="note">※ 診断用の演出です。本人の発言とは限りません</p>
+      <p class="note">${esc(quoteDisclaimer(id, mode))}</p>
     </section>
     <div style="display:grid;gap:8px;margin:16px 0">
       <a class="btn start" data-fresh="${mode}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a></div>

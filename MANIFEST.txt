@@ -1,14 +1,14 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 20a9dbe-202610291637
+版番号: ded76f5-202610291737
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
-合計サイズ: 31.56 MB
+合計サイズ: 31.57 MB
 
 主なフォルダ（ファイル数・サイズ）:
   app/og/                    201 件    25.66 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
-  app/                        23 件     0.36 MB
+  app/                        23 件     0.37 MB
   app/s/                     200 件     0.25 MB
   data/                        9 件     0.16 MB
   app/decor/                   4 件     0.07 MB
@@ -434,7 +434,7 @@
   app/icons/favicon.svg  1412
   app/index.html  3810
   app/legacy_data.js  1933
-  app/main.js  236148
+  app/main.js  236375
   app/meta.json  7869
   app/motion.css  2239
   app/motion.js  11554
@@ -539,7 +539,7 @@
   app/og/love/yoshida-shoin.png  146795
   app/og/love/zhuge-liang.png  130668
   app/og/normal/akechi-mitsuhide.png  110668
-  app/og/normal/alexander.png  119225
+  app/og/normal/alexander.png  128982
   app/og/normal/amundsen.png  121684
   app/og/normal/ariwara-narihira.png  110737
   app/og/normal/austen.png  110202
@@ -744,7 +744,7 @@
   app/s/love/yoshida-shoin.html  1259
   app/s/love/zhuge-liang.html  1230
   app/s/normal/akechi-mitsuhide.html  1233
-  app/s/normal/alexander.html  1241
+  app/s/normal/alexander.html  1296
   app/s/normal/amundsen.html  1204
   app/s/normal/ariwara-narihira.html  1236
   app/s/normal/austen.html  1244
@@ -860,7 +860,7 @@
   data/questions_friend.json  2997
   data/questions_love.json  6455
   data/rules.json  6121
-  data/texts.json  117401
+  data/texts.json  117434
   data/types.json  20106
   index.html  450
   robots.txt  265
