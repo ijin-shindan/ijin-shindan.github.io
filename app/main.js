@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=e1daf6f-202610300546";
-import { mountMotion } from "./motion.js?v=e1daf6f-202610300546";
-import { mountGuide } from "./guide.js?v=e1daf6f-202610300546";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=305f651-202610300646";
+import { mountMotion } from "./motion.js?v=305f651-202610300646";
+import { mountGuide } from "./guide.js?v=305f651-202610300646";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=e1daf6f-202610300546";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=e1daf6f-202610300546";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=e1daf6f-202610300546";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=e1daf6f-202610300546";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=e1daf6f-202610300546";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=e1daf6f-202610300546";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=e1daf6f-202610300546";
-import { storedResultMatches, storedList } from "./stored_result.js?v=e1daf6f-202610300546";
-import { clearPrefixedStorage } from "./storage_clear.js?v=e1daf6f-202610300546";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=e1daf6f-202610300546";
-import { applyZukanBatch } from "./zukan_batch.js?v=e1daf6f-202610300546";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=305f651-202610300646";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=305f651-202610300646";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=305f651-202610300646";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=305f651-202610300646";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=305f651-202610300646";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=305f651-202610300646";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=305f651-202610300646";
+import { storedResultMatches, storedList } from "./stored_result.js?v=305f651-202610300646";
+import { clearPrefixedStorage } from "./storage_clear.js?v=305f651-202610300646";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=305f651-202610300646";
+import { applyZukanBatch } from "./zukan_batch.js?v=305f651-202610300646";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=e1daf6f-202610300546")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=305f651-202610300646")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -804,7 +804,9 @@ function topQuizCtas() {
   const resumeLinks = resumable.map((mode) => `<button class="btn ${mode === primary ? "start" : "sub"}" type="button" data-resume-top="${mode}">${mode === "love" ? "恋愛診断" : "性格診断"}${progress[mode].answers.length === 12 ? "の回答を見直す" : "の続きから"}（${progress[mode].answers.length} / 12）</button>`).join("");
   const freshLinks = ["normal", "love"].map((mode) => {
     const label = mode === "love" ? "恋愛診断" : "性格診断";
-    const text = `${mode === "love" && !progress[mode] ? "💘 " : ""}${label}を${progress[mode] ? "最初から" : ""}始める`;
+    const text = topResumeSnapshots[mode].status === "invalid"
+      ? `${mode === "love" ? "💘 " : ""}${label}の途中記録を確認する`
+      : `${mode === "love" && !progress[mode] ? "💘 " : ""}${label}を${progress[mode] ? "最初から" : ""}始める`;
     const cls = mode === primary && !progress[mode] ? "start" : mode === "love" ? "love-sub" : "sub";
     return `<a class="btn ${cls}" data-fresh="${mode}" data-src="top" href="#/q/${mode}">${text}</a>${completed[mode] ? `<p class="quiz-save-warning" data-fresh-clear-warning>${label}の結果は保存済みです。新しく始めるには、残っている途中の記録を消す必要があります。消せない場合は端末の保存設定を確認してください。</p>` : ""}`;
   }).join("");
