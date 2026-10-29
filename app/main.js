@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=ffa8c11-202610300343";
-import { mountMotion } from "./motion.js?v=ffa8c11-202610300343";
-import { mountGuide } from "./guide.js?v=ffa8c11-202610300343";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=ee28aa7-202610300441";
+import { mountMotion } from "./motion.js?v=ee28aa7-202610300441";
+import { mountGuide } from "./guide.js?v=ee28aa7-202610300441";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ffa8c11-202610300343";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ffa8c11-202610300343";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ffa8c11-202610300343";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ffa8c11-202610300343";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ffa8c11-202610300343";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ffa8c11-202610300343";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ffa8c11-202610300343";
-import { storedResultMatches, storedList } from "./stored_result.js?v=ffa8c11-202610300343";
-import { clearPrefixedStorage } from "./storage_clear.js?v=ffa8c11-202610300343";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ffa8c11-202610300343";
-import { applyZukanBatch } from "./zukan_batch.js?v=ffa8c11-202610300343";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ee28aa7-202610300441";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ee28aa7-202610300441";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ee28aa7-202610300441";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ee28aa7-202610300441";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ee28aa7-202610300441";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ee28aa7-202610300441";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ee28aa7-202610300441";
+import { storedResultMatches, storedList } from "./stored_result.js?v=ee28aa7-202610300441";
+import { clearPrefixedStorage } from "./storage_clear.js?v=ee28aa7-202610300441";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ee28aa7-202610300441";
+import { applyZukanBatch } from "./zukan_batch.js?v=ee28aa7-202610300441";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ffa8c11-202610300343")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ee28aa7-202610300441")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2259,7 +2259,7 @@ function renderMe() {
   const ok = (m, e) => verifiedResult(m, e);
   const date = (t) => {
     const d = new Date(t);
-    return t && Number.isFinite(d.getTime()) ? d.toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" }) : "";
+    return t && Number.isFinite(d.getTime()) ? d.toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" }) : "";
   };
   const row = (m, e, lbl, face, href = `#/r/${m}/${e.code}`) => `<a class="me-row" href="${href}">
       <img class="tile" src="${face ?? avatar(e.fig)}" alt="" style="${themeVars(fig(e.fig).type)}">
