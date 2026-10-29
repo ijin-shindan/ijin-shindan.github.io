@@ -7,9 +7,22 @@ export const BATTLE_EVEN_THRESHOLD = 0.05;
 const norm = (v) => Math.hypot(...v);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 
+export async function getJSON(url) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(url, attempt ? { cache: "reload" } : undefined);
+      if (!response.ok) throw Error(`HTTP ${response.status}: ${url}`);
+      return await response.json();
+    } catch (error) {
+      if (attempt) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+}
+
 export async function loadData(base = "../data/") {
   const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "questions_friend", "texts"];
-  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=ee28aa7-202610300441`).then((r) => r.json())));
+  const jsons = await Promise.all(names.map((n) => getJSON(`${base}${n}.json?v=e1daf6f-202610300546`)));
   return Object.fromEntries(names.map((n, i) => [n, jsons[i]]));
 }
 
