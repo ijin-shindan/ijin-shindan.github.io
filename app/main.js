@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=cd4b73c-202610292235";
-import { mountMotion } from "./motion.js?v=cd4b73c-202610292235";
-import { mountGuide } from "./guide.js?v=cd4b73c-202610292235";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=804ade2-202610300050";
+import { mountMotion } from "./motion.js?v=804ade2-202610300050";
+import { mountGuide } from "./guide.js?v=804ade2-202610300050";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=cd4b73c-202610292235";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=cd4b73c-202610292235";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=cd4b73c-202610292235";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=cd4b73c-202610292235";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=cd4b73c-202610292235";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=cd4b73c-202610292235";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=cd4b73c-202610292235";
-import { storedResultMatches, storedList } from "./stored_result.js?v=cd4b73c-202610292235";
-import { clearPrefixedStorage } from "./storage_clear.js?v=cd4b73c-202610292235";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=cd4b73c-202610292235";
-import { applyZukanBatch } from "./zukan_batch.js?v=cd4b73c-202610292235";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=804ade2-202610300050";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=804ade2-202610300050";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=804ade2-202610300050";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=804ade2-202610300050";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=804ade2-202610300050";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=804ade2-202610300050";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=804ade2-202610300050";
+import { storedResultMatches, storedList } from "./stored_result.js?v=804ade2-202610300050";
+import { clearPrefixedStorage } from "./storage_clear.js?v=804ade2-202610300050";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=804ade2-202610300050";
+import { applyZukanBatch } from "./zukan_batch.js?v=804ade2-202610300050";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=cd4b73c-202610292235")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=804ade2-202610300050")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -141,6 +141,9 @@ function closeSheet(restoreFocus = true) {
   }
   if (activeZukanView?.pending && location.hash.split("/")[1] === "zukan") {
     queueMicrotask(refreshZukanAfterExternalChange);
+  }
+  if (activeSelfResult?.pendingZukanRefresh && location.hash === `#/r/${activeSelfResult.mode}/${activeSelfResult.code}`) {
+    queueMicrotask(refreshSelfAfterExternalChange);
   }
 }
 function openSheet(html, trigger, objectUrl = null) {
@@ -1786,7 +1789,8 @@ function renderResult(mode, code) {
   attachMotion(f.name);
   // The label and controls on this page describe the current saved SELF only
   // while the same-mode authority still points to this answer code.
-  activeSelfResult = mine?.code === code ? { mode, code, otherFigure: otherFigureAtRender, unverified: false } : null;
+  activeSelfResult = mine?.code === code ? { mode, code, otherFigure: otherFigureAtRender,
+    zukanSignature: selfResultZukanSignature(pendingSnapshot, mode, code), unverified: false } : null;
 }
 
 // 結果リンクの表示。URLだけでは送り主が友達か本人か判断できない。
@@ -3251,6 +3255,14 @@ let selfViewGeneration = 0;
 let activeSelfResult = null;
 let activeSelfOverview = null;
 let externalSessionClearFailed = false;
+function selfResultZukanSignature(snapshot, mode, code) {
+  const zukan = readZukanStorage();
+  const discovered = Object.entries(zukan.zukan).filter(([id, entry]) =>
+    DISCOVER_SRC.has(entry.src) && SD.figures[id] && isFree(id)).length;
+  const pending = snapshot.status === "ok" && snapshot.state.pendingZukan.some((entry) =>
+    entry.mode === mode && entry.code === code);
+  return JSON.stringify([zukan.status, discovered, pending]);
+}
 function selfOverviewCurrentSignature(snapshot) {
   if (snapshot.status !== "ok") return null;
   return JSON.stringify(["normal", "love"].map((mode) => {
@@ -3498,6 +3510,42 @@ function refreshSelfAfterExternalChange() {
       focusPageHeading();
       return;
     }
+    const currentZukan = selfResultZukanSignature(snapshot, activeSelfResult.mode, activeSelfResult.code);
+    if (currentZukan !== activeSelfResult.zukanSignature) {
+      if (!sheet.hidden) {
+        activeSelfResult.pendingZukanRefresh = true;
+        return;
+      }
+      const scrollY = window.scrollY;
+      const focused = document.activeElement;
+      const hadAppFocus = app.contains(focused);
+      const focusedHref = hadAppFocus && focused.tagName === "A" ? focused.getAttribute("href") : null;
+      const focusedRetry = hadAppFocus && focused.hasAttribute?.("data-retry-self-zukan");
+      const openDetails = [...app.querySelectorAll("details")].flatMap((detail, index) => detail.open ? [index] : []);
+      const focusedSummary = hadAppFocus && focused.tagName === "SUMMARY"
+        ? [...app.querySelectorAll("summary")].indexOf(focused) : -1;
+      const focusedShare = hadAppFocus && focused.hasAttribute?.("data-share")
+        ? [focused.getAttribute("data-share"), [...app.querySelectorAll("[data-share]")]
+          .filter((button) => button.getAttribute("data-share") === focused.getAttribute("data-share")).indexOf(focused)] : null;
+      const focusedButton = hadAppFocus && focused.tagName === "BUTTON"
+        ? ["data-duo", "data-add-same-person"].find((name) => focused.hasAttribute(name)) : null;
+      route();
+      const details = [...app.querySelectorAll("details")];
+      for (const index of openDetails) if (details[index]) details[index].open = true;
+      window.scrollTo(0, scrollY);
+      let target = focusedRetry ? app.querySelector('a[href="#/zukan"]')
+        : focusedHref ? [...app.querySelectorAll("a[href]")].find((link) => link.getAttribute("href") === focusedHref)
+          : focusedSummary >= 0 ? [...app.querySelectorAll("summary")][focusedSummary]
+            : focusedShare ? [...app.querySelectorAll("[data-share]")].filter((button) => button.getAttribute("data-share") === focusedShare[0])[focusedShare[1]]
+              : focusedButton ? app.querySelector(`[${focusedButton}]`) : null;
+      if (target?.hidden && focusedShare) {
+        target = [...app.querySelectorAll("[data-share]")]
+          .find((button) => button.getAttribute("data-share") === focusedShare[0] && !button.hidden);
+      }
+      (target || (hadAppFocus ? app.querySelector('a[href="#/zukan"]') : null))?.focus({ preventScroll: true });
+      return;
+    }
+    activeSelfResult.pendingZukanRefresh = false;
   }
   if (activeSelfOverview && activeSelfOverview.hash === location.hash) {
     const snapshot = selfStateSnapshot();
