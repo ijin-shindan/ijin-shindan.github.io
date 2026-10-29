@@ -1,11 +1,11 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 260c6f1-202610291044
+版番号: 69d3e7f-202610291443
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
-合計サイズ: 31.55 MB
+合計サイズ: 31.56 MB
 
 主なフォルダ（ファイル数・サイズ）:
-  app/og/                    201 件    25.65 MB
+  app/og/                    201 件    25.66 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
   app/                        23 件     0.36 MB
@@ -568,7 +568,7 @@
   app/og/normal/hojo-masako.png  105675
   app/og/normal/hojo-soun.png  120056
   app/og/normal/hojo-ujiyasu.png  112366
-  app/og/normal/hojo-yasutoki.png  111628
+  app/og/normal/hojo-yasutoki.png  118014
   app/og/normal/honda-tadakatsu.png  153521
   app/og/normal/ii-naomasa.png  118523
   app/og/normal/ikkyu.png  116113
@@ -773,7 +773,7 @@
   app/s/normal/hojo-masako.html  1207
   app/s/normal/hojo-soun.html  1202
   app/s/normal/hojo-ujiyasu.html  1217
-  app/s/normal/hojo-yasutoki.html  1233
+  app/s/normal/hojo-yasutoki.html  1239
   app/s/normal/honda-tadakatsu.html  1241
   app/s/normal/ii-naomasa.html  1197
   app/s/normal/ikkyu.html  1198
@@ -860,7 +860,7 @@
   data/questions_friend.json  2997
   data/questions_love.json  6455
   data/rules.json  6121
-  data/texts.json  116993
+  data/texts.json  117149
   data/types.json  20106
   index.html  450
   robots.txt  265
