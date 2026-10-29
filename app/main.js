@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=42f0b0a-202610300140";
-import { mountMotion } from "./motion.js?v=42f0b0a-202610300140";
-import { mountGuide } from "./guide.js?v=42f0b0a-202610300140";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=ffa8c11-202610300343";
+import { mountMotion } from "./motion.js?v=ffa8c11-202610300343";
+import { mountGuide } from "./guide.js?v=ffa8c11-202610300343";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=42f0b0a-202610300140";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=42f0b0a-202610300140";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=42f0b0a-202610300140";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=42f0b0a-202610300140";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=42f0b0a-202610300140";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=42f0b0a-202610300140";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=42f0b0a-202610300140";
-import { storedResultMatches, storedList } from "./stored_result.js?v=42f0b0a-202610300140";
-import { clearPrefixedStorage } from "./storage_clear.js?v=42f0b0a-202610300140";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=42f0b0a-202610300140";
-import { applyZukanBatch } from "./zukan_batch.js?v=42f0b0a-202610300140";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ffa8c11-202610300343";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ffa8c11-202610300343";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ffa8c11-202610300343";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ffa8c11-202610300343";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ffa8c11-202610300343";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ffa8c11-202610300343";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ffa8c11-202610300343";
+import { storedResultMatches, storedList } from "./stored_result.js?v=ffa8c11-202610300343";
+import { clearPrefixedStorage } from "./storage_clear.js?v=ffa8c11-202610300343";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ffa8c11-202610300343";
+import { applyZukanBatch } from "./zukan_batch.js?v=ffa8c11-202610300343";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=42f0b0a-202610300140")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ffa8c11-202610300343")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2502,11 +2502,19 @@ function renderAbout() {
 function renderUnavailable() {
   const [, page, mode] = location.hash.split("/");
   const planned = ["fr", "invite", "ask", "answer", "reply"].includes(page) || (["q", "r"].includes(page) && ["friend", "other"].includes(mode));
-  document.title = planned ? "招待・他己診断は開発中｜世界の偉人性格診断" : "このリンクは開けません｜世界の偉人性格診断";
+  const oldSelf = page === "legacy" || page === "saved-readonly";
+  document.title = planned ? "招待・他己診断は開発中｜世界の偉人性格診断"
+    : oldSelf ? "照合前の結果を表示できません｜世界の偉人性格診断"
+      : "このリンクは開けません｜世界の偉人性格診断";
   app.style.cssText = "";
-  app.innerHTML = `<section class="card"><h1>${planned ? '招待・他己診断 <span class="dev-badge">※開発中</span>' : 'このリンクは開けませんでした'}</h1>
-    <p>${planned ? (["fr", "invite"].includes(page) ? "古い招待リンクは現在使えません。" : "招待・他己診断は公開準備中です。") + "このリンクから相手への回答は送れません。" : page === "person" ? "カードの記録が変わったか、古いカードのリンクです。人物カード一覧から選び直してください。" : "リンクが途中で切れているか、対応していない形式です。"}性格版・恋愛版の自己診断は無料で遊べます。</p>
+  app.innerHTML = `<section class="card"><h1>${planned ? '招待・他己診断 <span class="dev-badge">※開発中</span>'
+    : oldSelf ? '照合前の結果を表示できません' : 'このリンクは開けませんでした'}</h1>
+    <p>${planned ? (["fr", "invite"].includes(page) ? "古い招待リンクは現在使えません。" : "招待・他己診断は公開準備中です。") + "このリンクから相手への回答は送れません。性格版・恋愛版の自己診断は無料で遊べます。"
+      : oldSelf ? "端末の記録が変わったか、この結果を現在の保存欄で確認できません。端末の記録から確認してください。"
+        : page === "person" ? "カードの記録が変わったか、古いカードのリンクです。人物カード一覧から選び直してください。性格版・恋愛版の自己診断は無料で遊べます。"
+          : "リンクが途中で切れているか、対応していない形式です。性格版・恋愛版の自己診断は無料で遊べます。"}</p>
     ${page === "person" ? '<a class="btn sub" href="#/people">人物カード一覧へ</a>' : ""}
+    ${oldSelf ? '<a class="btn sub" href="#/me">この端末の記録を見る</a>' : ""}
     <a class="btn start" href="#/q/normal">${esc(quizEntryLabel("normal", "自分の診断を始める"))}</a>
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
   window.scrollTo(0, 0);
@@ -3198,10 +3206,9 @@ function renderFigure(mode, id) {
 
 // Broken legacy synchronization never turns an unverified answer into SELF or
 // a friend's card. These routes only allow inspection of already stored data.
-function renderSelfReadOnly(mode, code, kind) {
-  const snapshot = selfStateSnapshot();
+function selfReadOnlyAllowed(snapshot, mode, code, kind) {
   if (!["legacy_changed", "legacy_unverified"].includes(snapshot.status)
-    || !engines[mode] || !validCode(engines[mode], code)) return renderUnavailable();
+    || !engines[mode] || !validCode(engines[mode], code)) return false;
   let allowed = false;
   if (kind === "saved-readonly") {
     const state = snapshot.state;
@@ -3210,14 +3217,19 @@ function renderSelfReadOnly(mode, code, kind) {
   } else if (kind === "legacy" && snapshot.status === "legacy_changed") {
     const key = `ijin.me.${mode}`;
     let raw;
-    try { raw = localStorage.getItem(key); } catch { return renderUnavailable(); }
+    try { raw = localStorage.getItem(key); } catch { return false; }
     if (raw !== null && raw !== snapshot.state.legacySnapshot?.[key]) {
       let entry;
-      try { entry = JSON.parse(raw); } catch { return renderUnavailable(); }
+      try { entry = JSON.parse(raw); } catch { return false; }
       allowed = verifiedResult(mode, entry) && entry.code === code;
     }
   }
-  if (!allowed) return renderUnavailable();
+  return allowed;
+}
+function renderSelfReadOnly(mode, code, kind) {
+  const snapshot = selfStateSnapshot();
+  if (!selfReadOnlyAllowed(snapshot, mode, code, kind)) return renderUnavailable();
+  activeSelfReadOnly = { hash: location.hash, mode, code, kind };
   const result = engines[mode].diagnose(answersOf(engines[mode], code));
   document.title = `照合前の結果｜世界の偉人性格診断`;
   app.style.cssText = themeVars(result.type.id);
@@ -3254,6 +3266,7 @@ let lastRevokedState = null;
 let selfViewGeneration = 0;
 let activeSelfResult = null;
 let activeSelfOverview = null;
+let activeSelfReadOnly = null;
 let externalSessionClearFailed = false;
 function selfResultZukanSignature(snapshot, mode, code) {
   const zukan = readZukanStorage();
@@ -3382,6 +3395,7 @@ function route() {
   revokeStaleSelfView();
   activeSelfResult = null;
   activeSelfOverview = null;
+  activeSelfReadOnly = null;
   activePeopleCardsView = null;
   activePersonCardView = null;
   activeZukanView = null;
@@ -3489,6 +3503,13 @@ function refreshZukanAfterExternalChange() {
 }
 function refreshSelfAfterExternalChange() {
   if (revokeStaleSelfView()) {
+    route();
+    focusPageHeading();
+    return;
+  }
+  const readOnly = activeSelfReadOnly;
+  if (readOnly?.hash === location.hash
+    && !selfReadOnlyAllowed(selfStateSnapshot(), readOnly.mode, readOnly.code, readOnly.kind)) {
     route();
     focusPageHeading();
     return;
