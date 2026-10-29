@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=dc70087-202610292136";
-import { mountMotion } from "./motion.js?v=dc70087-202610292136";
-import { mountGuide } from "./guide.js?v=dc70087-202610292136";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=cd4b73c-202610292235";
+import { mountMotion } from "./motion.js?v=cd4b73c-202610292235";
+import { mountGuide } from "./guide.js?v=cd4b73c-202610292235";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=dc70087-202610292136";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=dc70087-202610292136";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=dc70087-202610292136";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=dc70087-202610292136";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=dc70087-202610292136";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=dc70087-202610292136";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=dc70087-202610292136";
-import { storedResultMatches, storedList } from "./stored_result.js?v=dc70087-202610292136";
-import { clearPrefixedStorage } from "./storage_clear.js?v=dc70087-202610292136";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=dc70087-202610292136";
-import { applyZukanBatch } from "./zukan_batch.js?v=dc70087-202610292136";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=cd4b73c-202610292235";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=cd4b73c-202610292235";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=cd4b73c-202610292235";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=cd4b73c-202610292235";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=cd4b73c-202610292235";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=cd4b73c-202610292235";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=cd4b73c-202610292235";
+import { storedResultMatches, storedList } from "./stored_result.js?v=cd4b73c-202610292235";
+import { clearPrefixedStorage } from "./storage_clear.js?v=cd4b73c-202610292235";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=cd4b73c-202610292235";
+import { applyZukanBatch } from "./zukan_batch.js?v=cd4b73c-202610292235";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=dc70087-202610292136")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=cd4b73c-202610292235")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -138,6 +138,9 @@ function closeSheet(restoreFocus = true) {
   }
   if (activePersonCardView?.pending && location.hash === activePersonCardView.hash) {
     queueMicrotask(refreshPersonCardAfterExternalChange);
+  }
+  if (activeZukanView?.pending && location.hash.split("/")[1] === "zukan") {
+    queueMicrotask(refreshZukanAfterExternalChange);
   }
 }
 function openSheet(html, trigger, objectUrl = null) {
@@ -2173,6 +2176,7 @@ function capturedSelfResultViewGuard(mode, code, requireCurrent) {
 }
 
 // ---------------- 図鑑 ----------------
+let activeZukanView = null;
 function watchZukanImage(img) {
   if (!img) return;
   const showFallback = () => img.parentElement?.classList.add("image-failed");
@@ -2183,6 +2187,7 @@ function renderZukan() {
   document.title = "図鑑｜世界の偉人性格診断";
   const snapshot = readZukanStorage();
   const z = snapshot.zukan;
+  activeZukanView = { status: snapshot.status, raw: snapshot.raw, pending: false };
   app.style.cssText = "";
   const zPct = Math.round((zukanCount() / Math.max(1, FREE.length)) * 100);
   app.innerHTML = `
@@ -3360,6 +3365,7 @@ function route() {
   activeSelfOverview = null;
   activePeopleCardsView = null;
   activePersonCardView = null;
+  activeZukanView = null;
   queueMicrotask(showGlobalSelfWarning);
   disposeGuide();
   disposeGuide = () => {};
@@ -3434,6 +3440,34 @@ addEventListener("keydown", (e) => {
 addEventListener("pagehide", () => {
   if (quiz && quiz.answers.length && !quiz.abandonSent) { quiz.abandonSent = true; track("quiz_abandon", { mode: quiz.mode, n: quiz.answers.length, source: quiz.source }); }
 });
+function refreshZukanAfterExternalChange() {
+  if (location.hash.split("/")[1] !== "zukan" || !activeZukanView) return;
+  const latest = readZukanStorage();
+  if (latest.status === activeZukanView.status && latest.raw === activeZukanView.raw) {
+    activeZukanView.pending = false;
+    return;
+  }
+  if (!sheet.hidden) {
+    activeZukanView.pending = true;
+    return;
+  }
+  const scrollY = window.scrollY;
+  const focused = document.activeElement;
+  const focusId = app.contains(focused) ? focused?.dataset?.id : null;
+  const focusHref = app.contains(focused) && focused.tagName === "A" ? focused.getAttribute("href") : null;
+  const focusExport = app.contains(focused) && focused.hasAttribute?.("data-export-zukan");
+  renderZukan();
+  window.scrollTo(0, scrollY);
+  if (!focusId && !focusHref && !focusExport) return;
+  const target = focusId ? [...app.querySelectorAll(".zcell")].find((cell) => cell.dataset.id === focusId)
+    : focusHref ? [...app.querySelectorAll("a[href]")].find((link) => link.getAttribute("href") === focusHref)
+      : app.querySelector("[data-export-zukan]");
+  if (target) target.focus({ preventScroll: true });
+  else {
+    const heading = app.querySelector("h1");
+    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  }
+}
 function refreshSelfAfterExternalChange() {
   if (revokeStaleSelfView()) {
     route();
@@ -3442,6 +3476,7 @@ function refreshSelfAfterExternalChange() {
   }
   refreshPeopleCardsAfterExternalChange();
   refreshPersonCardAfterExternalChange();
+  refreshZukanAfterExternalChange();
   if (activeSelfResult) {
     const snapshot = selfStateSnapshot();
     if (snapshot.status !== "ok") {
