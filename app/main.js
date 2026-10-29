@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=328c47d-202610291536";
-import { mountMotion } from "./motion.js?v=328c47d-202610291536";
-import { mountGuide } from "./guide.js?v=328c47d-202610291536";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=20a9dbe-202610291637";
+import { mountMotion } from "./motion.js?v=20a9dbe-202610291637";
+import { mountGuide } from "./guide.js?v=20a9dbe-202610291637";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=328c47d-202610291536";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=328c47d-202610291536";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=328c47d-202610291536";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=328c47d-202610291536";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=328c47d-202610291536";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=328c47d-202610291536";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=328c47d-202610291536";
-import { storedResultMatches, storedList } from "./stored_result.js?v=328c47d-202610291536";
-import { clearPrefixedStorage } from "./storage_clear.js?v=328c47d-202610291536";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=328c47d-202610291536";
-import { applyZukanBatch } from "./zukan_batch.js?v=328c47d-202610291536";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=20a9dbe-202610291637";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=20a9dbe-202610291637";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=20a9dbe-202610291637";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=20a9dbe-202610291637";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=20a9dbe-202610291637";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=20a9dbe-202610291637";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=20a9dbe-202610291637";
+import { storedResultMatches, storedList } from "./stored_result.js?v=20a9dbe-202610291637";
+import { clearPrefixedStorage } from "./storage_clear.js?v=20a9dbe-202610291637";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=20a9dbe-202610291637";
+import { applyZukanBatch } from "./zukan_batch.js?v=20a9dbe-202610291637";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=328c47d-202610291536")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=20a9dbe-202610291637")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);

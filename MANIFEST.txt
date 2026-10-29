@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 328c47d-202610291536
+版番号: 20a9dbe-202610291637
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
 合計サイズ: 31.56 MB
@@ -562,7 +562,7 @@
   app/og/normal/helen-keller.png  106041
   app/og/normal/higuchi-ichiyo.png  117479
   app/og/normal/hijikata-toshizo.png  112232
-  app/og/normal/himiko.png  113030
+  app/og/normal/himiko.png  109554
   app/og/normal/hino-tomiko.png  114314
   app/og/normal/hiraga-gennai.png  113619
   app/og/normal/hojo-masako.png  105675
@@ -767,7 +767,7 @@
   app/s/normal/helen-keller.html  1247
   app/s/normal/higuchi-ichiyo.html  1240
   app/s/normal/hijikata-toshizo.html  1245
-  app/s/normal/himiko.html  1202
+  app/s/normal/himiko.html  1205
   app/s/normal/hino-tomiko.html  1213
   app/s/normal/hiraga-gennai.html  1215
   app/s/normal/hojo-masako.html  1207
@@ -860,7 +860,7 @@
   data/questions_friend.json  2997
   data/questions_love.json  6455
   data/rules.json  6121
-  data/texts.json  117245
+  data/texts.json  117401
   data/types.json  20106
   index.html  450
   robots.txt  265
