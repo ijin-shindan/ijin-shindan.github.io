@@ -9,7 +9,7 @@ const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 
 export async function loadData(base = "../data/") {
   const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "questions_friend", "texts"];
-  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=69d3e7f-202610291443`).then((r) => r.json())));
+  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=328c47d-202610291536`).then((r) => r.json())));
   return Object.fromEntries(names.map((n, i) => [n, jsons[i]]));
 }
 
