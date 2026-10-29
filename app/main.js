@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=ded76f5-202610291737";
-import { mountMotion } from "./motion.js?v=ded76f5-202610291737";
-import { mountGuide } from "./guide.js?v=ded76f5-202610291737";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=c97e5b5-202610291842";
+import { mountMotion } from "./motion.js?v=c97e5b5-202610291842";
+import { mountGuide } from "./guide.js?v=c97e5b5-202610291842";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=ded76f5-202610291737";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=ded76f5-202610291737";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=ded76f5-202610291737";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=ded76f5-202610291737";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=ded76f5-202610291737";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=ded76f5-202610291737";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=ded76f5-202610291737";
-import { storedResultMatches, storedList } from "./stored_result.js?v=ded76f5-202610291737";
-import { clearPrefixedStorage } from "./storage_clear.js?v=ded76f5-202610291737";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=ded76f5-202610291737";
-import { applyZukanBatch } from "./zukan_batch.js?v=ded76f5-202610291737";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=c97e5b5-202610291842";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=c97e5b5-202610291842";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=c97e5b5-202610291842";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=c97e5b5-202610291842";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=c97e5b5-202610291842";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=c97e5b5-202610291842";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=c97e5b5-202610291842";
+import { storedResultMatches, storedList } from "./stored_result.js?v=c97e5b5-202610291842";
+import { clearPrefixedStorage } from "./storage_clear.js?v=c97e5b5-202610291842";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=c97e5b5-202610291842";
+import { applyZukanBatch } from "./zukan_batch.js?v=c97e5b5-202610291842";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=ded76f5-202610291737")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=c97e5b5-202610291842")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2157,6 +2157,12 @@ function capturedSelfResultViewGuard(mode, code, requireCurrent) {
 }
 
 // ---------------- 図鑑 ----------------
+function watchZukanImage(img) {
+  if (!img) return;
+  const showFallback = () => img.parentElement?.classList.add("image-failed");
+  img.addEventListener("error", showFallback, { once: true });
+  if (img.complete && img.naturalWidth === 0) showFallback();
+}
 function renderZukan() {
   document.title = "図鑑｜世界の偉人性格診断";
   const snapshot = readZukanStorage();
@@ -2173,7 +2179,7 @@ function renderZukan() {
       <div class="zcells">${t.figures.map((f, k) => {
         const st = k > MAX_TIER ? "locked" : z[f.id] ? (DISCOVER_SRC.has(z[f.id].src) ? "me" : "known") : "unseen";
         return `<button class="zcell ${st}" data-id="${f.id}" data-st="${st}" style="--t-bg:${THEMES[t.id].bg}"
-          aria-label="${st === "me" ? `${esc(f.name)}（${esc(t.name)} ★${k + 1} 発見済み）` : st === "known" ? `${esc(f.name)}（${esc(t.name)} ★${k + 1} 未発見）` : `${esc(t.name)} ★${k + 1} 未発見`}"><img src="${avatar(f.id, st !== "me")}" alt="">
+          aria-label="${st === "me" ? `${esc(f.name)}（${esc(t.name)} ★${k + 1} 発見済み）` : st === "known" ? `${esc(f.name)}（${esc(t.name)} ★${k + 1} 未発見）` : `${esc(t.name)} ★${k + 1} 未発見`}"><img src="${avatar(f.id, st !== "me")}" alt=""><span class="z-fallback" aria-hidden="true">${st === "me" ? "発見" : "？"}</span>
           <span class="star">★${k + 1}</span>${st === "known" ? `<span class="znm">${esc(f.name)}</span>` : ""}${st === "locked" || st === "known" ? '<span class="lock">🔒</span>' : ""}</button>`;
       }).join("")}</div></div>`).join("")}
     <div style="display:grid;gap:10px"><a class="btn sub" href="#/me">この端末の記録</a><a class="btn sub" href="#/">トップへ</a></div>`;
@@ -2183,6 +2189,7 @@ function renderZukan() {
     try { exportDamagedZukanRaw(snapshot.raw); }
     catch { toast("元の図鑑記録を保存できませんでした"); }
   });
+  app.querySelectorAll(".zcell img").forEach(watchZukanImage);
   app.querySelectorAll(".zcell").forEach((b) => (b.onclick = () => {
     const { id, st } = b.dataset;
     if (st === "locked") return toast("この人物は現在の図鑑では表示できません");
@@ -2191,7 +2198,7 @@ function renderZukan() {
     const tx = texts[id];
     const srcTxt = sourceLabels(id).join("・");
     openSheet(`<div class="panel"><div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
-        <img class="tile" src="${avatar(id)}" alt="" style="width:72px;height:72px;${themeVars(fig(id).type)}">
+        <div class="z-sheet-art tile" style="${themeVars(fig(id).type)}"><img src="${avatar(id)}" alt=""><span class="z-fallback" aria-hidden="true">画像を表示できません</span></div>
         <div><h2 id="sheet-title" style="margin:0">${esc(fig(id).name)}</h2><div class="note" style="text-align:left">${esc(sd_type(id).name)}・★${fig(id).tier + 1}</div>
           ${srcTxt ? `<div class="note" style="text-align:left">取得元：${esc(srcTxt)}</div>` : ""}</div></div>
       <p style="font-family:var(--serif);font-weight:900;margin:0 0 8px">「${esc(tx.serif)}」</p><p class="body">${esc(tx.body)}</p>
@@ -2199,6 +2206,7 @@ function renderZukan() {
       ${id === "mori-motonari" ? '<p class="note">※ 三本の矢は後世の伝説を図案化したものです</p>' : ""}
       <details><summary>元ネタを見る</summary><p>${esc(tx.motoneta.text)}</p></details>
       <button class="btn sub close" style="margin-top:14px">閉じる</button></div>`, b);
+    watchZukanImage(sheet.querySelector(".z-sheet-art img"));
   }));
   window.scrollTo(0, 0);
 }
