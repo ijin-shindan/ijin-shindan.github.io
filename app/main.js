@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, Shindan, loadData } from "./shindan.js?v=1a41003-202610290625";
-import { mountMotion } from "./motion.js?v=1a41003-202610290625";
-import { mountGuide } from "./guide.js?v=1a41003-202610290625";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, loadData } from "./shindan.js?v=260c6f1-202610291044";
+import { mountMotion } from "./motion.js?v=260c6f1-202610291044";
+import { mountGuide } from "./guide.js?v=260c6f1-202610291044";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1a41003-202610290625";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1a41003-202610290625";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=1a41003-202610290625";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=1a41003-202610290625";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1a41003-202610290625";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1a41003-202610290625";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1a41003-202610290625";
-import { storedResultMatches, storedList } from "./stored_result.js?v=1a41003-202610290625";
-import { clearPrefixedStorage } from "./storage_clear.js?v=1a41003-202610290625";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1a41003-202610290625";
-import { applyZukanBatch } from "./zukan_batch.js?v=1a41003-202610290625";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=260c6f1-202610291044";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=260c6f1-202610291044";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=260c6f1-202610291044";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=260c6f1-202610291044";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=260c6f1-202610291044";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=260c6f1-202610291044";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=260c6f1-202610291044";
+import { storedResultMatches, storedList } from "./stored_result.js?v=260c6f1-202610291044";
+import { clearPrefixedStorage } from "./storage_clear.js?v=260c6f1-202610291044";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=260c6f1-202610291044";
+import { applyZukanBatch } from "./zukan_batch.js?v=260c6f1-202610291044";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 const getJSON = (u) => fetch(u).then((r) => r.json());
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=1a41003-202610290625")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=260c6f1-202610291044")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1310,7 +1310,7 @@ function reasonText(sd, a, b, strong, names = ["あなた", "相手"]) {  // 勝
   return strong ? `${A}の【${mine}】が、${B}の【${theirs}】に強みを出しやすい` : `${A}の【${mine}】は、${B}の【${theirs}】に押されやすい`;
 }
 
-// 相性の関係図：左はいつも「あなた」。矢印の向きで、どちらのタイプが得意かを見せる（性格タイプの組み合わせ。史実の勝ち負けではない）
+// 相性の関係図：左はいつも「あなた」。矢印の向きで、回答の6軸から見た得意・苦手を示す（史実の勝ち負けではない）。
 //   dir: "right"＝あなた→相手（得意） / "left"＝相手→あなた（苦手） / "both"＝互角
 function relRow({ label, me, other, dir, verb, cls, why, meWho = "あなた", otherWho = "相手", otherFace }) {
   const side = (id, who, src) => `<div class="rel-side"><img class="tile" src="${src ?? relFace(id)}" alt="" style="${themeVars(fig(id).type)}">
@@ -1321,11 +1321,11 @@ function relRow({ label, me, other, dir, verb, cls, why, meWho = "あなた", ot
     ${why ? `<p class="rel-why">${esc(why)}</p>` : ""}</div>`;
 }
 const verbsOf = (sd) => sd.modeConf.matchup_verbs ?? { strong: "得意", weak: "苦手" };  // 古いデータが残っていても動くように
-// 2人の性格タイプの相性（v = battle(あなた, 相手)）を関係図にする
+// 2人の回答から得た6軸の相性（v = battle(あなた, 相手)）を関係図にする
 function duelRow(sd, mu, ou, meId, otherId, { label, otherWho, otherFace }) {
   const v = sd.battle(mu, ou), vb = verbsOf(sd);
-  if (Math.abs(v) < 0.05) return relRow({ label: `${label}：互角`, me: meId, other: otherId, dir: "both", verb: "互角", cls: "even", why: "この組み合わせでは、どちらか一方が有利とは言いにくい", otherWho, otherFace });
-  const lead = sd.mode === "love" ? (v > 0 ? "あなたがリードしやすい" : `${otherWho}に振り回されやすい`) : (v > 0 ? "あなたのタイプが少し有利" : `${otherWho}のタイプが少し有利`);
+  if (Math.abs(v) < BATTLE_EVEN_THRESHOLD) return relRow({ label: `${label}：互角`, me: meId, other: otherId, dir: "both", verb: "互角", cls: "even", why: "この組み合わせでは、どちらか一方が有利とは言いにくい", otherWho, otherFace });
+  const lead = sd.mode === "love" ? (v > 0 ? "あなたがリードしやすい" : `${otherWho}に振り回されやすい`) : (v > 0 ? "あなたが少し有利" : `${otherWho}が少し有利`);
   return relRow({ label: `${label}：${lead}`, me: meId, other: otherId,
     dir: v > 0 ? "right" : "left", verb: v > 0 ? vb.strong : vb.weak, cls: v > 0 ? "good" : "bad",
     why: reasonText(sd, mu, ou, v > 0, ["あなた", otherWho]), otherWho, otherFace });
@@ -1652,8 +1652,8 @@ function renderResult(mode, code) {
         <div class="chips">${tx.motoneta.search.map((s) => `<a class="chip" href="${search(s)}" target="_blank" rel="noopener">🔍 ${esc(s)}</a>`).join("")}</div></details>
     </section>
     <section class="card"><h2>相性</h2>
-      <p class="rel-note">性格タイプの組み合わせで見た相性です（史実の勝ち負けではありません）。矢印の先が、押されやすい側。</p>
-      <div class="rels">${friendHtml}${matchRow("strong", strongId)}${matchRow("weak", weakId)}${!friendHtml && !strongId && !weakId ? '<p class="note">この回答では、相性の候補を表示できませんでした。</p>' : ""}</div>
+      <p class="rel-note">回答の6つの軸で見た、遊びの相性です。史実の勝ち負けではありません。矢印の先が、押されやすい側。</p>
+      <div class="rels">${friendHtml}${matchRow("strong", strongId)}${matchRow("weak", weakId)}${!friendHtml && !strongId && !weakId ? '<p class="note">回答の6つの軸では、得意・苦手を分けられませんでした。</p>' : ""}</div>
       ${fateHtml ? `<div class="fate-wrap">${fateHtml}</div>` : ""}
     </section>
     <section class="card levelup"><h2>もしも…</h2>${levelHtml}</section>
@@ -1789,7 +1789,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
   } else if (!past && mine) {
     const mu = sd.score(answersOf(sd, mine.code));
     compat = `<section class="card"><h2>あなたとの相性</h2>
-      <p class="rel-note">性格タイプの組み合わせで見た相性です（史実の勝ち負けではありません）。矢印の先が、押されやすい側。</p>
+      <p class="rel-note">回答の6つの軸で見た、遊びの相性です。史実の勝ち負けではありません。矢印の先が、押されやすい側。</p>
       <div class="rels">${duelRow(sd, mu, r.u, mine.fig, f.id, { label: "結果リンクの偉人", otherWho: "リンクの結果", otherFace: avatar(f.id) })}</div></section>`;
   }
   if (fromSharedPage && !personCard && !past && !prevLink) track("friend_view", { mode, figure: f.id, has_mine: mine && validCode(sd, mine.code) ? "yes" : "no" });

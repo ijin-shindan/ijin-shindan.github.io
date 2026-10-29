@@ -2,13 +2,14 @@
 // 軸の順番は常に [O好奇, C規律, E社交, A協調, G胆力, M野心]。
 
 export const AXES = ["O", "C", "E", "A", "G", "M"];
+export const BATTLE_EVEN_THRESHOLD = 0.05;
 
 const norm = (v) => Math.hypot(...v);
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 
 export async function loadData(base = "../data/") {
   const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "questions_friend", "texts"];
-  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=1a41003-202610290625`).then((r) => r.json())));
+  const jsons = await Promise.all(names.map((n) => fetch(`${base}${n}.json?v=260c6f1-202610291044`).then((r) => r.json())));
   return Object.fromEntries(names.map((n, i) => [n, jsons[i]]));
 }
 
@@ -133,17 +134,13 @@ export class Shindan {
       if (o.winner === meFigId) strong.push(o.loser);
       else if (o.loser === meFigId) weak.push(o.winner);
     }
-    if (t.special === "balance") {
-      const sub = this.classify(u)[1];
-      u = u.map((x, i) => x + 0.1 * sub.unit[i]);
-    }
     const scored = this.types
       .filter((x) => x.unit && x.id !== t.id)
       .map((x) => [this.battle(u, x.unit), x])
       .sort((a, b) => a[0] - b[0]);
     const pick = (x) => x.figures[tier].id;
-    strong.push(...[...scored].reverse().filter((p) => p[0] > 0).map((p) => pick(p[1])));
-    weak.push(...scored.filter((p) => p[0] < 0).map((p) => pick(p[1])));
+    strong.push(...[...scored].reverse().filter((p) => p[0] >= BATTLE_EVEN_THRESHOLD).map((p) => pick(p[1])));
+    weak.push(...scored.filter((p) => p[0] <= -BATTLE_EVEN_THRESHOLD).map((p) => pick(p[1])));
     // 史実ネタの相手が鍵つきの段階なら出さない（無料版では名前を見せないため）
     const ok = (id) => this.figures[id].tier <= this.plan.max_tier;
     return { strong: strong.filter(ok).slice(0, n), weak: weak.filter(ok).slice(0, n) };
