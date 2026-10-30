@@ -12,28 +12,40 @@
   <meta property="og:url" content="https://ijin-shindan.github.io/app/">
   <link rel="canonical" href="https://ijin-shindan.github.io/app/">
   <meta name="twitter:card" content="summary_large_image">
+  <script>
+    if (location.hash && location.hash !== '#' && location.hash !== '#/') {
+      document.documentElement.classList.add('boot-deep');
+    }
+  </script>
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=1aa5c5e-202610301707">
+  <link rel="stylesheet" href="style.css?v=06bf198-202610301802">
   <link rel="stylesheet" href="motion.css?v=5">
   <link rel="stylesheet" href="guide.css?v=6">
 </head>
 <body>
   <main id="app">
-    <section class="hero">
-      <div class="seal">偉</div>
-      <div id="guide"></div>
-      <h1>100人の偉人のうち、<br>あなたは誰？</h1>
-      <p class="sub">12問・約1分半・登録なし</p>
-    </section>
-    <div class="cta">
-      <a class="btn start" href="#/q/normal">診断スタート</a>
-      <a class="btn love-sub" href="#/q/love">💘 恋愛バージョンもある</a>
+    <div id="boot-static-top">
+      <section class="hero">
+        <div class="seal">偉</div>
+        <div id="guide"></div>
+        <h1>100人の偉人のうち、<br>あなたは誰？</h1>
+        <p class="sub">12問・約1分半・登録なし</p>
+      </section>
+      <div class="cta">
+        <a class="btn start" href="#/q/normal">診断スタート</a>
+        <a class="btn love-sub" href="#/q/love">💘 恋愛バージョンもある</a>
+      </div>
+      <p class="boot-status" id="boot-status" role="status" aria-live="polite"></p>
     </div>
-    <p class="boot-status" id="boot-status" role="status" aria-live="polite"></p>
+    <section class="card boot-deep-wait" id="boot-deep-wait" role="status">
+      <div class="seal" aria-hidden="true">偉</div>
+      <h1>ページを開いています</h1>
+      <p>少し待ってね。</p>
+    </section>
     <noscript>
-      <style>.cta,.teaser{display:none!important}</style>
+      <style>#boot-static-top,#boot-deep-wait{display:none!important}</style>
       <section class="card" role="alert">
         <h2>JavaScriptがオフのため、診断を始められません</h2>
         <p>JavaScriptを有効にして、ページをもう一度読み込んでください。この操作では答えや端末の記録を消しません。</p>
@@ -42,7 +54,7 @@
   </main>
   <div id="overlay" hidden></div>
   <div id="sheet" hidden></div>
-  <script type="module" src="main.js?v=1aa5c5e-202610301707"></script>
+  <script type="module" src="main.js?v=06bf198-202610301802"></script>
   <script>
     let bootFailed = false;
     function showBootFailure() {
@@ -65,6 +77,10 @@
       app.replaceChildren(alert);
     }
     document.querySelector('script[type="module"]').addEventListener('error', showBootFailure);
+    window.addEventListener('hashchange', () => {
+      if (window.__ijinReady || window.__ijinBootErrorHandled || bootFailed) return;
+      document.documentElement.classList.toggle('boot-deep', !!location.hash && location.hash !== '#' && location.hash !== '#/');
+    });
     window.addEventListener('error', (event) => {
       if (!event.filename || window.__ijinReady || window.__ijinBootErrorHandled) return;
       const script = new URL(event.filename, location.href);

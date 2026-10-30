@@ -22,7 +22,7 @@ export async function getJSON(url) {
 
 export async function loadData(base = "../data/") {
   const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "questions_friend", "texts"];
-  const jsons = await Promise.all(names.map((n) => getJSON(`${base}${n}.json?v=1aa5c5e-202610301707`)));
+  const jsons = await Promise.all(names.map((n) => getJSON(`${base}${n}.json?v=06bf198-202610301802`)));
   return Object.fromEntries(names.map((n, i) => [n, jsons[i]]));
 }
 
