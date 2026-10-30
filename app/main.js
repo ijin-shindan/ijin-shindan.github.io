@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=498156e-202610300747";
-import { mountMotion } from "./motion.js?v=498156e-202610300747";
-import { mountGuide } from "./guide.js?v=498156e-202610300747";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=148f2dd-202610301050";
+import { mountMotion } from "./motion.js?v=148f2dd-202610301050";
+import { mountGuide } from "./guide.js?v=148f2dd-202610301050";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=498156e-202610300747";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=498156e-202610300747";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=498156e-202610300747";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=498156e-202610300747";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=498156e-202610300747";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=498156e-202610300747";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=498156e-202610300747";
-import { storedResultMatches, storedList } from "./stored_result.js?v=498156e-202610300747";
-import { clearPrefixedStorage } from "./storage_clear.js?v=498156e-202610300747";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=498156e-202610300747";
-import { applyZukanBatch } from "./zukan_batch.js?v=498156e-202610300747";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=148f2dd-202610301050";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=148f2dd-202610301050";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=148f2dd-202610301050";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=148f2dd-202610301050";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=148f2dd-202610301050";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=148f2dd-202610301050";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=148f2dd-202610301050";
+import { storedResultMatches, storedList } from "./stored_result.js?v=148f2dd-202610301050";
+import { clearPrefixedStorage } from "./storage_clear.js?v=148f2dd-202610301050";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=148f2dd-202610301050";
+import { applyZukanBatch } from "./zukan_batch.js?v=148f2dd-202610301050";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=498156e-202610300747")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=148f2dd-202610301050")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1960,6 +1960,7 @@ function runReveal(r, mode, short, onFinish = null) {
   const card = $(".rcard"), stage = $(".stage"), lvEl = $(".meta-row .lv b");
   const t = r.type, tl = typeLabel(t, mode);
   let done = false;
+  let stopCountUp = null;
   const focusResult = () => {
     const heading = card.querySelector("h1");
     if (heading?.isConnected) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -1968,6 +1969,7 @@ function runReveal(r, mode, short, onFinish = null) {
     if (done) return;
     done = true;
     clearTimers();
+    stopCountUp?.();
     const focusWasOverlay = overlay.contains(document.activeElement);
     overlay.hidden = true; overlay.className = ""; overlay.innerHTML = "";
     app.inert = false;
@@ -1984,7 +1986,7 @@ function runReveal(r, mode, short, onFinish = null) {
     later(t0, () => { overlay.hidden = true; app.inert = false; card.classList.add("reveal"); stage.dataset.state = "sil"; focusResult(); });
     later(t0 + 500, () => { stage.dataset.state = "color"; });
     card.querySelectorAll(".stars .on").forEach((el, k) => { el.style.opacity = 0; later(t0 + 700 + k * 180, () => (el.style.opacity = 1)); });
-    later(t0 + 1100, () => countUp(lvEl, r.lv, 450));
+    later(t0 + 1100, () => { stopCountUp = countUp(lvEl, r.lv, 450); });
     if (r.capped) later(t0 + 1600, () => { const lv = card.querySelector(".lv"); lv.classList.remove("capped"); void lv.offsetWidth; lv.classList.add("capped"); });
     later(t0 + 1700, () => finish(false));
   };
@@ -2011,8 +2013,16 @@ function runReveal(r, mode, short, onFinish = null) {
 }
 function countUp(el, to, ms) {
   const t0 = performance.now();
-  const step = (now) => { const p = Math.min(1, (now - t0) / ms); el.textContent = Math.max(1, Math.round(to * p * (2 - p))); if (p < 1) requestAnimationFrame(step); };
-  requestAnimationFrame(step);
+  let frame = 0;
+  let active = true;
+  const step = (now) => {
+    if (!active) return;
+    const p = Math.min(1, (now - t0) / ms);
+    el.textContent = Math.max(1, Math.round(to * p * (2 - p)));
+    if (p < 1) frame = requestAnimationFrame(step);
+  };
+  frame = requestAnimationFrame(step);
+  return () => { active = false; cancelAnimationFrame(frame); };
 }
 
 // ---------------- シェア画像（1080×1350、端末の中で作る） ----------------
