@@ -1,27 +1,27 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=148f2dd-202610301050";
-import { mountMotion } from "./motion.js?v=148f2dd-202610301050";
-import { mountGuide } from "./guide.js?v=148f2dd-202610301050";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=8d46d6a-202610301151";
+import { mountMotion } from "./motion.js?v=8d46d6a-202610301151";
+import { mountGuide } from "./guide.js?v=8d46d6a-202610301151";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=148f2dd-202610301050";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=148f2dd-202610301050";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=148f2dd-202610301050";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=148f2dd-202610301050";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=148f2dd-202610301050";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=148f2dd-202610301050";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=148f2dd-202610301050";
-import { storedResultMatches, storedList } from "./stored_result.js?v=148f2dd-202610301050";
-import { clearPrefixedStorage } from "./storage_clear.js?v=148f2dd-202610301050";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=148f2dd-202610301050";
-import { applyZukanBatch } from "./zukan_batch.js?v=148f2dd-202610301050";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=8d46d6a-202610301151";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=8d46d6a-202610301151";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=8d46d6a-202610301151";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=8d46d6a-202610301151";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=8d46d6a-202610301151";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=8d46d6a-202610301151";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=8d46d6a-202610301151";
+import { storedResultMatches, storedList } from "./stored_result.js?v=8d46d6a-202610301151";
+import { clearPrefixedStorage } from "./storage_clear.js?v=8d46d6a-202610301151";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=8d46d6a-202610301151";
+import { applyZukanBatch } from "./zukan_batch.js?v=8d46d6a-202610301151";
 
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=148f2dd-202610301050")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=8d46d6a-202610301151")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1573,6 +1573,9 @@ function renderResult(mode, code) {
   const validFriend = friend && typeof friend.code === "string" && typeof friend.fig === "string"
     && SD.figures[friend.fig] && validCode(sd, friend.code)
     && sd.diagnose(answersOf(sd, friend.code)).figure.id === friend.fig;
+  // A reload clears the one-render fresh source. Keep reply wording only for
+  // the shared result bound to this completed diagnostic attempt.
+  const replyToShared = freshSource === "friend" || Boolean(startedFromShared && validFriend);
   // The shared result compares real answers. Do not show that same figure a
   // second time using its generic type profile, which can point the other way.
   // Keep the original choices for Zukan registration; do not promote an
@@ -1652,20 +1655,20 @@ function renderResult(mode, code) {
     ${freshSaveStatus === "already_completed_not_current" ? '<p class="note" role="alert">この途中記録の診断は以前に完了しています。その後、自分の結果は別のものに戻されています。今回の画面は保存済みの現在結果ではなく、診断回数も増やしていません。</p>' : ""}
     ${freshSaveStatus === "legacy_possible_duplicate" ? '<p class="note" role="alert">旧版の途中記録と同じ回答の結果が、すでにこの端末にあります。前回の完了記録か判別できないため、診断回数を増やさず、途中記録も残しました。この結果は表示のみです。</p>' : ""}
     ${progressDeleteUnconfirmed ? '<p class="note" role="alert">途中の記録が消えたか確認できませんでした。この端末に残っている可能性があります。結果は表示できます。</p>' : ""}
-    ${freshSource === "friend" ? returnSharedHtml : ""}
-    <p class="note share-warning ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${freshSource === "friend" ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
+    ${replyToShared ? returnSharedHtml : ""}
+    <p class="note share-warning ${reveal ? "reveal-hide" : ""}" style="margin:12px 0 4px">${replyToShared ? "結果は自動では届きません。最初にリンクをくれた友達を選んで送ってください。" : "結果は自動では届きません。友達からリンクをもらった場合は、その相手を選んで返してください。"}結果リンクを知る人は、12問の答えを読み取れます。</p>
     <div class="share-row after ${reveal ? "reveal-hide" : ""}">
       <button class="btn primary wide" data-share="friend">${typeof navigator.share === "function"
-        ? (freshSource === "friend" ? "友達に結果を返す" : "友達に結果を送る")
+        ? (replyToShared ? "友達に結果を返す" : "友達に結果を送る")
         : "送る文章とリンクをコピー"}</button>
       <button class="btn sub" data-share="line">LINEで送る</button>
       <button class="btn sub" data-share="x">Xでポスト</button>
       <button class="btn sub" data-share="image">画像を保存</button>
       <button class="btn sub" data-share="copy">リンクをコピー</button>
     </div>
-    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${freshSource === "friend" ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}${typeof navigator.share !== "function" ? "コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。" : ""}</p>
+    <p class="note ${reveal ? "reveal-hide" : ""}" style="margin:4px 0 12px">画像だけでは友達が結果を開けません。${replyToShared ? "最初にリンクをくれた友達へ結果リンクを返してください。結果は自動では届きません。" : "友達には結果リンクを送ってください。"}${typeof navigator.share !== "function" ? "コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。" : ""}</p>
     ${!localSaveOk && freshSaveStatus !== "saved_zukan_pending" ? '<p class="note" role="alert">このブラウザでは結果または図鑑の登録を確認できませんでした。必要なら、このページのリンクを控えてください。</p>' : ""}
-    ${freshSource !== "friend" ? returnSharedHtml : ""}
+    ${!replyToShared ? returnSharedHtml : ""}
     ${(() => { const prev = previousResult(mode); return verifiedResult(mode, prev) && prev.code !== code
       ? `<p class="note prev-link">前の結果：<a href="#/r/${mode}/${prev.code}">${esc(fig(prev.fig).name)}（見る・戻す）</a></p>` : ""; })()}
     <section class="card"><h2>偉人に重ねたあなたの物語</h2>
