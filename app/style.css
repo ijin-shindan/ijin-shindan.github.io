@@ -210,6 +210,8 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 .friend-head { text-align: center; margin: 4px 0 12px; padding: 8px 10px; background: var(--card);
   border: 2px solid var(--world-edge); border-radius: 6px; box-shadow: 3px 3px 0 var(--world-shadow); }
 .friend-head h1 { font-family: var(--serif); font-weight: 900; font-size: 22px; margin: 0; }
+.friend-figure-name { display: inline-block; max-width: 100%; }
+.friend-name-part { display: inline-block; max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
 .friend-result-kind { white-space: nowrap; }
 @media (max-width: 400px) { .friend-result-kind { display: block; } }
 .friend-head .friend-origin-note { font-size: 14px; line-height: 1.55; margin: 8px 0 0; }

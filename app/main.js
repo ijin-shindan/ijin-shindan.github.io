@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=4405d4a-202610302109";
-import { mountMotion } from "./motion.js?v=4405d4a-202610302109";
-import { mountGuide } from "./guide.js?v=4405d4a-202610302109";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=6f5a9e8-202610302153";
+import { mountMotion } from "./motion.js?v=6f5a9e8-202610302153";
+import { mountGuide } from "./guide.js?v=6f5a9e8-202610302153";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=4405d4a-202610302109";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=4405d4a-202610302109";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=4405d4a-202610302109";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=4405d4a-202610302109";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=4405d4a-202610302109";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=4405d4a-202610302109";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=4405d4a-202610302109";
-import { storedResultMatches, storedList } from "./stored_result.js?v=4405d4a-202610302109";
-import { clearPrefixedStorage } from "./storage_clear.js?v=4405d4a-202610302109";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=4405d4a-202610302109";
-import { applyZukanBatch } from "./zukan_batch.js?v=4405d4a-202610302109";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=6f5a9e8-202610302153";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=6f5a9e8-202610302153";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=6f5a9e8-202610302153";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=6f5a9e8-202610302153";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=6f5a9e8-202610302153";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=6f5a9e8-202610302153";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=6f5a9e8-202610302153";
+import { storedResultMatches, storedList } from "./stored_result.js?v=6f5a9e8-202610302153";
+import { clearPrefixedStorage } from "./storage_clear.js?v=6f5a9e8-202610302153";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=6f5a9e8-202610302153";
+import { applyZukanBatch } from "./zukan_batch.js?v=6f5a9e8-202610302153";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=4405d4a-202610302109")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=6f5a9e8-202610302153")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1805,6 +1805,13 @@ function renderResult(mode, code) {
 }
 
 // 結果リンクの表示。URLだけでは送り主が友達か本人か判断できない。
+function friendHeadingFigure(name) {
+  const parts = name.split("・");
+  return `<span class="friend-figure-name">${parts.map((part, index) =>
+    `<span class="friend-name-part">${index === 0 ? "「" : ""}${esc(part)}${index < parts.length - 1 ? "・" : "」"}</span>`
+  ).join("<wbr>")}</span>`;
+}
+
 function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = false) {
   const f = r.figure;
   const own = seenSelfResults().includes(mode + code);  // この端末で自分で診断したことがある結果
@@ -1841,10 +1848,10 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       : ""}<button class="btn sub" data-add-person>人物カードに追加する</button></section>`;
   app.innerHTML = `
     <div class="friend-head">${personCard
-      ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
+      ? `<h1>${esc(personCard.label || "友達カード")}の結果<br>${friendHeadingFigure(f.name)}<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">人物カードに保存した共有結果です。あなたの結果とは別です。</p>`
       : past || prevLink
-      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">この端末にも同じ答えがあります。送り主は分かりません。</p>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
-      : `<h1>結果リンクの偉人は<br>「${esc(f.name)}」<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。送り主は確認できず、あなた自身の結果と同じになることもあります。</p>`}
+      ? `<h1>${prevLink ? "前に保存した、リンクの結果" : "以前のあなたの結果"}<br>${friendHeadingFigure(f.name)}<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">この端末にも同じ答えがあります。送り主は分かりません。</p>${mine ? `<p class="note" style="margin:6px 0 0">いまの自分の結果は「${esc(fig(mine.fig).name)}」です</p>` : ""}`
+      : `<h1>結果リンクの偉人は<br>${friendHeadingFigure(f.name)}<span class="friend-result-kind">タイプ</span></h1><p class="note friend-origin-note">このリンクに記録された回答の結果です。送り主は確認できず、あなた自身の結果と同じになることもあります。</p>`}
       <p class="back-links">${mine && validCode(sd, mine.code) ? `<a href="${esc(fromSharedPage && mine.code === code ? withoutSharedResultParam(location.href) : `#/r/${mode}/${mine.code}`)}">← 自分の結果（${esc(fig(mine.fig).name)}）へ戻る</a>` : ""}<a href="#/me">この端末の記録</a></p></div>
     ${resultCard(r, mode, past ? "past" : prevLink ? "saved" : "friend", false)}
     ${personCta}
