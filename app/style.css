@@ -90,6 +90,9 @@ img { display: block; }
   .hero .sub { margin-bottom: 8px; }
 }
 .cta { display: grid; gap: 12px; }
+.boot-status { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--world-edge); border-radius: 6px;
+  background: var(--card); color: var(--ink-soft); font-size: 14px; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.boot-status:empty { height: 0; margin: 0; padding: 0; border: 0; overflow: hidden; }
 .teaser { display: flex; gap: 12px; align-items: center; margin: 22px 0 0; padding: 12px; border-radius: var(--r-md); background: var(--card); border: 2px solid var(--world-edge); box-shadow: 4px 4px 0 var(--world-shadow); min-height: 84px; }
 .teaser img { width: 60px; height: 60px; border-radius: 6px; flex: none; }
 .teaser .who { font-size: 12px; color: var(--ink-soft); }

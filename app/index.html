@@ -15,7 +15,7 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=adf468f-202610301551">
+  <link rel="stylesheet" href="style.css?v=1aa5c5e-202610301707">
   <link rel="stylesheet" href="motion.css?v=5">
   <link rel="stylesheet" href="guide.css?v=6">
 </head>
@@ -31,6 +31,7 @@
       <a class="btn start" href="#/q/normal">診断スタート</a>
       <a class="btn love-sub" href="#/q/love">💘 恋愛バージョンもある</a>
     </div>
+    <p class="boot-status" id="boot-status" role="status" aria-live="polite"></p>
     <noscript>
       <style>.cta,.teaser{display:none!important}</style>
       <section class="card" role="alert">
@@ -38,11 +39,10 @@
         <p>JavaScriptを有効にして、ページをもう一度読み込んでください。この操作では答えや端末の記録を消しません。</p>
       </section>
     </noscript>
-    <div class="teaser"></div>
   </main>
   <div id="overlay" hidden></div>
   <div id="sheet" hidden></div>
-  <script type="module" src="main.js?v=adf468f-202610301551"></script>
+  <script type="module" src="main.js?v=1aa5c5e-202610301707"></script>
   <script>
     let bootFailed = false;
     function showBootFailure() {
@@ -73,6 +73,12 @@
         showBootFailure();
       }
     });
+    setTimeout(() => {
+      const status = document.getElementById('boot-status');
+      if (status?.isConnected && !window.__ijinReady && !window.__ijinBootErrorHandled && !bootFailed) {
+        status.textContent = '画面を準備しています。少し待ってね。';
+      }
+    }, 1000);
   </script>
 </body>
 </html>
