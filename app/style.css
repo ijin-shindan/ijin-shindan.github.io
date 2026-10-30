@@ -307,6 +307,7 @@ details p { font-size: 14px; margin: 8px 0; }
 .rel-who { font-size: 11px; font-weight: 800; color: var(--ink-soft); line-height: 1.2; }
 .rel-nm { font-family: var(--serif); font-weight: 900; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
 .rel-side .undisc { margin: 1px 0 0; justify-self: start; font-size: 11px; padding: 0 5px; }
+@media (max-width: 260px) { .rel-side .undisc { white-space: normal; overflow-wrap: anywhere; } }
 .rel-arrow { display: grid; justify-items: center; min-width: 40px; }
 .rel-verb { font-size: 12px; font-weight: 900; }
 .rel-ar { font-size: 24px; line-height: 1; font-weight: 900; }
