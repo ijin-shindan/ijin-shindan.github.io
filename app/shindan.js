@@ -39,7 +39,7 @@ export async function getJSON(url, timeoutMs = 30000) {
 
 export async function loadData(base = "../data/") {
   const names = ["axes", "types", "rules", "plans", "questions", "questions_love", "questions_friend", "texts"];
-  const jsons = await Promise.all(names.map((n) => getJSON(`${base}${n}.json?v=49a383a-202610310013`)));
+  const jsons = await Promise.all(names.map((n) => getJSON(`${base}${n}.json?v=5e763e6-202610310035`)));
   return Object.fromEntries(names.map((n, i) => [n, jsons[i]]));
 }
 

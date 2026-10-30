@@ -413,6 +413,10 @@ details p { font-size: 14px; margin: 8px 0; }
 .result-float-stack { position: fixed; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 40;
   display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
 .result-float-stack .fab { position: static; align-self: flex-end; margin-right: 16px; max-width: calc(100vw - 32px); pointer-events: auto; }
+.result-float-stack .result-jump { align-self: flex-end; margin-right: 16px; min-height: 44px; max-width: calc(100vw - 32px);
+  border: 2px solid var(--ink); border-radius: 999px; padding: 9px 18px; background: var(--card); color: var(--ink);
+  font: inherit; font-weight: 800; box-shadow: 0 3px 0 var(--shu); pointer-events: auto; }
+.result-float-stack .result-jump[hidden] { display: none; }
 .result-float-stack .toast { position: static; order: -1; transform: none; animation: resulttoastup .2s ease-out both; pointer-events: auto; }
 
 @keyframes pop { 0% { transform: scale(.94); } 100% { transform: scale(1); } }
