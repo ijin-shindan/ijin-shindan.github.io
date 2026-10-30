@@ -1,5 +1,5 @@
 // 他己回答は別人の証明ができない。端末内の返信記録としてだけ扱う。
-import { validInviteToken, validFriendCode } from "./social.js?v=5e763e6-202610310035";
+import { validInviteToken, validFriendCode } from "./social.js?v=710f341-202610310055";
 
 export function appendOtherReply(records, entry, maxRecords = 50) {
   if (!Array.isArray(records) || !validInviteToken(entry?.token) || !validFriendCode(entry?.code))

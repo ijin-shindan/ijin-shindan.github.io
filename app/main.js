@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=5e763e6-202610310035";
-import { mountMotion } from "./motion.js?v=5e763e6-202610310035";
-import { mountGuide } from "./guide.js?v=5e763e6-202610310035";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=710f341-202610310055";
+import { mountMotion } from "./motion.js?v=710f341-202610310055";
+import { mountGuide } from "./guide.js?v=710f341-202610310055";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=5e763e6-202610310035";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=5e763e6-202610310035";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=5e763e6-202610310035";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=5e763e6-202610310035";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=5e763e6-202610310035";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=5e763e6-202610310035";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=5e763e6-202610310035";
-import { storedResultMatches, storedList } from "./stored_result.js?v=5e763e6-202610310035";
-import { clearPrefixedStorage } from "./storage_clear.js?v=5e763e6-202610310035";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=5e763e6-202610310035";
-import { applyZukanBatch } from "./zukan_batch.js?v=5e763e6-202610310035";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=710f341-202610310055";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=710f341-202610310055";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=710f341-202610310055";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=710f341-202610310055";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=710f341-202610310055";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=710f341-202610310055";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=710f341-202610310055";
+import { storedResultMatches, storedList } from "./stored_result.js?v=710f341-202610310055";
+import { clearPrefixedStorage } from "./storage_clear.js?v=710f341-202610310055";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=710f341-202610310055";
+import { applyZukanBatch } from "./zukan_batch.js?v=710f341-202610310055";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=5e763e6-202610310035")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=710f341-202610310055")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1782,8 +1782,27 @@ function renderResult(mode, code) {
   // スクロールしても消えないシェアボタン
   const fab = $(".fab"), row = $(".share-row");
   // 古いWebViewでは監視APIがない。通常の共有ボタン行はそのまま使える。
-  if (typeof IntersectionObserver === "function")
-    new IntersectionObserver(([e]) => (fab.hidden = e.isIntersecting || e.boundingClientRect.top > 0)).observe(row);
+  if (typeof IntersectionObserver === "function") {
+    // 一回の速いスクロールで共有行を飛び越すと、交差状態は変わらず監視通知が来ない。
+    // スクロール時にも現在位置を読み、共有行が完全に上へ抜けた時だけ表示する。
+    const syncFab = () => {
+      if (fab.isConnected && row.isConnected) fab.hidden = row.getBoundingClientRect().bottom >= 0;
+    };
+    let frame = 0;
+    const queueFabSync = () => {
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; syncFab(); });
+    };
+    const observer = new IntersectionObserver(queueFabSync);
+    observer.observe(row);
+    window.addEventListener("scroll", queueFabSync, { passive: true });
+    disposeResultShareFab = () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", queueFabSync);
+      if (frame) cancelAnimationFrame(frame);
+    };
+    // 直後のscrollTo(0, 0)が終わった次の描画で初期位置を読む。
+    queueFabSync();
+  }
   prerenderShare(r, mode);
   window.scrollTo(0, 0);
   if (reveal) {
@@ -3337,6 +3356,7 @@ let trustedEpoch = null;
 let lastRevokedState = null;
 let selfViewGeneration = 0;
 let activeSelfResult = null;
+let disposeResultShareFab = () => {};
 let activeSelfOverview = null;
 let activeSelfReadOnly = null;
 let externalSessionClearFailed = false;
@@ -3462,6 +3482,8 @@ function revokeStaleSelfView() {
   return true;
 }
 function route() {
+  disposeResultShareFab();
+  disposeResultShareFab = () => {};
   // A hash navigation can beat the storage event. Check the last trusted epoch
   // before rendering a result, without acknowledging an unseen deletion.
   revokeStaleSelfView();
