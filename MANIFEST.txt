@@ -1,5 +1,5 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: 6b8e1a6-202610301301
+版番号: e94e816-202610301354
 公開先: https://ijin-shindan.github.io/app/
 ファイル数: 846（この一覧を含む）
 合計サイズ: 31.58 MB
@@ -851,7 +851,7 @@
   app/storage_clear.js  878
   app/storage_epoch.js  3666
   app/stored_result.js  717
-  app/style.css  51993
+  app/style.css  52056
   app/zukan_batch.js  1385
   data/axes.json  2449
   data/firebase.json  144
