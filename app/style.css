@@ -267,7 +267,7 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 
 /* ---------------- 結果の下のカード ---------------- */
 .share-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
-.share-row .btn { flex: 1 0 calc(50% - 5px); min-width: max-content; max-width: 100%; width: auto; padding-inline: 7px; }
+.share-row .btn { flex: 1 0 max-content; min-width: calc(50% - 5px); max-width: 100%; width: auto; padding-inline: 7px; overflow-wrap: anywhere; text-wrap: balance; }
 .share-row .wide { flex-basis: 100%; }
 @media (max-width: 360px) { .share-row .btn.sub { font-size: 14px; } }
 .card { background: var(--card); border: 2px solid var(--world-edge); border-radius: 9px; padding: 18px; margin: 14px 0;
