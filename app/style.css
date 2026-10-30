@@ -233,7 +233,8 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
 .stage .avatar-fallback { display: none; position: absolute; inset: 0; padding: 18px; place-items: center; text-align: center; font-weight: 800; color: #26221d; background: var(--t-bg2); }
 .stage.art-empty .avatar-fallback { display: grid; }
 .fig-name { font-family: var(--serif); font-weight: 900; line-height: 1.2; margin: 14px 0 6px; letter-spacing: .04em;
-  font-size: clamp(24px, calc(300px / var(--len)), 40px); word-break: keep-all; overflow-wrap: anywhere; color: #26221d; }
+  font-size: clamp(24px, calc(300px / var(--len)), 40px); word-break: keep-all; overflow-wrap: anywhere; color: #26221d;
+  scroll-margin-top: calc(12px + env(safe-area-inset-top)); }
 .type-line { display: inline-flex; align-items: center; gap: 8px; color: #26221d; }
 .emblem { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--t-accent); color: var(--t-on, #fff); font-family: var(--serif); font-weight: 900; font-size: 14px; }
 .type-name { font-weight: 800; }
