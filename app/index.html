@@ -20,7 +20,7 @@
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="style.css?v=60cc3f3-202610301859">
+  <link rel="stylesheet" href="style.css?v=5ed7932-202610301956">
   <link rel="stylesheet" href="motion.css?v=5">
   <link rel="stylesheet" href="guide.css?v=6">
 </head>
@@ -54,10 +54,10 @@
   </main>
   <div id="overlay" hidden></div>
   <div id="sheet" hidden></div>
-  <script type="module" src="main.js?v=60cc3f3-202610301859"></script>
+  <script type="module" src="main.js?v=5ed7932-202610301956"></script>
   <script>
     let bootFailed = false;
-    function showBootFailure() {
+    function showBootFailure(isSlow = false) {
       if (bootFailed || window.__ijinReady || window.__ijinBootErrorHandled) return;
       bootFailed = true;
       const app = document.getElementById('app');
@@ -65,7 +65,7 @@
       alert.className = 'card';
       alert.setAttribute('role', 'alert');
       const heading = document.createElement('h1');
-      heading.textContent = 'ページを読み込めませんでした';
+      heading.textContent = isSlow === true ? '読み込みに時間がかかっています' : 'ページを読み込めませんでした';
       const message = document.createElement('p');
       message.textContent = '通信状況を確かめて、もう一度読み込んでください。この操作では答えや端末の記録を消しません。';
       const retry = document.createElement('button');
@@ -95,6 +95,11 @@
         status.textContent = '画面を準備しています。少し待ってね。';
       }
     }, 1000);
+    setTimeout(() => {
+      if (!window.__ijinModuleStarted && !window.__ijinReady && !window.__ijinBootErrorHandled) {
+        showBootFailure(true);
+      }
+    }, 45000);
   </script>
 </body>
 </html>
