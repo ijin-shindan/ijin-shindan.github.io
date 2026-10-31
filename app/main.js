@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=cf6d06f-202611010133";
-import { mountMotion } from "./motion.js?v=cf6d06f-202611010133";
-import { mountGuide } from "./guide.js?v=cf6d06f-202611010133";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=2bccd94-202611010227";
+import { mountMotion } from "./motion.js?v=2bccd94-202611010227";
+import { mountGuide } from "./guide.js?v=2bccd94-202611010227";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=cf6d06f-202611010133";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=cf6d06f-202611010133";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=cf6d06f-202611010133";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=cf6d06f-202611010133";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=cf6d06f-202611010133";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=cf6d06f-202611010133";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=cf6d06f-202611010133";
-import { storedResultMatches, storedList } from "./stored_result.js?v=cf6d06f-202611010133";
-import { clearPrefixedStorage } from "./storage_clear.js?v=cf6d06f-202611010133";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=cf6d06f-202611010133";
-import { applyZukanBatch } from "./zukan_batch.js?v=cf6d06f-202611010133";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=2bccd94-202611010227";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=2bccd94-202611010227";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=2bccd94-202611010227";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=2bccd94-202611010227";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=2bccd94-202611010227";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=2bccd94-202611010227";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=2bccd94-202611010227";
+import { storedResultMatches, storedList } from "./stored_result.js?v=2bccd94-202611010227";
+import { clearPrefixedStorage } from "./storage_clear.js?v=2bccd94-202611010227";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=2bccd94-202611010227";
+import { applyZukanBatch } from "./zukan_batch.js?v=2bccd94-202611010227";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=cf6d06f-202611010133")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=2bccd94-202611010227")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -922,8 +922,12 @@ function showGuardedResumeReadFailure() {
   heading.tabIndex = -1;
   heading.focus({ preventScroll: true });
 }
-function showGuardedResumeExpired() {
-  app.innerHTML = `<section class="card"><h1>この途中記録からは再開できません</h1><p>途中記録の期限が切れたか、結果が保存済みです。この操作では答えを消していません。トップに戻り、端末の記録を確認してください。</p><a class="btn start" href="#/">トップへ戻る</a></section>`;
+function showGuardedResumeExpired(expiredByTime = false) {
+  const title = expiredByTime ? "途中記録の期限が切れました" : "この途中記録からは再開できません";
+  const detail = expiredByTime
+    ? "最後の回答から24時間が過ぎたため、続きからは再開できません。途中の答えは消していません。トップに戻り、「保存された答えを消して最初から診断する」を押すと、新しく始められます。"
+    : "途中記録の期限が切れたか、結果が保存済みです。この操作では答えを消していません。トップに戻り、端末の記録を確認してください。";
+  app.innerHTML = `<section class="card"><h1>${title}</h1><p>${detail}</p><a class="btn start" href="#/">トップへ戻る</a></section>`;
   window.scrollTo(0, 0);
   const heading = app.querySelector(".card h1");
   heading.tabIndex = -1;
@@ -933,7 +937,7 @@ function showExpiredQuizProgress(mode) {
   clearTimers();
   quiz = null;
   clearQuizCursor(mode);
-  showGuardedResumeExpired();
+  showGuardedResumeExpired(true);
 }
 
 function partialU(sd, answers) {  // 途中までの回答で軸スコアを出す（未回答の軸は0）
@@ -966,9 +970,11 @@ function renderQuiz(mode, anim = false, memoryOnlyStart = false) {
       if (snapshot.status !== "ok" || snapshot.raw !== expectedResume.raw)
         return showQuizProgressConflict(mode, snapshot.status === "invalid", epoch);
       const savedForGuard = snapshot.progress;
-      if (!validProgress(savedForGuard) || savedForGuard.answers.length === 0 || Date.now() - savedForGuard.t >= 864e5
+      const expiredByTime = validProgress(savedForGuard) && savedForGuard.answers.length > 0
+        && Date.now() - savedForGuard.t >= 864e5;
+      if (!validProgress(savedForGuard) || savedForGuard.answers.length === 0 || expiredByTime
         || (savedForGuard.answers.length === 12 && completedQuizProgress(mode, savedForGuard, selfStateSnapshot())))
-        return showGuardedResumeExpired();
+        return showGuardedResumeExpired(expiredByTime);
     }
     if (snapshot.status === "invalid") return showQuizProgressConflict(mode, true, epoch);
     const saved = snapshot.progress;
