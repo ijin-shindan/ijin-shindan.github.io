@@ -292,7 +292,7 @@ details { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12p
 summary { cursor: pointer; color: var(--ai); font-weight: 800; font-size: 14px; }
 details p { font-size: 14px; margin: 8px 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--ai-soft); color: var(--ai); text-decoration: none; }
+.chip { display: inline-flex; align-items: center; min-height: 44px; max-width: 100%; font-size: 13px; padding: 4px 10px; overflow-wrap: anywhere; border-radius: 999px; background: var(--ai-soft); color: var(--ai); text-decoration: none; }
 .fate { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: center; padding: 12px; border-radius: var(--r-md); background: var(--shu-soft); margin-bottom: 10px; }
 .fate img { width: 72px; height: 72px; border-radius: 18px; }
 .fate .lbl { font-size: 12px; font-weight: 800; color: var(--shu); }
