@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=010531c-202610310156";
-import { mountMotion } from "./motion.js?v=010531c-202610310156";
-import { mountGuide } from "./guide.js?v=010531c-202610310156";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=318ab21-202610311005";
+import { mountMotion } from "./motion.js?v=318ab21-202610311005";
+import { mountGuide } from "./guide.js?v=318ab21-202610311005";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=010531c-202610310156";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=010531c-202610310156";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=010531c-202610310156";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=010531c-202610310156";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=010531c-202610310156";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=010531c-202610310156";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=010531c-202610310156";
-import { storedResultMatches, storedList } from "./stored_result.js?v=010531c-202610310156";
-import { clearPrefixedStorage } from "./storage_clear.js?v=010531c-202610310156";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=010531c-202610310156";
-import { applyZukanBatch } from "./zukan_batch.js?v=010531c-202610310156";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=318ab21-202610311005";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=318ab21-202610311005";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=318ab21-202610311005";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=318ab21-202610311005";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=318ab21-202610311005";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=318ab21-202610311005";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=318ab21-202610311005";
+import { storedResultMatches, storedList } from "./stored_result.js?v=318ab21-202610311005";
+import { clearPrefixedStorage } from "./storage_clear.js?v=318ab21-202610311005";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=318ab21-202610311005";
+import { applyZukanBatch } from "./zukan_batch.js?v=318ab21-202610311005";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=010531c-202610310156")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=318ab21-202610311005")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2502,7 +2502,7 @@ function renderHow() {
     ["①", "性格診断をする", "12問・約1分半。登録なしですぐ始められます。"],
     ["②", "似た偉人と出会う", "6つの軸をもとに、今の回答に近い偉人を1人表示します。"],
     ["③", "偉人を図鑑に集める", "相性・もしもの分岐などで名前を知り、診断で出会うと図鑑に「発見」として残ります。"],
-    ["④", "結果を自分でシェアする", "共有リンクや画像は、自分で選んだときだけ送れます。受け取った結果は自分の結果と区別して表示します。"],
+    ["④", "結果を自分でシェアする", "結果リンクは自分で送れます。リンクを知る人は12問の答えを読み取れます。画像を保存しても、自動では送られません。受け取った結果は自分の結果と区別して表示します。"],
     ["⑤", "人物カードを増やす", "友達から自己診断結果リンクが届いたら、結果画面でカードに追加できます。"],
     OTHER_PILOT ? ["⑥", "友達から見た自分も聞く（試作）", "招待リンクを自分で送り、友達が答えたら返信リンクを送ってもらいます。回答は自動では届きません。"] : ["予定", "他己分析 ※開発中", "友達があなたについて答える機能です。今は公開していません。"],
   ];
