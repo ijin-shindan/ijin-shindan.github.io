@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=9947036-202610311919";
-import { mountMotion } from "./motion.js?v=9947036-202610311919";
-import { mountGuide } from "./guide.js?v=9947036-202610311919";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=abeee31-202610312124";
+import { mountMotion } from "./motion.js?v=abeee31-202610312124";
+import { mountGuide } from "./guide.js?v=abeee31-202610312124";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=9947036-202610311919";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=9947036-202610311919";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=9947036-202610311919";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=9947036-202610311919";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=9947036-202610311919";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=9947036-202610311919";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=9947036-202610311919";
-import { storedResultMatches, storedList } from "./stored_result.js?v=9947036-202610311919";
-import { clearPrefixedStorage } from "./storage_clear.js?v=9947036-202610311919";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=9947036-202610311919";
-import { applyZukanBatch } from "./zukan_batch.js?v=9947036-202610311919";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=abeee31-202610312124";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=abeee31-202610312124";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=abeee31-202610312124";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=abeee31-202610312124";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=abeee31-202610312124";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=abeee31-202610312124";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=abeee31-202610312124";
+import { storedResultMatches, storedList } from "./stored_result.js?v=abeee31-202610312124";
+import { clearPrefixedStorage } from "./storage_clear.js?v=abeee31-202610312124";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=abeee31-202610312124";
+import { applyZukanBatch } from "./zukan_batch.js?v=abeee31-202610312124";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=9947036-202610311919")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=abeee31-202610312124")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2625,8 +2625,10 @@ function renderUnavailable() {
           : "リンクが途中で切れているか、対応していない形式です。性格版・恋愛版の自己診断は無料で遊べます。"}</p>
     ${page === "person" ? '<a class="btn sub" href="#/people">人物カード一覧へ</a>' : ""}
     ${oldSelf ? '<a class="btn sub" href="#/me">この端末の記録を見る</a>' : ""}
-    <a class="btn start" href="#/q/normal">${esc(quizEntryLabel("normal", "自分の診断を始める"))}</a>
+    ${resultErrorQuizLinks("normal", "自分の診断を始める")}
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+  bindFreshQuizLinks();
+  bindResultErrorResumeLinks();
   window.scrollTo(0, 0);
 }
 
