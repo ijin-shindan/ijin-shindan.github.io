@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=6836256-202611010425";
-import { mountMotion } from "./motion.js?v=6836256-202611010425";
-import { mountGuide } from "./guide.js?v=6836256-202611010425";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=64dacea-202611010528";
+import { mountMotion } from "./motion.js?v=64dacea-202611010528";
+import { mountGuide } from "./guide.js?v=64dacea-202611010528";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=6836256-202611010425";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=6836256-202611010425";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=6836256-202611010425";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=6836256-202611010425";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=6836256-202611010425";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=6836256-202611010425";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=6836256-202611010425";
-import { storedResultMatches, storedList } from "./stored_result.js?v=6836256-202611010425";
-import { clearPrefixedStorage } from "./storage_clear.js?v=6836256-202611010425";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=6836256-202611010425";
-import { applyZukanBatch } from "./zukan_batch.js?v=6836256-202611010425";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=64dacea-202611010528";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=64dacea-202611010528";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=64dacea-202611010528";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=64dacea-202611010528";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=64dacea-202611010528";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=64dacea-202611010528";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=64dacea-202611010528";
+import { storedResultMatches, storedList } from "./stored_result.js?v=64dacea-202611010528";
+import { clearPrefixedStorage } from "./storage_clear.js?v=64dacea-202611010528";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=64dacea-202611010528";
+import { applyZukanBatch } from "./zukan_batch.js?v=64dacea-202611010528";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=6836256-202611010425")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=64dacea-202611010528")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1460,6 +1460,9 @@ function resultErrorQuizLinks(mode, freshText) {
   const resumeLink = resumable ? `<button class="btn start" type="button" data-resume-result-error="${mode}">${resumeText}</button>` : "";
   return resumeLink + freshLink;
 }
+function resultErrorQuizEntry(mode, freshText) {
+  return `<div data-error-quiz-entry data-mode="${mode}" data-fresh-text="${freshText}">${resultErrorQuizLinks(mode, freshText)}</div>`;
+}
 function showResultResumeUnavailable(link, reason = "expired") {
   let warning = link.nextElementSibling;
   if (!warning?.matches("[data-result-resume-warning]")) {
@@ -1515,15 +1518,54 @@ function bindResultErrorResumeLinks(selector = "[data-resume-result-error]", sna
     });
   });
 }
+let resultErrorExpiryTimer = null;
+function clearResultErrorExpiryTimer() {
+  if (resultErrorExpiryTimer !== null) clearTimeout(resultErrorExpiryTimer);
+  resultErrorExpiryTimer = null;
+}
+function scheduleResultErrorExpiry() {
+  clearResultErrorExpiryTimer();
+  const entry = app.querySelector("[data-error-quiz-entry]");
+  const mode = entry?.dataset.mode;
+  if (!entry?.querySelector(`[data-resume-result-error="${mode}"]`)) return;
+  const snapshot = readQuizProgress(mode);
+  const deadline = snapshot.status === "ok" ? snapshot.progress?.t + 864e5 : NaN;
+  if (!Number.isFinite(deadline)) return;
+  const hash = location.hash;
+  const delay = Math.max(1, Math.min(2_147_483_647, deadline - Date.now()));
+  resultErrorExpiryTimer = setTimeout(() => {
+    resultErrorExpiryTimer = null;
+    if (location.hash !== hash) return;
+    refreshResultErrorEntry();
+  }, delay);
+}
+function refreshResultErrorEntry() {
+  const entry = app.querySelector("[data-error-quiz-entry]");
+  if (!entry) return;
+  const { mode, freshText } = entry.dataset;
+  const scrollY = window.scrollY;
+  const focused = entry.contains(document.activeElement) ? document.activeElement : null;
+  const focusResume = focused?.dataset?.resumeResultError === mode;
+  const focusFresh = focused?.dataset?.fresh === mode;
+  entry.innerHTML = resultErrorQuizLinks(mode, freshText);
+  bindFreshQuizLinks();
+  bindResultErrorResumeLinks();
+  scheduleResultErrorExpiry();
+  window.scrollTo(0, scrollY);
+  const target = focusResume || focusFresh ? entry.querySelector(`[data-${focusResume ? "resume-result-error" : "fresh"}="${mode}"]`)
+    ?? entry.querySelector(`[data-fresh="${mode}"]`) : null;
+  target?.focus({ preventScroll: true });
+}
 
 function renderResult(mode, code) {
   const sd = engines[mode];
   if (!validCode(sd, code)) {
     document.title = "結果リンクを開けません｜世界の偉人性格診断";
     app.style.cssText = "";
-    app.innerHTML = `<section class="card"><h1>この結果リンクは開けませんでした</h1><p>リンクが途中で切れているか、対応していない形式です。</p>${resultErrorQuizLinks(mode, "新しく診断する")}<a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+    app.innerHTML = `<section class="card"><h1>この結果リンクは開けませんでした</h1><p>リンクが途中で切れているか、対応していない形式です。</p>${resultErrorQuizEntry(mode, "新しく診断する")}<a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
     bindFreshQuizLinks();
     bindResultErrorResumeLinks();
+    scheduleResultErrorExpiry();
     return;
   }
   const r = sd.diagnose(answersOf(sd, code));
@@ -1546,9 +1588,10 @@ function renderResult(mode, code) {
     justFinished = null;
     document.title = "共有結果を確認できません｜世界の偉人性格診断";
     app.style.cssText = "";
-    app.innerHTML = `<section class="card"><h1>この共有結果は確認できません</h1><p>カードの人物か診断の種類が、回答結果と一致しません。送った人にリンクを作り直してもらってください。</p>${resultErrorQuizLinks(mode, "自分を診断する")}<a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
+    app.innerHTML = `<section class="card"><h1>この共有結果は確認できません</h1><p>カードの人物か診断の種類が、回答結果と一致しません。送った人にリンクを作り直してもらってください。</p>${resultErrorQuizEntry(mode, "自分を診断する")}<a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
     bindFreshQuizLinks();
     bindResultErrorResumeLinks();
+    scheduleResultErrorExpiry();
     return;
   }
   const pendingFresh = justFinished && justFinished.mode === mode && justFinished.code === code ? justFinished : null;
@@ -1558,9 +1601,10 @@ function renderResult(mode, code) {
     justFinished = null;
     document.title = "診断の記録が変わりました｜世界の偉人性格診断";
     app.style.cssText = "";
-    app.innerHTML = `<section class="card"><h1>別のタブで端末の記録が変わりました</h1><p>この画面の診断結果は、保存済みの自分の結果として表示しません。途中の答えがあれば続きから開くか、新しく診断するか、この端末の記録を開き直してください。</p>${resultErrorQuizLinks(mode, "新しく診断する")}<a class="btn sub" href="#/me">この端末の記録を見る</a></section>`;
+    app.innerHTML = `<section class="card"><h1>別のタブで端末の記録が変わりました</h1><p>この画面の診断結果は、保存済みの自分の結果として表示しません。途中の答えがあれば続きから開くか、新しく診断するか、この端末の記録を開き直してください。</p>${resultErrorQuizEntry(mode, "新しく診断する")}<a class="btn sub" href="#/me">この端末の記録を見る</a></section>`;
     bindFreshQuizLinks();
     bindResultErrorResumeLinks();
+    scheduleResultErrorExpiry();
     return;
   }
   // Q12 の保存後でも、画面遷移までに別タブが以前の結果を戻せる。
@@ -2664,10 +2708,11 @@ function renderUnavailable() {
           : "リンクが途中で切れているか、対応していない形式です。性格版・恋愛版の自己診断は無料で遊べます。"}</p>
     ${page === "person" ? '<a class="btn sub" href="#/people">人物カード一覧へ</a>' : ""}
     ${oldSelf ? '<a class="btn sub" href="#/me">この端末の記録を見る</a>' : ""}
-    ${resultErrorQuizLinks("normal", "自分の診断を始める")}
+    ${resultErrorQuizEntry("normal", "自分の診断を始める")}
     <a class="btn sub" style="margin-top:10px" href="#/">トップへ</a></section>`;
   bindFreshQuizLinks();
   bindResultErrorResumeLinks();
+  scheduleResultErrorExpiry();
   window.scrollTo(0, 0);
 }
 
@@ -3577,6 +3622,7 @@ function route() {
   disposeResultShareFab = () => {};
   clearTopQuizExpiryTimer();
   clearPeopleEntryExpiryTimer();
+  clearResultErrorExpiryTimer();
   // A hash navigation can beat the storage event. Check the last trusted epoch
   // before rendering a result, without acknowledging an unseen deletion.
   revokeStaleSelfView();
