@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=318ab21-202610311005";
-import { mountMotion } from "./motion.js?v=318ab21-202610311005";
-import { mountGuide } from "./guide.js?v=318ab21-202610311005";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=335b1e8-202610311104";
+import { mountMotion } from "./motion.js?v=335b1e8-202610311104";
+import { mountGuide } from "./guide.js?v=335b1e8-202610311104";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=318ab21-202610311005";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=318ab21-202610311005";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=318ab21-202610311005";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=318ab21-202610311005";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=318ab21-202610311005";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=318ab21-202610311005";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=318ab21-202610311005";
-import { storedResultMatches, storedList } from "./stored_result.js?v=318ab21-202610311005";
-import { clearPrefixedStorage } from "./storage_clear.js?v=318ab21-202610311005";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=318ab21-202610311005";
-import { applyZukanBatch } from "./zukan_batch.js?v=318ab21-202610311005";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=335b1e8-202610311104";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=335b1e8-202610311104";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=335b1e8-202610311104";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=335b1e8-202610311104";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=335b1e8-202610311104";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=335b1e8-202610311104";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=335b1e8-202610311104";
+import { storedResultMatches, storedList } from "./stored_result.js?v=335b1e8-202610311104";
+import { clearPrefixedStorage } from "./storage_clear.js?v=335b1e8-202610311104";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=335b1e8-202610311104";
+import { applyZukanBatch } from "./zukan_batch.js?v=335b1e8-202610311104";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=318ab21-202610311005")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=335b1e8-202610311104")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -2227,16 +2227,32 @@ async function shareImage(r, mode, trigger = null, stillValid = () => true) {
     if (!stillValid() || generation !== selfViewGeneration || !viewEpochMatches(epoch)
       || stateStatus === "missing_after_migration" || selfStateSnapshot().status !== stateStatus
       || (trigger && !trigger.isConnected)) return;
-    const src = URL.createObjectURL(blob);
-    if (/Line\/|Instagram|FBAN|FBAV|Twitter|; wv\)/i.test(navigator.userAgent)) {
-      // アプリ内ブラウザはダウンロードできないので、画像を出して長押しで保存してもらう
-      openSheet(`<div class="panel"><h2 id="sheet-title">画像を長押しして保存</h2><img src="${src}" alt="保存用の結果画像" style="width:100%;border-radius:12px">
-        <button class="btn sub close" style="margin-top:12px">閉じる</button></div>`, trigger, src);
+    const inAppBrowser = /Line\/|Instagram|FBAN|FBAV|Twitter|; wv\)/i.test(navigator.userAgent);
+    let src = null;
+    try {
+      src = URL.createObjectURL(blob);
+      if (inAppBrowser) {
+        // アプリ内ブラウザはダウンロードできないので、画像を出して長押しで保存してもらう
+        openSheet(`<div class="panel"><h2 id="sheet-title">画像を長押しして保存</h2><img src="${src}" alt="保存用の結果画像" style="width:100%;border-radius:12px">
+          <button class="btn sub close" style="margin-top:12px">閉じる</button></div>`, trigger, src);
+      } else {
+        const a = document.createElement("a");
+        a.href = src; a.download = `ijin-${mode}-${r.figure.id}-lv${r.lv}.png`; a.click();
+      }
+    } catch {
+      if (src) {
+        // openSheet が途中で失敗した場合は、残ったシートも閉じてURLを解放する。
+        if (sheetObjectUrl === src) closeSheet();
+        else URL.revokeObjectURL(src);
+      }
+      if (stillValid() && generation === selfViewGeneration && viewEpochMatches(epoch))
+        toast("画像を保存できませんでした。スクショで保存してください");
+      return;
+    }
+    if (inAppBrowser) {
       track("share_image_done", { method: "inapp" });
       return;
     }
-    const a = document.createElement("a");
-    a.href = src; a.download = `ijin-${mode}-${r.figure.id}-lv${r.lv}.png`; a.click();
     setTimeout(() => URL.revokeObjectURL(src), 60_000);
     track("share_image_done", { method: "download" });
     toast("画像の保存を開始しました。端末のダウンロード先を確認してください");
