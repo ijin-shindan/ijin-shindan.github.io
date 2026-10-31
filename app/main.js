@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=53a8f92-202610311210";
-import { mountMotion } from "./motion.js?v=53a8f92-202610311210";
-import { mountGuide } from "./guide.js?v=53a8f92-202610311210";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=a3e0153-202610311304";
+import { mountMotion } from "./motion.js?v=a3e0153-202610311304";
+import { mountGuide } from "./guide.js?v=a3e0153-202610311304";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=53a8f92-202610311210";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=53a8f92-202610311210";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=53a8f92-202610311210";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=53a8f92-202610311210";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=53a8f92-202610311210";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=53a8f92-202610311210";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=53a8f92-202610311210";
-import { storedResultMatches, storedList } from "./stored_result.js?v=53a8f92-202610311210";
-import { clearPrefixedStorage } from "./storage_clear.js?v=53a8f92-202610311210";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=53a8f92-202610311210";
-import { applyZukanBatch } from "./zukan_batch.js?v=53a8f92-202610311210";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=a3e0153-202610311304";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=a3e0153-202610311304";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=a3e0153-202610311304";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=a3e0153-202610311304";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=a3e0153-202610311304";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=a3e0153-202610311304";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=a3e0153-202610311304";
+import { storedResultMatches, storedList } from "./stored_result.js?v=a3e0153-202610311304";
+import { clearPrefixedStorage } from "./storage_clear.js?v=a3e0153-202610311304";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=a3e0153-202610311304";
+import { applyZukanBatch } from "./zukan_batch.js?v=a3e0153-202610311304";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=53a8f92-202610311210")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=a3e0153-202610311304")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1678,7 +1678,7 @@ function renderResult(mode, code) {
       ${mode === "love" && tx.love.note ? `<p class="love-note">※${esc(tx.love.note)}</p>` : ""}
       <p class="body">${esc(tx.body)}</p>
       <details><summary>元ネタを見る</summary><p>${esc(tx.motoneta.text)}</p>
-        <div class="chips">${tx.motoneta.search.map((s) => `<a class="chip" href="${search(s)}" target="_blank" rel="noopener noreferrer">🔍 ${esc(s)}</a>`).join("")}</div></details>
+        <div class="chips">${tx.motoneta.search.map((s) => `<a class="chip" href="${search(s)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(s)}をWikipediaで検索（新しいタブで開く）">🔍 ${esc(s)}</a>`).join("")}</div></details>
     </section>
     <section class="card"><h2>相性</h2>
       <p class="rel-note">回答の6つの軸で見た、遊びの相性です。史実の勝ち負けではありません。矢印の先が、押されやすい側。</p>
