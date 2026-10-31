@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=0ed0087-202610311609";
-import { mountMotion } from "./motion.js?v=0ed0087-202610311609";
-import { mountGuide } from "./guide.js?v=0ed0087-202610311609";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=0fe5874-202610311817";
+import { mountMotion } from "./motion.js?v=0fe5874-202610311817";
+import { mountGuide } from "./guide.js?v=0fe5874-202610311817";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=0ed0087-202610311609";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=0ed0087-202610311609";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=0ed0087-202610311609";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=0ed0087-202610311609";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=0ed0087-202610311609";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=0ed0087-202610311609";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=0ed0087-202610311609";
-import { storedResultMatches, storedList } from "./stored_result.js?v=0ed0087-202610311609";
-import { clearPrefixedStorage } from "./storage_clear.js?v=0ed0087-202610311609";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=0ed0087-202610311609";
-import { applyZukanBatch } from "./zukan_batch.js?v=0ed0087-202610311609";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=0fe5874-202610311817";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=0fe5874-202610311817";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=0fe5874-202610311817";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=0fe5874-202610311817";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=0fe5874-202610311817";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=0fe5874-202610311817";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=0fe5874-202610311817";
+import { storedResultMatches, storedList } from "./stored_result.js?v=0fe5874-202610311817";
+import { clearPrefixedStorage } from "./storage_clear.js?v=0fe5874-202610311817";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=0fe5874-202610311817";
+import { applyZukanBatch } from "./zukan_batch.js?v=0fe5874-202610311817";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=0ed0087-202610311609")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=0fe5874-202610311817")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1017,8 +1017,8 @@ function renderQuiz(mode, anim = false, memoryOnlyStart = false) {
       <h1 class="qtext" id="current-question" tabindex="-1" aria-label="${i + 1}問目、全${qs.length}問。${esc(q.text)}">${esc(q.text)}</h1>
       ${quizUnsavedWarning(quiz)}
       ${quizSharedReturnWarning(quiz)}
-      <p class="qhint">いちばん近いものを1つ選んでね。押すと次へ進みます。</p>
-      <div class="scale5" role="group" aria-labelledby="current-question">
+      <p class="qhint" id="self-choice-hint">いちばん近いものを1つ選んでね。押すと次へ進みます。</p>
+      <div class="scale5" role="group" aria-labelledby="current-question" aria-describedby="self-choice-hint">
         ${[1, 2, 3, 4, 5].map((v) => `<button class="dotbtn v${v} ${answers[i] === v ? "sel" : ""}" data-v="${v}" aria-label="${esc(sd.data.questions.scale[v - 1])}${answers[i] === v ? "（前の回答）" : ""}"><i aria-hidden="true"></i><span>${esc(sd.data.questions.scale[v - 1])}</span></button>`).join("")}
       </div>
     </div>`;
