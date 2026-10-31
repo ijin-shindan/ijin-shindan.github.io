@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=4f0c5e6-202610312316";
-import { mountMotion } from "./motion.js?v=4f0c5e6-202610312316";
-import { mountGuide } from "./guide.js?v=4f0c5e6-202610312316";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=bca1d2f-202611010022";
+import { mountMotion } from "./motion.js?v=bca1d2f-202611010022";
+import { mountGuide } from "./guide.js?v=bca1d2f-202611010022";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=4f0c5e6-202610312316";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=4f0c5e6-202610312316";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=4f0c5e6-202610312316";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=4f0c5e6-202610312316";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=4f0c5e6-202610312316";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=4f0c5e6-202610312316";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=4f0c5e6-202610312316";
-import { storedResultMatches, storedList } from "./stored_result.js?v=4f0c5e6-202610312316";
-import { clearPrefixedStorage } from "./storage_clear.js?v=4f0c5e6-202610312316";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=4f0c5e6-202610312316";
-import { applyZukanBatch } from "./zukan_batch.js?v=4f0c5e6-202610312316";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=bca1d2f-202611010022";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=bca1d2f-202611010022";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=bca1d2f-202611010022";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=bca1d2f-202611010022";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=bca1d2f-202611010022";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=bca1d2f-202611010022";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=bca1d2f-202611010022";
+import { storedResultMatches, storedList } from "./stored_result.js?v=bca1d2f-202611010022";
+import { clearPrefixedStorage } from "./storage_clear.js?v=bca1d2f-202611010022";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=bca1d2f-202611010022";
+import { applyZukanBatch } from "./zukan_batch.js?v=bca1d2f-202611010022";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=4f0c5e6-202610312316")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=bca1d2f-202611010022")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -3390,6 +3390,12 @@ function selfOverviewCurrentSignature(snapshot) {
     return result ? [result.code, result.via ?? null] : null;
   }));
 }
+function peopleEntryProgressSignature(snapshot) {
+  if (ownSelfShares(snapshot).length) return null;
+  const progress = readQuizProgress("normal");
+  return JSON.stringify([progress.status, progress.raw ?? null,
+    resultErrorQuizLinks("normal", "まず自分を診断する")]);
+}
 function topZukanSignature() {
   const zukan = readZukanStorage();
   const discovered = Object.entries(zukan.zukan).filter(([id, entry]) =>
@@ -3427,6 +3433,7 @@ function captureSelfOverview(snapshot = selfStateSnapshot()) {
   activeSelfOverview = { hash: location.hash, status: snapshot.status,
     current: selfOverviewCurrentSignature(snapshot),
     me: location.hash === "#/me" ? selfOverviewMeSignature(snapshot) : null,
+    peopleProgress: location.hash === "#/people" ? peopleEntryProgressSignature(snapshot) : null,
     topZukan: location.hash === "#/" || !location.hash ? topZukanSignature() : null };
 }
 function deferUnverifiedMeRefresh() {
@@ -3700,9 +3707,11 @@ function refreshSelfAfterExternalChange() {
     const snapshot = selfStateSnapshot();
     const current = selfOverviewCurrentSignature(snapshot);
     const me = location.hash === "#/me" ? selfOverviewMeSignature(snapshot) : null;
+    const peopleProgress = location.hash === "#/people" ? peopleEntryProgressSignature(snapshot) : null;
     const topZukan = activeSelfOverview.topZukan !== null ? topZukanSignature() : null;
     if (snapshot.status !== activeSelfOverview.status || current !== activeSelfOverview.current
-      || me !== activeSelfOverview.me || topZukan !== activeSelfOverview.topZukan) {
+      || me !== activeSelfOverview.me || peopleProgress !== activeSelfOverview.peopleProgress
+      || topZukan !== activeSelfOverview.topZukan) {
       if (location.hash === "#/me") {
         // A recovery checkbox or export confirmation may be in progress on an
         // unverified record page. Leave it intact until the person refreshes.
@@ -3741,10 +3750,24 @@ function refreshSelfAfterExternalChange() {
         const ownShares = ownSelfShares(snapshot);
         const container = app.querySelector("[data-self-overview]");
         if (container) {
+          const focused = document.activeElement;
+          const focusedEntry = container.contains?.(focused)
+            ? focused?.hasAttribute?.("data-resume-result-error") ? "resume" : focused?.hasAttribute?.("data-fresh") ? "fresh" : null
+            : null;
+          const scrollY = window.scrollY;
           container.innerHTML = peopleOwnSharesHtml(ownShares);
           bindPeopleOwnShares(ownShares);
           bindFreshQuizLinks();
           bindResultErrorResumeLinks();
+          if (focusedEntry) {
+            const target = focusedEntry === "resume"
+              ? container.querySelector('[data-resume-result-error="normal"]') || container.querySelector('[data-fresh="normal"]')
+              : container.querySelector('[data-fresh="normal"]');
+            const destination = target || app.querySelector("h1");
+            if (destination && !target) destination.tabIndex = -1;
+            destination?.focus({ preventScroll: true });
+          }
+          window.scrollTo(0, scrollY);
         }
         captureSelfOverview(snapshot);
       } else {
