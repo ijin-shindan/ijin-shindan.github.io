@@ -1,28 +1,28 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=64dacea-202611010528";
-import { mountMotion } from "./motion.js?v=64dacea-202611010528";
-import { mountGuide } from "./guide.js?v=64dacea-202611010528";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=4a079a3-202611010624";
+import { mountMotion } from "./motion.js?v=4a079a3-202611010624";
+import { mountGuide } from "./guide.js?v=4a079a3-202611010624";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=64dacea-202611010528";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=64dacea-202611010528";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=64dacea-202611010528";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=64dacea-202611010528";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=64dacea-202611010528";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=64dacea-202611010528";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=64dacea-202611010528";
-import { storedResultMatches, storedList } from "./stored_result.js?v=64dacea-202611010528";
-import { clearPrefixedStorage } from "./storage_clear.js?v=64dacea-202611010528";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=64dacea-202611010528";
-import { applyZukanBatch } from "./zukan_batch.js?v=64dacea-202611010528";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=4a079a3-202611010624";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=4a079a3-202611010624";
+import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=4a079a3-202611010624";
+import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=4a079a3-202611010624";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=4a079a3-202611010624";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=4a079a3-202611010624";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=4a079a3-202611010624";
+import { storedResultMatches, storedList } from "./stored_result.js?v=4a079a3-202611010624";
+import { clearPrefixedStorage } from "./storage_clear.js?v=4a079a3-202611010624";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=4a079a3-202611010624";
+import { applyZukanBatch } from "./zukan_batch.js?v=4a079a3-202611010624";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=64dacea-202611010528")]);
+    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=4a079a3-202611010624")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
     const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
@@ -1556,6 +1556,48 @@ function refreshResultErrorEntry() {
     ?? entry.querySelector(`[data-fresh="${mode}"]`) : null;
   target?.focus({ preventScroll: true });
 }
+const RESULT_RETRY_EXPIRED_TEXT = "途中の回答の期限が切れたため、この回答から保存を再試行できません。途中の答えは自動では消していません。必要なら結果リンクを控え、最初から診断してください。";
+const RESULT_RETRY_CHANGED_TEXT = "途中の記録が変わったため、この画面から保存を再試行できません。途中の答えは消していません。画面を開き直して確認してください。";
+let resultRetryExpiryTimer = null;
+function clearResultRetryExpiryTimer() {
+  if (resultRetryExpiryTimer !== null) clearTimeout(resultRetryExpiryTimer);
+  resultRetryExpiryTimer = null;
+}
+function replaceResultRetryButton(mode, message) {
+  const button = app.querySelector("[data-retry-result-progress]");
+  if (!button?.isConnected) return;
+  const focused = document.activeElement === button;
+  const scrollY = window.scrollY;
+  const note = document.createElement("p");
+  note.className = "note";
+  note.id = "result-retry-status";
+  note.dataset.resultRetryUnavailable = "";
+  note.setAttribute("role", "status");
+  note.textContent = message;
+  button.replaceWith(note);
+  const fresh = app.querySelector(`[data-fresh="${mode}"]`);
+  fresh?.setAttribute("aria-describedby", `${fresh.getAttribute("aria-describedby") ?? ""} result-retry-status`.trim());
+  if (focused) fresh?.focus({ preventScroll: true });
+  window.scrollTo(0, scrollY);
+}
+function scheduleResultRetryExpiry(mode, snapshot) {
+  clearResultRetryExpiryTimer();
+  const saved = snapshot?.status === "ok" ? snapshot.progress : null;
+  if (!validProgress(saved) || !saved.answers.length || !app.querySelector("[data-retry-result-progress]")) return;
+  const deadline = saved.t + 864e5;
+  const hash = location.hash;
+  const delay = Math.max(1, Math.min(2_147_483_647, deadline - Date.now()));
+  resultRetryExpiryTimer = setTimeout(() => {
+    resultRetryExpiryTimer = null;
+    if (location.hash !== hash) return;
+    const latest = readQuizProgress(mode);
+    if (latest.status === "unavailable") return;
+    if (latest.status !== "ok" || latest.raw !== snapshot.raw)
+      return replaceResultRetryButton(mode, RESULT_RETRY_CHANGED_TEXT);
+    if (Date.now() < deadline) return scheduleResultRetryExpiry(mode, latest);
+    replaceResultRetryButton(mode, RESULT_RETRY_EXPIRED_TEXT);
+  }, delay);
+}
 
 function renderResult(mode, code) {
   const sd = engines[mode];
@@ -1630,6 +1672,11 @@ function renderResult(mode, code) {
   const freshSaveStatus = fresh && renderEpochStatus === "epoch_unavailable"
     && (["saved", "saved_progress_uncleared", "saved_zukan_pending"].includes(pendingFresh.saveStatus))
     ? "save_unverified" : fresh ? pendingFresh.saveStatus : null;
+  const retryableSave = ["partial", "save_unverified", "zukan_queue_full", "state_unverified"].includes(freshSaveStatus);
+  const retrySnapshot = retryableSave ? readQuizProgress(mode) : null;
+  const retrySaved = retrySnapshot?.status === "ok" ? retrySnapshot.progress : null;
+  const retryExpired = !!retrySaved && validProgress(retrySaved) && retrySaved.answers.length > 0
+    && Date.now() - retrySaved.t >= 864e5;
   const shortReveal = fresh && !!pendingFresh.wasSeen;
   justFinished = null;
   const who = fromSharedPage ? "friend" : (fresh || mine?.code === code ? "me" : "friend");
@@ -1788,8 +1835,9 @@ function renderResult(mode, code) {
       </section>
     <div style="display:grid;gap:10px;margin-top:20px">
       ${pendingFigure ? '<button class="btn sub" data-retry-self-zukan>図鑑への登録を再試行</button>' : ""}
-      ${["partial", "save_unverified", "zukan_queue_full", "state_unverified"].includes(freshSaveStatus) ? `<button class="btn sub" type="button" data-resume-result-error="${mode}">途中の回答に戻って保存を再試行</button>` : ""}
-      <a class="btn sub" data-fresh="${mode}" data-src="retry" href="#/q/${mode}">もう一度診断する</a>
+      ${retryableSave ? retryExpired ? `<p class="note" id="result-retry-status" role="status" data-result-retry-unavailable>${RESULT_RETRY_EXPIRED_TEXT}</p>`
+        : `<button class="btn sub" type="button" data-resume-result-error="${mode}" data-retry-result-progress>途中の回答に戻って保存を再試行</button>` : ""}
+      <a class="btn sub" data-fresh="${mode}" data-src="retry" href="#/q/${mode}" ${retryExpired ? 'aria-describedby="result-retry-status"' : ""}>もう一度診断する</a>
       ${["partial", "save_unverified", "saved_zukan_pending", "state_unverified", "zukan_queue_full", "attempt_changed", "already_completed_not_current", "legacy_possible_duplicate"].includes(freshSaveStatus)
         ? '<p class="note" style="margin:0">「もう一度診断する」は残っている途中の回答を消し、1問目から始めます。結果を残したい場合は先にリンクを控えてください。</p>' : ""}
       <a class="btn sub" href="#/me">この端末の記録</a>
@@ -1832,6 +1880,7 @@ function renderResult(mode, code) {
   }));
   bindFreshQuizLinks();
   bindResultErrorResumeLinks();
+  if (retryableSave && !retryExpired) scheduleResultRetryExpiry(mode, retrySnapshot);
   const retryFigureEpoch = capturePersonCardEpoch();
   $("[data-retry-self-zukan]")?.addEventListener("click", async (event) => {
     const button = event.currentTarget;
@@ -3623,6 +3672,7 @@ function route() {
   clearTopQuizExpiryTimer();
   clearPeopleEntryExpiryTimer();
   clearResultErrorExpiryTimer();
+  clearResultRetryExpiryTimer();
   // A hash navigation can beat the storage event. Check the last trusted epoch
   // before rendering a result, without acknowledging an unseen deletion.
   revokeStaleSelfView();
