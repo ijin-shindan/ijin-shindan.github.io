@@ -6,7 +6,7 @@
 .ng-stage::before { content:""; position:absolute; left:-8%; right:-8%; bottom:12%; height:22%; background:var(--scene-hill,#bddbcd); clip-path:polygon(0 60%,19% 60%,19% 34%,41% 34%,41% 52%,65% 52%,65% 24%,85% 24%,85% 48%,100% 48%,100% 100%,0 100%); }
 .ng-portrait { position:absolute; inset:3%; background-repeat:no-repeat; background-size:300% 200%; background-position:0 0; transform-origin:50% 70%; }
 .ng-buttons { display:flex; justify-content:center; gap:7px; }
-.ng-guide .ng-buttons button { min-height:36px; padding:6px 11px; border:2px solid var(--world-edge,#6b6358); border-radius:6px; background:var(--card,#fff8); color:var(--ink,#243b4a); font-family:inherit; font-size:11px; cursor:pointer; box-shadow:0 2px 0 var(--world-shadow,#6b63584a); }
+.ng-guide .ng-buttons button { min-height:44px; padding:6px 11px; border:2px solid var(--world-edge,#6b6358); border-radius:6px; background:var(--card,#fff8); color:var(--ink,#243b4a); font-family:inherit; font-size:11px; cursor:pointer; box-shadow:0 2px 0 var(--world-shadow,#6b63584a); }
 .ng-guide .ng-buttons button:disabled { opacity:.4; cursor:default; }
 .ng-guide button:focus-visible { outline:3px solid #b76531; outline-offset:3px; }
 .ng-status { display:inline-block; margin:4px 0 0; padding:0 5px; min-height:1.5em; border-radius:3px; background:var(--card,#fffdf8); font-size:10px; color:var(--ink-soft,#6b6358); }
