@@ -381,6 +381,7 @@ details p { font-size: 14px; margin: 8px 0; }
   background: var(--card); border: 1px solid var(--world-edge); border-radius: 4px; }
 .zrow h2 i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .zcells { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+@media (max-width: 284px) { .zcells { grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); } }
 .zcell { position: relative; border: 2px solid var(--world-edge); padding: 0; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--t-bg); box-shadow: 3px 3px 0 var(--world-shadow); }
 .zcell img { width: 100%; height: 100%; }
 .zcell .z-fallback { position: absolute; inset: 0; display: none; place-items: center; padding: 3px; font-size: 20px; font-weight: 900; color: #26221d; pointer-events: none; }
