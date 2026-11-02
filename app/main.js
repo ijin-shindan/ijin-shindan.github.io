@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=7bf2477-202611022022";
-import { mountMotion } from "./motion.js?v=7bf2477-202611022022";
-import { mountGuide } from "./guide.js?v=7bf2477-202611022022";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=d3ba09e-202611022037";
+import { mountMotion } from "./motion.js?v=d3ba09e-202611022037";
+import { mountGuide } from "./guide.js?v=d3ba09e-202611022037";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=7bf2477-202611022022";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7bf2477-202611022022";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=7bf2477-202611022022";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7bf2477-202611022022";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=7bf2477-202611022022";
-import { storedResultMatches, storedList } from "./stored_result.js?v=7bf2477-202611022022";
-import { clearPrefixedStorage } from "./storage_clear.js?v=7bf2477-202611022022";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=7bf2477-202611022022";
-import { applyZukanBatch } from "./zukan_batch.js?v=7bf2477-202611022022";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=d3ba09e-202611022037";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d3ba09e-202611022037";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=d3ba09e-202611022037";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d3ba09e-202611022037";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=d3ba09e-202611022037";
+import { storedResultMatches, storedList } from "./stored_result.js?v=d3ba09e-202611022037";
+import { clearPrefixedStorage } from "./storage_clear.js?v=d3ba09e-202611022037";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=d3ba09e-202611022037";
+import { applyZukanBatch } from "./zukan_batch.js?v=d3ba09e-202611022037";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=7bf2477-202611022022"), import("./other_replies.js?v=7bf2477-202611022022")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=d3ba09e-202611022037"), import("./other_replies.js?v=d3ba09e-202611022037")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=7bf2477-202611022022")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=d3ba09e-202611022037")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -73,6 +73,8 @@ const lastSharedInMemory = { normal: null, love: null };
 function track() {} // この公開版ではアクセス・診断結果を計測しない。
 let disposeGuide = () => {};
 let disposeTeaser = () => {};
+// Keep the teaser still across in-app routes; a full reload starts from the OS preference.
+let teaserSessionPaused = false;
 let disposeMotion = () => {};
 function attachMotion(name) {
   disposeMotion();
@@ -879,7 +881,8 @@ function mountTeaser(teaser, toggle) {
   const media = matchMedia("(prefers-reduced-motion: reduce)");
   const pool = pick(FREE, 12);
   let k = 0;
-  let paused = media.matches;
+  let paused = media.matches || teaserSessionPaused;
+  teaserSessionPaused = paused;
   let teaserTimer = null;
   const stopTimer = () => {
     if (teaserTimer !== null) clearTimeout(teaserTimer);
@@ -905,6 +908,7 @@ function mountTeaser(teaser, toggle) {
   const syncToggle = () => { toggle.textContent = paused ? "一言を動かす" : "一言を止める"; toggle.setAttribute("aria-pressed", String(paused)); };
   toggle.onclick = () => {
     paused = !paused;
+    teaserSessionPaused = paused;
     if (paused) stopTimer();
     syncToggle();
     if (!paused) show();
@@ -912,6 +916,7 @@ function mountTeaser(teaser, toggle) {
   const onMotionChange = () => {
     if (!media.matches) return;
     paused = true;
+    teaserSessionPaused = true;
     stopTimer();
     syncToggle();
   };
