@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=1158349-202611021828";
-import { mountMotion } from "./motion.js?v=1158349-202611021828";
-import { mountGuide } from "./guide.js?v=1158349-202611021828";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=7bf2477-202611022022";
+import { mountMotion } from "./motion.js?v=7bf2477-202611022022";
+import { mountGuide } from "./guide.js?v=7bf2477-202611022022";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1158349-202611021828";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1158349-202611021828";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1158349-202611021828";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1158349-202611021828";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1158349-202611021828";
-import { storedResultMatches, storedList } from "./stored_result.js?v=1158349-202611021828";
-import { clearPrefixedStorage } from "./storage_clear.js?v=1158349-202611021828";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1158349-202611021828";
-import { applyZukanBatch } from "./zukan_batch.js?v=1158349-202611021828";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=7bf2477-202611022022";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=7bf2477-202611022022";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=7bf2477-202611022022";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=7bf2477-202611022022";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=7bf2477-202611022022";
+import { storedResultMatches, storedList } from "./stored_result.js?v=7bf2477-202611022022";
+import { clearPrefixedStorage } from "./storage_clear.js?v=7bf2477-202611022022";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=7bf2477-202611022022";
+import { applyZukanBatch } from "./zukan_batch.js?v=7bf2477-202611022022";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=1158349-202611021828"), import("./other_replies.js?v=1158349-202611021828")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=7bf2477-202611022022"), import("./other_replies.js?v=7bf2477-202611022022")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=1158349-202611021828")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=7bf2477-202611022022")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -885,13 +885,22 @@ function mountTeaser(teaser, toggle) {
     if (teaserTimer !== null) clearTimeout(teaserTimer);
     teaserTimer = null;
   };
+  const scheduleNext = () => {
+    if (paused || document.hidden || teaserTimer !== null) return;
+    const timer = setTimeout(() => {
+      if (teaserTimer !== timer) return;
+      teaserTimer = null;
+      if (!paused && !document.hidden) show();
+    }, 5000);
+    teaserTimer = timer;
+  };
   const show = () => {
     stopTimer();
     const f = pool[k++ % pool.length];
     teaser.classList.remove("fade"); void teaser.offsetWidth; teaser.classList.add("fade");
     teaser.innerHTML = `<img class="tile" src="${avatar(f.id)}" alt="" style="${themeVars(f.type)}">
       <div><div class="who">${esc(f.name)}タイプの人は</div><div class="line">「${esc(texts[f.id].serif)}」</div><small>演出の一言・本人の発言とは限りません</small></div>`;
-    if (!paused) teaserTimer = setTimeout(show, 5000);
+    scheduleNext();
   };
   const syncToggle = () => { toggle.textContent = paused ? "一言を動かす" : "一言を止める"; toggle.setAttribute("aria-pressed", String(paused)); };
   toggle.onclick = () => {
@@ -906,12 +915,18 @@ function mountTeaser(teaser, toggle) {
     stopTimer();
     syncToggle();
   };
+  const onVisibilityChange = () => {
+    if (document.hidden) stopTimer();
+    else scheduleNext();
+  };
   media.addEventListener("change", onMotionChange);
+  document.addEventListener("visibilitychange", onVisibilityChange);
   syncToggle();
   show();
   return () => {
     stopTimer();
     media.removeEventListener("change", onMotionChange);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     toggle.onclick = null;
   };
 }
