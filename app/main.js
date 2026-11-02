@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=d3ba09e-202611022037";
-import { mountMotion } from "./motion.js?v=d3ba09e-202611022037";
-import { mountGuide } from "./guide.js?v=d3ba09e-202611022037";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=0fb9f61-202611022057";
+import { mountMotion } from "./motion.js?v=0fb9f61-202611022057";
+import { mountGuide } from "./guide.js?v=0fb9f61-202611022057";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=d3ba09e-202611022037";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d3ba09e-202611022037";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=d3ba09e-202611022037";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d3ba09e-202611022037";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=d3ba09e-202611022037";
-import { storedResultMatches, storedList } from "./stored_result.js?v=d3ba09e-202611022037";
-import { clearPrefixedStorage } from "./storage_clear.js?v=d3ba09e-202611022037";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=d3ba09e-202611022037";
-import { applyZukanBatch } from "./zukan_batch.js?v=d3ba09e-202611022037";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=0fb9f61-202611022057";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=0fb9f61-202611022057";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=0fb9f61-202611022057";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=0fb9f61-202611022057";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=0fb9f61-202611022057";
+import { storedResultMatches, storedList } from "./stored_result.js?v=0fb9f61-202611022057";
+import { clearPrefixedStorage } from "./storage_clear.js?v=0fb9f61-202611022057";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=0fb9f61-202611022057";
+import { applyZukanBatch } from "./zukan_batch.js?v=0fb9f61-202611022057";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=d3ba09e-202611022037"), import("./other_replies.js?v=d3ba09e-202611022037")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=0fb9f61-202611022057"), import("./other_replies.js?v=0fb9f61-202611022057")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=d3ba09e-202611022037")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=0fb9f61-202611022057")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -1602,12 +1602,13 @@ function refreshResultErrorEntry() {
 }
 const RESULT_RETRY_EXPIRED_TEXT = "途中の回答の期限が切れたため、この回答から保存を再試行できません。途中の答えは自動では消していません。必要なら結果リンクを控え、最初から診断してください。";
 const RESULT_RETRY_CHANGED_TEXT = "途中の記録が変わったため、この画面から保存を再試行できません。途中の答えは消していません。画面を開き直して確認してください。";
+const RESULT_RETRY_UNAVAILABLE_TEXT = "この端末の途中の記録を読み取れないため、この画面から保存を再試行できません。途中の答えは自動では消していません。画面を開き直して保存状態を確認してください。";
 let resultRetryExpiryTimer = null;
 function clearResultRetryExpiryTimer() {
   if (resultRetryExpiryTimer !== null) clearTimeout(resultRetryExpiryTimer);
   resultRetryExpiryTimer = null;
 }
-function replaceResultRetryButton(mode, message) {
+function replaceResultRetryButton(mode, message, disableFresh = false) {
   const button = app.querySelector("[data-retry-result-progress]");
   if (!button?.isConnected) return;
   const focused = document.activeElement === button;
@@ -1621,7 +1622,16 @@ function replaceResultRetryButton(mode, message) {
   button.replaceWith(note);
   const fresh = app.querySelector(`[data-fresh="${mode}"]`);
   fresh?.setAttribute("aria-describedby", `${fresh.getAttribute("aria-describedby") ?? ""} result-retry-status`.trim());
-  if (focused) fresh?.focus({ preventScroll: true });
+  if (disableFresh) {
+    const focusedFresh = document.activeElement === fresh;
+    if (fresh) {
+      fresh.disabled = true;
+      fresh.setAttribute("aria-disabled", "true");
+      fresh.textContent = "保存状態を確認できません。画面を開き直してください";
+    }
+    note.tabIndex = -1;
+    if (focused || focusedFresh) note.focus({ preventScroll: true });
+  } else if (focused) fresh?.focus({ preventScroll: true });
   window.scrollTo(0, scrollY);
 }
 function scheduleResultRetryExpiry(mode, snapshot) {
@@ -1635,7 +1645,8 @@ function scheduleResultRetryExpiry(mode, snapshot) {
     resultRetryExpiryTimer = null;
     if (location.hash !== hash) return;
     const latest = readQuizProgress(mode);
-    if (latest.status === "unavailable") return;
+    if (latest.status === "unavailable")
+      return replaceResultRetryButton(mode, RESULT_RETRY_UNAVAILABLE_TEXT, true);
     if (latest.status !== "ok" || latest.raw !== snapshot.raw)
       return replaceResultRetryButton(mode, RESULT_RETRY_CHANGED_TEXT);
     if (Date.now() < deadline) return scheduleResultRetryExpiry(mode, latest);
