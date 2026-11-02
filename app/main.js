@@ -1,31 +1,33 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=feb938a-202611020203";
-import { mountMotion } from "./motion.js?v=feb938a-202611020203";
-import { mountGuide } from "./guide.js?v=feb938a-202611020203";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=d3db60c-202611021517";
+import { mountMotion } from "./motion.js?v=d3db60c-202611021517";
+import { mountGuide } from "./guide.js?v=d3db60c-202611021517";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=feb938a-202611020203";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=feb938a-202611020203";
-import { orderOtherV1Questions, otherV1ProgressIndex } from "./other_v1.js?v=feb938a-202611020203";
-import { appendOtherReply, removeOtherReply } from "./other_replies.js?v=feb938a-202611020203";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=feb938a-202611020203";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=feb938a-202611020203";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=feb938a-202611020203";
-import { storedResultMatches, storedList } from "./stored_result.js?v=feb938a-202611020203";
-import { clearPrefixedStorage } from "./storage_clear.js?v=feb938a-202611020203";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=feb938a-202611020203";
-import { applyZukanBatch } from "./zukan_batch.js?v=feb938a-202611020203";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=d3db60c-202611021517";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d3db60c-202611021517";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=d3db60c-202611021517";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d3db60c-202611021517";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=d3db60c-202611021517";
+import { storedResultMatches, storedList } from "./stored_result.js?v=d3db60c-202611021517";
+import { clearPrefixedStorage } from "./storage_clear.js?v=d3db60c-202611021517";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=d3db60c-202611021517";
+import { applyZukanBatch } from "./zukan_batch.js?v=d3db60c-202611021517";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
+// 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
+const OTHER_PILOT = otherPilotAllowed(location.hostname);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=d3db60c-202611021517"), import("./other_replies.js?v=d3db60c-202611021517")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData(), getJSON("meta.json?v=feb938a-202611020203")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=d3db60c-202611021517")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
+    const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
-    const otherQuestions = orderOtherV1Questions(data.questions_friend.questions);
+    const otherQuestions = otherV1 ? otherV1.orderOtherV1Questions(data.questions_friend.questions) : [];
     const SD = engines.normal;
     const texts = data.texts.figures;
     const axisById = Object.fromEntries(data.axes.axes.map((a) => [a.id, a]));
@@ -38,7 +40,7 @@ async function loadInitialState() {
     const MAX_TIER = SD.plan.max_tier;
     const FREE = Object.values(SD.figures).filter((f) => f.tier <= MAX_TIER);
     const LOCKED = Object.values(SD.figures).filter((f) => f.tier > MAX_TIER);
-    return { data, meta, engines, otherQuestions, SD, texts, axisById, THEMES, MAX_TIER, FREE, LOCKED };
+    return { data, meta, engines, otherQuestions, otherV1, otherRepliesApi, SD, texts, axisById, THEMES, MAX_TIER, FREE, LOCKED };
   } catch (e) {
     window.__ijinBootErrorHandled = true;
     app.innerHTML = `<section class="card" role="alert"><h1>ページを読み込めませんでした</h1>
@@ -48,9 +50,11 @@ async function loadInitialState() {
     throw e;
   }
 }
-const { data, meta, engines, otherQuestions, SD, texts, axisById, THEMES, MAX_TIER, FREE, LOCKED } = await loadInitialState();
+const { data, meta, engines, otherQuestions, otherV1, otherRepliesApi, SD, texts, axisById, THEMES, MAX_TIER, FREE, LOCKED } = await loadInitialState();
+const otherV1ProgressIndex = otherV1?.otherV1ProgressIndex;
+const appendOtherReply = otherRepliesApi?.appendOtherReply;
+const removeOtherReply = otherRepliesApi?.removeOtherReply;
 // 他己用6軸の質問品質と補正値は未検証。公開サイトには出さず、ローカル試作だけで確認する。
-const OTHER_PILOT = otherPilotAllowed(location.hostname);
 const OTHER = { normal: "love", love: "normal" };
 const THREE_HEROES = ["oda-nobunaga", "toyotomi-hideyoshi", "tokugawa-ieyasu"];
 

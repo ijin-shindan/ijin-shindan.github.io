@@ -1,16 +1,16 @@
 公開物の中身の一覧（scripts/build_dist.py が作成）
-版番号: feb938a-202611020203
+版番号: d3db60c-202611021517
 公開先: https://ijin-shindan.github.io/app/
-ファイル数: 846（この一覧を含む）
-合計サイズ: 31.60 MB
+ファイル数: 842（この一覧を含む）
+合計サイズ: 31.59 MB
 
 主なフォルダ（ファイル数・サイズ）:
   app/og/                    201 件    25.66 MB
   app/avatars/               400 件     3.37 MB
   app/assets/                  1 件     1.68 MB
-  app/                        23 件     0.39 MB
+  app/                        20 件     0.39 MB
   app/s/                     200 件     0.25 MB
-  data/                        9 件     0.16 MB
+  data/                        8 件     0.16 MB
   app/decor/                   4 件     0.07 MB
   app/icons/                   3 件     0.01 MB
   （一番上）                        4 件     0.00 MB
@@ -434,7 +434,7 @@
   app/icons/favicon.svg  1412
   app/index.html  5162
   app/legacy_data.js  1933
-  app/main.js  260640
+  app/main.js  261080
   app/meta.json  7869
   app/motion.css  2239
   app/motion.js  11554
@@ -639,9 +639,6 @@
   app/og/normal/yoshida-shoin.png  122313
   app/og/normal/zhuge-liang.png  119759
   app/og/top.png  142799
-  app/other_partial.js  1970
-  app/other_replies.js  836
-  app/other_v1.js  1266
   app/people.js  3398
   app/s/love/akechi-mitsuhide.html  1259
   app/s/love/alexander.html  1273
@@ -846,7 +843,7 @@
   app/self_state.js  17148
   app/shared_entry.js  861
   app/shared_return.js  1497
-  app/shindan.js  8177
+  app/shindan.js  8232
   app/social.js  2971
   app/storage_clear.js  878
   app/storage_epoch.js  3666
@@ -857,7 +854,6 @@
   data/firebase.json  144
   data/plans.json  2033
   data/questions.json  5660
-  data/questions_friend.json  2997
   data/questions_love.json  6455
   data/rules.json  6121
   data/texts.json  117434
