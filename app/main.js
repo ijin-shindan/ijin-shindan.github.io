@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=d3db60c-202611021517";
-import { mountMotion } from "./motion.js?v=d3db60c-202611021517";
-import { mountGuide } from "./guide.js?v=d3db60c-202611021517";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=1158349-202611021828";
+import { mountMotion } from "./motion.js?v=1158349-202611021828";
+import { mountGuide } from "./guide.js?v=1158349-202611021828";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=d3db60c-202611021517";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d3db60c-202611021517";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=d3db60c-202611021517";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d3db60c-202611021517";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=d3db60c-202611021517";
-import { storedResultMatches, storedList } from "./stored_result.js?v=d3db60c-202611021517";
-import { clearPrefixedStorage } from "./storage_clear.js?v=d3db60c-202611021517";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=d3db60c-202611021517";
-import { applyZukanBatch } from "./zukan_batch.js?v=d3db60c-202611021517";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=1158349-202611021828";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=1158349-202611021828";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=1158349-202611021828";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=1158349-202611021828";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=1158349-202611021828";
+import { storedResultMatches, storedList } from "./stored_result.js?v=1158349-202611021828";
+import { clearPrefixedStorage } from "./storage_clear.js?v=1158349-202611021828";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=1158349-202611021828";
+import { applyZukanBatch } from "./zukan_batch.js?v=1158349-202611021828";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=d3db60c-202611021517"), import("./other_replies.js?v=d3db60c-202611021517")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=1158349-202611021828"), import("./other_replies.js?v=1158349-202611021828")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=d3db60c-202611021517")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=1158349-202611021828")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -72,6 +72,7 @@ let currentMode = "none", nextSrc = null;
 const lastSharedInMemory = { normal: null, love: null };
 function track() {} // この公開版ではアクセス・診断結果を計測しない。
 let disposeGuide = () => {};
+let disposeTeaser = () => {};
 let disposeMotion = () => {};
 function attachMotion(name) {
   disposeMotion();
@@ -874,6 +875,46 @@ function topCurrentResultsHtml(me) {
       <a class="btn sub" href="#/me">この端末の記録（自分・受け取った結果）</a>
     </div>`;
 }
+function mountTeaser(teaser, toggle) {
+  const media = matchMedia("(prefers-reduced-motion: reduce)");
+  const pool = pick(FREE, 12);
+  let k = 0;
+  let paused = media.matches;
+  let teaserTimer = null;
+  const stopTimer = () => {
+    if (teaserTimer !== null) clearTimeout(teaserTimer);
+    teaserTimer = null;
+  };
+  const show = () => {
+    stopTimer();
+    const f = pool[k++ % pool.length];
+    teaser.classList.remove("fade"); void teaser.offsetWidth; teaser.classList.add("fade");
+    teaser.innerHTML = `<img class="tile" src="${avatar(f.id)}" alt="" style="${themeVars(f.type)}">
+      <div><div class="who">${esc(f.name)}タイプの人は</div><div class="line">「${esc(texts[f.id].serif)}」</div><small>演出の一言・本人の発言とは限りません</small></div>`;
+    if (!paused) teaserTimer = setTimeout(show, 5000);
+  };
+  const syncToggle = () => { toggle.textContent = paused ? "一言を動かす" : "一言を止める"; toggle.setAttribute("aria-pressed", String(paused)); };
+  toggle.onclick = () => {
+    paused = !paused;
+    if (paused) stopTimer();
+    syncToggle();
+    if (!paused) show();
+  };
+  const onMotionChange = () => {
+    if (!media.matches) return;
+    paused = true;
+    stopTimer();
+    syncToggle();
+  };
+  media.addEventListener("change", onMotionChange);
+  syncToggle();
+  show();
+  return () => {
+    stopTimer();
+    media.removeEventListener("change", onMotionChange);
+    toggle.onclick = null;
+  };
+}
 function renderTop() {
   document.title = "世界の偉人性格診断";
   captureSelfOverview();
@@ -907,29 +948,8 @@ function renderTop() {
   scheduleTopQuizExpiry();
   disposeGuide = mountGuide($("#guide"));
   window.scrollTo(0, 0);
-  // 決め台詞は読み切れる間隔で切り替える。動きを抑える設定では静止。
-  const teaser = $(".teaser");
-  const toggle = $("[data-teaser-toggle]");
-  const pool = pick(FREE, 12);
-  let k = 0;
-  let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let teaserTimer;
-  const show = () => {
-    const f = pool[k++ % pool.length];
-    teaser.classList.remove("fade"); void teaser.offsetWidth; teaser.classList.add("fade");
-    teaser.innerHTML = `<img class="tile" src="${avatar(f.id)}" alt="" style="${themeVars(f.type)}">
-      <div><div class="who">${esc(f.name)}タイプの人は</div><div class="line">「${esc(texts[f.id].serif)}」</div><small>演出の一言・本人の発言とは限りません</small></div>`;
-    if (!paused) { teaserTimer = setTimeout(show, 5000); timers.push(teaserTimer); }
-  };
-  const syncToggle = () => { toggle.textContent = paused ? "一言を動かす" : "一言を止める"; toggle.setAttribute("aria-pressed", String(paused)); };
-  toggle.onclick = () => {
-    paused = !paused;
-    if (paused) clearTimeout(teaserTimer);
-    syncToggle();
-    if (!paused) show();
-  };
-  syncToggle();
-  show();
+  // 決め台詞は読み切れる間隔で切り替え、動きの設定変更にも追従する。
+  disposeTeaser = mountTeaser($(".teaser"), $("[data-teaser-toggle]"));
 }
 
 // ---------------- 質問 ----------------
@@ -3690,6 +3710,8 @@ function route() {
   queueMicrotask(showGlobalSelfWarning);
   disposeGuide();
   disposeGuide = () => {};
+  disposeTeaser();
+  disposeTeaser = () => {};
   disposeMotion();
   disposeMotion = () => {};
   clearTimers();
