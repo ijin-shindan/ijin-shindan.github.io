@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=0fb9f61-202611022057";
-import { mountMotion } from "./motion.js?v=0fb9f61-202611022057";
-import { mountGuide } from "./guide.js?v=0fb9f61-202611022057";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=a648ea3-202611022247";
+import { mountMotion } from "./motion.js?v=a648ea3-202611022247";
+import { mountGuide } from "./guide.js?v=a648ea3-202611022247";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=0fb9f61-202611022057";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=0fb9f61-202611022057";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=0fb9f61-202611022057";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=0fb9f61-202611022057";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=0fb9f61-202611022057";
-import { storedResultMatches, storedList } from "./stored_result.js?v=0fb9f61-202611022057";
-import { clearPrefixedStorage } from "./storage_clear.js?v=0fb9f61-202611022057";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=0fb9f61-202611022057";
-import { applyZukanBatch } from "./zukan_batch.js?v=0fb9f61-202611022057";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=a648ea3-202611022247";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=a648ea3-202611022247";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=a648ea3-202611022247";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=a648ea3-202611022247";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=a648ea3-202611022247";
+import { storedResultMatches, storedList } from "./stored_result.js?v=a648ea3-202611022247";
+import { clearPrefixedStorage } from "./storage_clear.js?v=a648ea3-202611022247";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=a648ea3-202611022247";
+import { applyZukanBatch } from "./zukan_batch.js?v=a648ea3-202611022247";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=0fb9f61-202611022057"), import("./other_replies.js?v=0fb9f61-202611022057")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=a648ea3-202611022247"), import("./other_replies.js?v=a648ea3-202611022247")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=0fb9f61-202611022057")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=a648ea3-202611022247")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -426,6 +426,7 @@ function showFreshQuizMemoryOnlyNotice(link) {
 }
 function bindFreshQuizLinks() {
   app.querySelectorAll("[data-fresh]").forEach((entry) => {
+    const inErrorEntry = app.querySelector?.("[data-error-quiz-entry]")?.contains?.(entry);
     // Starting over may delete saved answers. Make it an action instead of a
     // navigable link so a new tab cannot bypass the same-tab clear guard.
     const destination = entry.getAttribute?.("href") || `#/q/${entry.dataset.fresh}`;
@@ -441,7 +442,8 @@ function bindFreshQuizLinks() {
     }
     const mode = link.dataset.fresh;
     const epochAtView = capturePersonCardEpoch();
-    const snapshot = readQuizProgress(mode);
+    const snapshot = inErrorEntry && resultErrorEntryView?.hash === location.hash
+      && resultErrorEntryView.mode === mode ? resultErrorEntryView.snapshot : readQuizProgress(mode);
     if (snapshot.status === "invalid") {
       const label = mode === "love" ? "恋愛診断" : "性格診断";
       link.textContent = `${label}の途中記録を確認する`;
@@ -1492,8 +1494,7 @@ function fateOf(id) {
   return o ? { ...o, win: o.winner === id, other: o.winner === id ? o.loser : o.winner } : null;
 }
 
-function resultErrorQuizLinks(mode, freshText) {
-  const snapshot = readQuizProgress(mode);
+function resultErrorQuizLinks(mode, freshText, snapshot = readQuizProgress(mode)) {
   const saved = snapshot.status === "ok" && validProgress(snapshot.progress) ? snapshot.progress : null;
   const hasAnswers = !!saved?.answers.length;
   const resumable = hasAnswers && Date.now() - saved.t < 864e5
@@ -1504,8 +1505,12 @@ function resultErrorQuizLinks(mode, freshText) {
   const resumeLink = resumable ? `<button class="btn start" type="button" data-resume-result-error="${mode}">${resumeText}</button>` : "";
   return resumeLink + freshLink;
 }
+let resultErrorEntryView = null;
 function resultErrorQuizEntry(mode, freshText) {
-  return `<div data-error-quiz-entry data-mode="${mode}" data-fresh-text="${freshText}">${resultErrorQuizLinks(mode, freshText)}</div>`;
+  const snapshot = readQuizProgress(mode);
+  const links = resultErrorQuizLinks(mode, freshText, snapshot);
+  resultErrorEntryView = { hash: location.hash, mode, status: snapshot.status, raw: snapshot.raw ?? null, links, snapshot };
+  return `<div data-error-quiz-entry data-mode="${mode}" data-fresh-text="${freshText}">${links}</div>`;
 }
 function showResultResumeUnavailable(link, reason = "expired") {
   let warning = link.nextElementSibling;
@@ -1525,7 +1530,12 @@ function showResultResumeUnavailable(link, reason = "expired") {
 function bindResultErrorResumeLinks(selector = "[data-resume-result-error]", snapshots = null) {
   app.querySelectorAll(selector).forEach((link) => {
     const mode = link.dataset.resumeTop ?? link.dataset.resumeResultError;
-    const snapshotAtView = snapshots?.[mode] ?? readQuizProgress(mode);
+    const inErrorEntry = link.dataset.resumeResultError === mode
+      && app.querySelector?.("[data-error-quiz-entry]")?.contains?.(link);
+    const snapshotAtView = snapshots?.[mode]
+      ?? (inErrorEntry && resultErrorEntryView?.hash === location.hash
+        && resultErrorEntryView.mode === mode ? resultErrorEntryView.snapshot : null)
+      ?? readQuizProgress(mode);
     link.addEventListener("click", (event) => {
       if ((event.button !== undefined && event.button !== 0) || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (link.isConnected === false) return;
@@ -1587,11 +1597,19 @@ function refreshResultErrorEntry() {
   const entry = app.querySelector("[data-error-quiz-entry]");
   if (!entry) return;
   const { mode, freshText } = entry.dataset;
+  const snapshot = readQuizProgress(mode);
+  const links = resultErrorQuizLinks(mode, freshText, snapshot);
+  if (resultErrorEntryView?.hash === location.hash && resultErrorEntryView.mode === mode
+    && resultErrorEntryView.status === snapshot.status
+    && resultErrorEntryView.raw === (snapshot.raw ?? null)
+    && resultErrorEntryView.links === links
+    && !entry.querySelector("[data-result-resume-warning]")) return;
   const scrollY = window.scrollY;
   const focused = entry.contains(document.activeElement) ? document.activeElement : null;
   const focusResume = focused?.dataset?.resumeResultError === mode;
   const focusFresh = focused?.dataset?.fresh === mode;
-  entry.innerHTML = resultErrorQuizLinks(mode, freshText);
+  entry.innerHTML = links;
+  resultErrorEntryView = { hash: location.hash, mode, status: snapshot.status, raw: snapshot.raw ?? null, links, snapshot };
   bindFreshQuizLinks();
   bindResultErrorResumeLinks();
   scheduleResultErrorExpiry();
@@ -4012,6 +4030,7 @@ function refreshSelfAfterExternalChange() {
       return;
     }
   }
+  refreshResultErrorEntry();
   refreshTopQuizCtas();
   showGlobalSelfWarning();
 }
