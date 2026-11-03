@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=d55b41d-202611032154";
-import { mountMotion } from "./motion.js?v=d55b41d-202611032154";
-import { mountGuide } from "./guide.js?v=d55b41d-202611032154";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=88c3ab3-202611040209";
+import { mountMotion } from "./motion.js?v=88c3ab3-202611040209";
+import { mountGuide } from "./guide.js?v=88c3ab3-202611040209";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=d55b41d-202611032154";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=d55b41d-202611032154";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=d55b41d-202611032154";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=d55b41d-202611032154";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=d55b41d-202611032154";
-import { storedResultMatches, storedList } from "./stored_result.js?v=d55b41d-202611032154";
-import { clearPrefixedStorage } from "./storage_clear.js?v=d55b41d-202611032154";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=d55b41d-202611032154";
-import { applyZukanBatch } from "./zukan_batch.js?v=d55b41d-202611032154";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=88c3ab3-202611040209";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=88c3ab3-202611040209";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=88c3ab3-202611040209";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=88c3ab3-202611040209";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=88c3ab3-202611040209";
+import { storedResultMatches, storedList } from "./stored_result.js?v=88c3ab3-202611040209";
+import { clearPrefixedStorage } from "./storage_clear.js?v=88c3ab3-202611040209";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=88c3ab3-202611040209";
+import { applyZukanBatch } from "./zukan_batch.js?v=88c3ab3-202611040209";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=d55b41d-202611032154"), import("./other_replies.js?v=d55b41d-202611032154")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=88c3ab3-202611040209"), import("./other_replies.js?v=88c3ab3-202611040209")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=d55b41d-202611032154")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=88c3ab3-202611040209")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -1172,6 +1172,7 @@ function renderQuiz(mode, anim = false, memoryOnlyStart = false) {
 
 function renderCheckpoint(mode, n) {
   const sd = engines[mode];
+  document.title = `途中経過｜${sd.modeConf.name}`;
   const ans = Object.fromEntries(quiz.qs.map((q, k) => [q.id, quiz.answers[k]]).filter(([, v]) => v));
   const u = partialU(sd, ans);
   // 方向が相殺された回答から、補正値だけで「有力候補」を見せない。
