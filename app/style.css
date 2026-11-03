@@ -146,16 +146,16 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
   box-shadow: 5px 5px 0 var(--world-shadow); }
 .qbox.in { animation: slidein .18s ease-out; }
 .qbox.out { animation: slideout .18s ease-in both; }
-.intro { background: var(--ai-soft); color: var(--ai); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 18px; }
-.qtext { font-family: var(--sans); font-weight: 800; font-size: clamp(19px, 5vw, 22px); line-height: 1.5; margin: 0 0 14px; text-align: left; }
+.intro { background: var(--ai-soft); color: var(--ai); border-radius: 10px; padding: 10px 14px; font-size: .8125rem; margin-bottom: 18px; }
+.qtext { font-family: var(--sans); font-weight: 800; font-size: clamp(1.1875rem, 5vw, 1.375rem); line-height: 1.5; margin: 0 0 14px; text-align: left; }
 .qtext:focus { outline: 2px solid #426d91; outline-offset: 3px; border-radius: 4px; }
-.qhint { margin: 0 0 12px; color: var(--ink-soft); font-size: 14px; line-height: 1.45; }
+.qhint { margin: 0 0 12px; color: var(--ink-soft); font-size: .875rem; line-height: 1.45; }
 .quiz-save-warning { margin: 0 0 14px; padding: 10px 12px; border: 2px solid var(--shu); border-radius: 6px;
-  background: var(--shu-soft); color: var(--ink); font-size: 14px; font-weight: 700; line-height: 1.5; text-align: left; }
+  background: var(--shu-soft); color: var(--ink); font-size: .875rem; font-weight: 700; line-height: 1.5; text-align: left; }
 .checkpoint .quiz-save-warning { margin: 12px 0 16px; }
 .scale5 { display: grid; gap: 8px; }
 .dotbtn { --c: var(--ink-soft); display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 14px;
-  border: 2px solid var(--line); border-left: 7px solid var(--c); border-radius: 6px; background: var(--card); color: var(--ink); text-align: left; font-size: 15px; font-weight: 800; box-shadow: 0 3px 0 var(--line); }
+  border: 2px solid var(--line); border-left: 7px solid var(--c); border-radius: 6px; background: var(--card); color: var(--ink); text-align: left; font-size: .9375rem; font-weight: 800; box-shadow: 0 3px 0 var(--line); }
 .dotbtn i { display: block; flex: none; width: 20px; height: 20px; border: 2px solid var(--c); border-radius: 4px; }
 .dotbtn.v1 { --c: #386b9a; }
 .dotbtn.v2 { --c: #438789; }
