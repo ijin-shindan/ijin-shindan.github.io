@@ -119,6 +119,8 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: 14px; 
   padding: 4px 10px; background: var(--card); border: 2px solid var(--world-edge); border-radius: 6px; box-shadow: 3px 3px 0 var(--world-shadow); }
 .qhead .count { margin-left: auto; }
 .qhead .count b { font-weight: 800; font-size: 18px; color: var(--ink); }
+.self-qhead { font-size: .875rem; }
+.self-qhead .count b { font-size: 1.125rem; }
 .back { display: inline-flex; align-items: center; background: none; border: none; color: var(--ink-soft); padding: 8px 0; min-height: 44px; }
 .back:disabled { visibility: hidden; }
 .mystery { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--serif);
