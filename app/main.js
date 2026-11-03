@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=c40a507-202611031554";
-import { mountMotion } from "./motion.js?v=c40a507-202611031554";
-import { mountGuide } from "./guide.js?v=c40a507-202611031554";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=fcf988c-202611031756";
+import { mountMotion } from "./motion.js?v=fcf988c-202611031756";
+import { mountGuide } from "./guide.js?v=fcf988c-202611031756";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=c40a507-202611031554";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=c40a507-202611031554";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=c40a507-202611031554";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=c40a507-202611031554";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=c40a507-202611031554";
-import { storedResultMatches, storedList } from "./stored_result.js?v=c40a507-202611031554";
-import { clearPrefixedStorage } from "./storage_clear.js?v=c40a507-202611031554";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=c40a507-202611031554";
-import { applyZukanBatch } from "./zukan_batch.js?v=c40a507-202611031554";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=fcf988c-202611031756";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=fcf988c-202611031756";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=fcf988c-202611031756";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=fcf988c-202611031756";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=fcf988c-202611031756";
+import { storedResultMatches, storedList } from "./stored_result.js?v=fcf988c-202611031756";
+import { clearPrefixedStorage } from "./storage_clear.js?v=fcf988c-202611031756";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=fcf988c-202611031756";
+import { applyZukanBatch } from "./zukan_batch.js?v=fcf988c-202611031756";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=c40a507-202611031554"), import("./other_replies.js?v=c40a507-202611031554")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=fcf988c-202611031756"), import("./other_replies.js?v=fcf988c-202611031756")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=c40a507-202611031554")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=fcf988c-202611031756")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -2086,7 +2086,7 @@ function renderFriend(sd, mode, code, r, personCard = null, fromSharedPage = fal
       <p>友達から届いたリンクなら、最初にリンクを送った友達を選んで、自分の結果リンクを返してください。結果は自動では届きません。自分で開いたリンクなら操作は不要です。</p>
       <p class="social-note">送る結果リンクを知る人は、あなたの12問の答えを読み取れます。</p>
       <button class="btn start" data-return-self>${typeof navigator.share === "function" ? "自分の結果リンクを送る" : "返す文章とリンクをコピー"}</button>
-      ${typeof navigator.share !== "function" ? '<p class="social-note">コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。</p>' : ""}</section>` : ""}
+      <p class="social-note">${typeof navigator.share === "function" ? "「文章とリンクをコピーしました」と表示されたら、LINEなどの会話に貼り付けて送ってください。" : "コピーした文章とリンクは、LINEなどの会話に貼り付けて送ってください。"}</p></section>` : ""}
     <div style="display:grid;gap:8px;margin:16px 0">
       ${mine ? (past || prevLink ? "" : `<a class="btn sub" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">もう一度12問で診断する</a><p class="note" data-fresh-save-note style="margin:0">新しい結果が、この端末の現在の結果になります。</p>${compat}`) : `<a class="btn start" data-fresh="${mode}" data-src="${fromSharedPage ? "friend" : "result_link"}" href="#/q/${mode}">あなたは誰？ 12問で診断する</a>
       <p class="note" style="margin:0">答えたら自分の結果リンクを共有できます。友達から届いたなら、その友達へ返せます。</p>`}
@@ -3096,7 +3096,7 @@ function peopleOwnSharesHtml(ownShares) {
         ${ownShares.map(({ mode }, i) => { const label = mode === "love" ? "恋愛版" : "性格版"; return `
           <button class="btn ${i === 0 ? "start" : "sub"}" data-invite-self="${mode}">${typeof navigator.share === "function" ? `${label}の結果を友達に送る` : `${label}の共有文とリンクをコピー`}</button>
           <button class="btn sub" data-copy-self="${mode}">${label}の結果リンクをコピー</button>`; }).join("")}
-        ${typeof navigator.share !== "function" ? '<p class="social-note">コピーした共有文とリンクは、LINEなどの会話に貼り付けて送ってください。</p>' : ""}`
+        <p class="social-note">${typeof navigator.share === "function" ? "「文章とリンクをコピーしました」と表示されたら、LINEなどの会話に貼り付けて送ってください。" : "コピーした共有文とリンクは、LINEなどの会話に貼り付けて送ってください。"}</p>`
     : resultErrorQuizLinks("normal", "まず自分を診断する");
 }
 function bindPeopleOwnShares(ownShares) {
