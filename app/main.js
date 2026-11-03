@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=15547d8-202611031952";
-import { mountMotion } from "./motion.js?v=15547d8-202611031952";
-import { mountGuide } from "./guide.js?v=15547d8-202611031952";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=dfa3c68-202611032059";
+import { mountMotion } from "./motion.js?v=dfa3c68-202611032059";
+import { mountGuide } from "./guide.js?v=dfa3c68-202611032059";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=15547d8-202611031952";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=15547d8-202611031952";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=15547d8-202611031952";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=15547d8-202611031952";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=15547d8-202611031952";
-import { storedResultMatches, storedList } from "./stored_result.js?v=15547d8-202611031952";
-import { clearPrefixedStorage } from "./storage_clear.js?v=15547d8-202611031952";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=15547d8-202611031952";
-import { applyZukanBatch } from "./zukan_batch.js?v=15547d8-202611031952";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=dfa3c68-202611032059";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=dfa3c68-202611032059";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=dfa3c68-202611032059";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=dfa3c68-202611032059";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=dfa3c68-202611032059";
+import { storedResultMatches, storedList } from "./stored_result.js?v=dfa3c68-202611032059";
+import { clearPrefixedStorage } from "./storage_clear.js?v=dfa3c68-202611032059";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=dfa3c68-202611032059";
+import { applyZukanBatch } from "./zukan_batch.js?v=dfa3c68-202611032059";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=15547d8-202611031952"), import("./other_replies.js?v=15547d8-202611031952")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=dfa3c68-202611032059"), import("./other_replies.js?v=dfa3c68-202611032059")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=15547d8-202611031952")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=dfa3c68-202611032059")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
