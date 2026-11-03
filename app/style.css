@@ -216,7 +216,7 @@ main > .share-warning { padding: 10px 12px; border-width: 2px; font-size: .875re
 .friend-name-part { display: inline-block; max-width: 100%; overflow-wrap: anywhere; text-wrap: balance; }
 .friend-result-kind { white-space: nowrap; }
 @media (max-width: 400px) { .friend-result-kind { display: block; } }
-.friend-head .friend-origin-note { font-size: 14px; line-height: 1.55; margin: 8px 0 0; }
+.friend-head .friend-origin-note { font-size: .875rem; line-height: 1.55; margin: 8px 0 0; }
 .rcard { text-align: center; padding: 18px 16px 14px; border: 3px solid var(--world-edge); border-radius: 8px;
   background: var(--t-bg3); box-shadow: 5px 5px 0 var(--world-shadow); position: relative; overflow: hidden; }
 .rcard::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 7px; background: repeating-linear-gradient(90deg, var(--t-accent) 0 30px, color-mix(in srgb, var(--t-accent) 65%, white) 30px 60px); }
