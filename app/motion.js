@@ -44,10 +44,27 @@ function sanitizedSvg(text, label) {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const source = doc.documentElement;
   if (source.localName !== 'svg' || doc.querySelector('parsererror')) throw new Error('Invalid portrait');
-  source.querySelectorAll('script,foreignObject,iframe,animate,animateTransform,set').forEach(el => el.remove());
+  source.querySelectorAll('script,style,foreignObject,iframe,animate,animateTransform,set').forEach(el => el.remove());
   for (const el of [source,...source.querySelectorAll('*')]) {
     for (const attr of [...el.attributes]) {
-      if (/^on/i.test(attr.name) || (/href$/i.test(attr.name) && !attr.value.startsWith('#'))) el.removeAttribute(attr.name);
+      const value = attr.value.trim();
+      // CSS escapes/comments can disguise resource references from a plain regex.
+      const css = value.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\\([0-9a-f]{1,6})(?:\r\n|[\t\n\f\r ]|$)?|\\([\s\S])/gi,
+        (_match, hex, escaped) => {
+          if (hex) {
+            const codePoint = Number.parseInt(hex, 16);
+            return codePoint === 0 || codePoint > 0x10ffff ? '\ufffd' : String.fromCodePoint(codePoint);
+          }
+          return escaped ?? '';
+        });
+      const unsafeCssReference = /(?:url\s*\(|@import\b)/i.test(css);
+      const unsupportedInlineStyle = attr.name.toLowerCase() === 'style'
+        && !/^display\s*:\s*(?:inline|none)\s*;?$/i.test(value);
+      if (/^on/i.test(attr.name)
+        || attr.name.toLowerCase() === 'xml:base'
+        || (/href$/i.test(attr.name) && !value.startsWith('#'))
+        || unsafeCssReference
+        || unsupportedInlineStyle) el.removeAttribute(attr.name);
     }
   }
   const svg = document.importNode(source, true);

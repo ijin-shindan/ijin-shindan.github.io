@@ -1,29 +1,29 @@
 // 画面：トップ（#/）→ 質問（#/q/<mode>）→ 結果（#/r/<mode>/<回答>）／ 図鑑（#/zukan）
 // 結果のURLには回答（1〜5の数字の列）が入るので、そのままシェアできる。
 // 設計の根拠：docs/ui-redesign.md（デザイナー）、docs/game-design-review.md の P0（ゲーム開発者）
-import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=88c3ab3-202611040209";
-import { mountMotion } from "./motion.js?v=88c3ab3-202611040209";
-import { mountGuide } from "./guide.js?v=88c3ab3-202611040209";
+import { AXES, BATTLE_EVEN_THRESHOLD, Shindan, getJSON, loadData } from "./shindan.js?v=34d29a7-202611040624";
+import { mountMotion } from "./motion.js?v=34d29a7-202611040624";
+import { mountGuide } from "./guide.js?v=34d29a7-202611040624";
 import { SELF_KEY, LEGACY_SELF_KEYS, blankSelfState, readSelfState, initializeSelfState, armSelfClear,
-  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=88c3ab3-202611040209";
-import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=88c3ab3-202611040209";
-import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=88c3ab3-202611040209";
-import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=88c3ab3-202611040209";
-import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=88c3ab3-202611040209";
-import { storedResultMatches, storedList } from "./stored_result.js?v=88c3ab3-202611040209";
-import { clearPrefixedStorage } from "./storage_clear.js?v=88c3ab3-202611040209";
-import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=88c3ab3-202611040209";
-import { applyZukanBatch } from "./zukan_batch.js?v=88c3ab3-202611040209";
+  writeSelfState, rebaselineLegacySelfState, nextDiagnosisState, nextRestoredState, nextZukanSettledState } from "./self_state.js?v=34d29a7-202611040624";
+import { createInviteToken, validInviteToken, validFriendCode, makeFriendCode, friendAnswersFromCode, makeInviteUrl, makeReplyUrl, parseSocialHash, otherPilotAllowed } from "./social.js?v=34d29a7-202611040624";
+import { prependPersonCard, distinctCardFigures, figureSetProgress, cleanPersonCardLabel, personCardDisplayName, personCardNeedsLabel } from "./people.js?v=34d29a7-202611040624";
+import { isSharedResultEntry, sharedResultViewPath, withoutSharedResultParam } from "./shared_entry.js?v=34d29a7-202611040624";
+import { rememberSharedReturn, readSharedReturn } from "./shared_return.js?v=34d29a7-202611040624";
+import { storedResultMatches, storedList } from "./stored_result.js?v=34d29a7-202611040624";
+import { clearPrefixedStorage } from "./storage_clear.js?v=34d29a7-202611040624";
+import { readClearEpoch, compareClearEpoch, ensureClearEpoch, advanceClearEpoch } from "./storage_epoch.js?v=34d29a7-202611040624";
+import { applyZukanBatch } from "./zukan_batch.js?v=34d29a7-202611040624";
 
 window.__ijinModuleStarted = true;
 const $ = (s, el = document) => el.querySelector(s);
 const app = $("#app"), overlay = $("#overlay"), sheet = $("#sheet");
 // 公開版では起動時にOTHER設問を取得しない。ループバック試作だけ従来どおり読む。
 const OTHER_PILOT = otherPilotAllowed(location.hostname);
-const loadOtherModules = () => Promise.all([import("./other_v1.js?v=88c3ab3-202611040209"), import("./other_replies.js?v=88c3ab3-202611040209")]);
+const loadOtherModules = () => Promise.all([import("./other_v1.js?v=34d29a7-202611040624"), import("./other_replies.js?v=34d29a7-202611040624")]);
 async function loadInitialState() {
   try {
-    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=88c3ab3-202611040209")]);
+    const [data, meta] = await Promise.all([loadData("../data/", OTHER_PILOT), getJSON("meta.json?v=34d29a7-202611040624")]);
     const engines = { normal: new Shindan(data, "free", "normal"), love: new Shindan(data, "free", "love") };
     const [otherV1, otherRepliesApi] = OTHER_PILOT ? await loadOtherModules() : [null, null];
     // OTHER の設問は試験中。未較正の人物判定を実行せず、回答そのものを返す。
@@ -76,6 +76,7 @@ let disposeTeaser = () => {};
 // Keep the teaser still across in-app routes; a full reload starts from the OS preference.
 let teaserSessionPaused = false;
 let disposeMotion = () => {};
+let disposeReveal = () => {};
 function attachMotion(name) {
   disposeMotion();
   const stage = app.querySelector('.stage');
@@ -367,6 +368,9 @@ function showQuizProgressConflict(mode, invalid = false, epochAtView = capturePe
   clearTimers();
   quiz = null;
   clearQuizCursor(mode);
+  document.title = invalid
+    ? "途中記録を読み込めません｜世界の偉人性格診断"
+    : "診断の記録が変わりました｜世界の偉人性格診断";
   const openLatestQuiz = () => {
     if (location.hash === `#/q/${mode}`) renderQuiz(mode);
     else location.hash = `#/q/${mode}`;
@@ -980,6 +984,7 @@ let justFinished = null;  // 演出を出すのは、いま答え終えた結果
 let pendingGuardedResume = null;
 
 function showGuardedResumeReadFailure() {
+  document.title = "途中の記録を読み込めません｜世界の偉人性格診断";
   app.innerHTML = `<section class="card"><h1>途中の記録を今は読み込めません</h1><p>この操作では答えを消していません。トップに戻り、端末の保存設定を確認してからもう一度試してください。</p><a class="btn start" href="#/">トップへ戻る</a></section>`;
   window.scrollTo(0, 0);
   const heading = app.querySelector(".card h1");
@@ -988,6 +993,9 @@ function showGuardedResumeReadFailure() {
 }
 function showGuardedResumeExpired(expiredByTime = false) {
   const title = expiredByTime ? "途中記録の期限が切れました" : "この途中記録からは再開できません";
+  document.title = expiredByTime
+    ? "途中記録の期限切れ｜世界の偉人性格診断"
+    : "途中記録を再開できません｜世界の偉人性格診断";
   const detail = expiredByTime
     ? "最後の回答から24時間が過ぎたため、続きからは再開できません。途中の答えは消していません。トップに戻り、「保存された答えを消して最初から診断する」を押すと、新しく始められます。"
     : "途中記録の期限が切れたか、結果が保存済みです。この操作では答えを消していません。トップに戻り、端末の記録を確認してください。";
@@ -2197,12 +2205,33 @@ function renderPersonCardUnreadable(status) {
 
 // 結果が出る瞬間の演出（約5秒。どこをタップしても最後まで飛ぶ）
 function runReveal(r, mode, short, onFinish = null) {
+  disposeReveal();
+  disposeReveal = () => {};
   const sd = engines[mode];
   const card = $(".rcard"), stage = $(".stage"), lvEl = $(".meta-row .lv b");
   const jumpButton = app.querySelector("[data-result-jump]");
   const t = r.type, tl = typeLabel(t, mode);
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let done = false;
   let stopCountUp = null;
+  let detachReduceMotion = () => {};
+  const onCardClick = () => finish(true);
+  const releaseReveal = () => {
+    detachReduceMotion();
+    detachReduceMotion = () => {};
+    stopCountUp?.();
+    stopCountUp = null;
+    overlay.onclick = null;
+    card.removeEventListener?.("click", onCardClick);
+    if (disposeReveal === dispose) disposeReveal = () => {};
+  };
+  const dispose = () => {
+    if (done) return;
+    done = true;
+    releaseReveal();
+  };
+  disposeReveal = dispose;
+  const revealLater = (ms, fn) => later(ms, () => { if (!done) fn(); });
   const focusResult = () => {
     const heading = card.querySelector("h1");
     if (heading?.isConnected) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -2210,8 +2239,8 @@ function runReveal(r, mode, short, onFinish = null) {
   const finish = (skipped) => {
     if (done) return;
     done = true;
+    releaseReveal();
     clearTimers();
-    stopCountUp?.();
     const focusWasOverlay = overlay.contains(document.activeElement);
     // 演出の面には端末の安全領域を含む余白がある。隠す前に読み取る。
     const revealInsets = getComputedStyle(overlay);
@@ -2266,16 +2295,16 @@ function runReveal(r, mode, short, onFinish = null) {
     });
   };
   overlay.onclick = () => finish(true);
-  card.addEventListener("click", () => finish(true), { once: true });
+  card.addEventListener("click", onCardClick, { once: true });
   const cardPhase = (t0) => {
-    later(t0, () => { overlay.hidden = true; app.inert = false; card.classList.add("reveal"); stage.dataset.state = "sil"; focusResult(); });
-    later(t0 + 500, () => { stage.dataset.state = "color"; });
-    card.querySelectorAll(".stars .on").forEach((el, k) => { el.style.opacity = 0; later(t0 + 700 + k * 180, () => (el.style.opacity = 1)); });
-    later(t0 + 1100, () => { stopCountUp = countUp(lvEl, r.lv, 450); });
-    if (r.capped) later(t0 + 1600, () => { const lv = card.querySelector(".lv"); lv.classList.remove("capped"); void lv.offsetWidth; lv.classList.add("capped"); });
-    later(t0 + 1700, () => finish(false));
+    revealLater(t0, () => { overlay.hidden = true; app.inert = false; card.classList.add("reveal"); stage.dataset.state = "sil"; focusResult(); });
+    revealLater(t0 + 500, () => { stage.dataset.state = "color"; });
+    card.querySelectorAll(".stars .on").forEach((el, k) => { el.style.opacity = 0; revealLater(t0 + 700 + k * 180, () => (el.style.opacity = 1)); });
+    revealLater(t0 + 1100, () => { stopCountUp = countUp(lvEl, r.lv, 450); });
+    if (r.capped) revealLater(t0 + 1600, () => { const lv = card.querySelector(".lv"); lv.classList.remove("capped"); void lv.offsetWidth; lv.classList.add("capped"); });
+    revealLater(t0 + 1700, () => finish(false));
   };
-  if (short || matchMedia("(prefers-reduced-motion: reduce)").matches) { overlay.hidden = true; return cardPhase(0); }
+  if (short || reduceMotion.matches) { overlay.hidden = true; return cardPhase(0); }
   // 前半：鑑定中（暗転 → レーダーが1軸ずつ伸びる → 系統のルーレット → 系統色が広がる）
   overlay.hidden = false;
   app.inert = true;
@@ -2283,17 +2312,27 @@ function runReveal(r, mode, short, onFinish = null) {
   overlay.innerHTML = `<div><div class="msg">あなたの魂を鑑定中…</div>${radar(r.scores, { grow: true })}
     <div class="roulette">？</div><div class="tname"></div></div><button type="button" class="skip">結果を見る（演出をスキップ）</button>`;
   $(".skip", overlay).focus({ preventScroll: true });
+  const onReduceMotionChange = () => { if (reduceMotion.matches) finish(false); };
+  if (typeof reduceMotion.addEventListener === "function") {
+    reduceMotion.addEventListener("change", onReduceMotionChange);
+    detachReduceMotion = () => reduceMotion.removeEventListener("change", onReduceMotionChange);
+  } else if (typeof reduceMotion.addListener === "function") {
+    reduceMotion.addListener(onReduceMotionChange);
+    detachReduceMotion = () => reduceMotion.removeListener(onReduceMotionChange);
+  }
+  // The preference may have changed between the initial check and listener setup.
+  if (reduceMotion.matches) { finish(false); return; }
   const shape = $(".shape", overlay), rou = $(".roulette", overlay), tname = $(".tname", overlay);
   const vals = [0, 0, 0, 0, 0, 0];
-  AXES.forEach((a, k) => later(200 + k * 150, () => { vals[k] = r.scores[a]; shape.setAttribute("points", radarPoints(vals)); }));
+  AXES.forEach((a, k) => revealLater(200 + k * 150, () => { vals[k] = r.scores[a]; shape.setAttribute("points", radarPoints(vals)); }));
   const types = sd.types.filter((x) => x.unit || x.special);
   let at = 1150;
   for (let k = 0; k < 12; k++) {
     const x = k === 11 ? t : types[(k * 7 + 3) % types.length];
-    later(at, () => { rou.textContent = x.name[0]; rou.style.background = THEMES[x.id].accent; rou.style.color = "#fff"; });
+    revealLater(at, () => { rou.textContent = x.name[0]; rou.style.background = THEMES[x.id].accent; rou.style.color = "#fff"; });
     at += 60 + k * 22;
   }
-  later(at, () => { overlay.classList.add("spread"); tname.textContent = tl.name; });
+  revealLater(at, () => { overlay.classList.add("spread"); tname.textContent = tl.name; });
   cardPhase(at + 800);
 }
 function countUp(el, to, ms) {
@@ -3764,6 +3803,8 @@ function route() {
   disposeTeaser = () => {};
   disposeMotion();
   disposeMotion = () => {};
+  disposeReveal();
+  disposeReveal = () => {};
   clearTimers();
   { const [, pg, md, cd] = location.hash.split("/");
     currentMode = (pg === "q" || pg === "r" || pg === "f") && engines[md] ? md : "none";
@@ -3890,6 +3931,8 @@ function refreshSelfAfterExternalChange() {
         disposeResultShareFab = () => {};
         disposeMotion();
         disposeMotion = () => {};
+        disposeReveal();
+        disposeReveal = () => {};
         clearTimers();
         overlay.hidden = true;
         overlay.onclick = null;
